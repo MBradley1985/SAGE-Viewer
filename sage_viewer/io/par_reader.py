@@ -12,7 +12,8 @@ def parse_par(par_path: str | Path) -> SimConfig:
     are resolved relative to the par file's parent directory (the SAGE root).
     """
     par_path = Path(par_path).resolve()
-    root = par_path.parent
+    # Paths in the par file are relative to the SAGE root (parent of input/)
+    root = par_path.parent.parent
 
     raw: dict[str, str] = {}
     with open(par_path) as f:

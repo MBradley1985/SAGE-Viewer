@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from trame.app import get_server
+from trame.ui.vuetify3 import SinglePageLayout
 from trame.widgets import vuetify3 as v3
 from trame_vtk.modules.vtk import has_capabilities
+from trame_vtk.widgets.vtk import VtkRemoteView
 
 from sage_viewer.config import SimConfig
 from sage_viewer.io.par_reader import parse_par
@@ -26,11 +28,6 @@ def create_app(
     max_halos: int = 100_000,
     max_galaxies: int = 100_000,
 ):
-    """Instantiate and return a configured Trame server ready to serve.
-
-    Returns (server, scene) so the caller can start the server or inspect
-    the scene programmatically.
-    """
     config: SimConfig = parse_par(par_path)
     snap_table = SnapshotTable(config.snap_list_path)
     loader = SnapshotLoader(
@@ -57,22 +54,62 @@ def create_app(
     server = get_server(client_type="vue3")
     server.enable_module(has_capabilities)
 
-    with v3.VApp(theme="dark"):
-        build_toolbar(server, scene)
+    # Force Vuetify 3 into dark mode globally
+    server.state["$vuetify"] = {
+        "theme": {
+            "defaultTheme": "dark",
+            "themes": {
+                "dark": {
+                    "colors": {
+                        "primary": "#7c3aed",
+                        "secondary": "#06b6d4",
+                        "background": "#0a0a0f",
+                        "surface": "#111827",
+                    }
+                }
+            },
+        }
+    }
 
-        with v3.VMain():
-            with v3.VLayout(style="height:100vh;"):
-                build_layer_panel(server, scene)
+    with SinglePageLayout(server, full_height=True) as layout:
+        layout.title.set_text("SAGE-Viewer")
 
-                # PyVista render window embedded via trame-vtk
-                from trame_vtk.widgets.vtk import VtkRemoteView
-                VtkRemoteView(
-                    scene.plotter.ren_win,
-                    style="flex:1;",
-                )
+        with layout.toolbar as tb:
+            tb.density = "compact"
+            tb.color = "#1a1a2e"
+            build_toolbar(server, scene)
 
-                build_navigation_panel(server, scene)
+        with layout.content:
+            with v3.VContainer(
+                fluid=True,
+                style="height:100%;padding:0;margin:0;",
+            ):
+                with v3.VRow(no_gutters=True, style="height:100%;margin:0;"):
 
-        build_info_panel(server, scene)
+                    # Left panel — layer controls
+                    with v3.VCol(
+                        cols="auto",
+                        style="width:270px;background:#0d0d1a;overflow-y:auto;height:100%;flex-shrink:0;",
+                    ):
+                        build_layer_panel(server, scene)
+
+                    # Centre — PyVista render window
+                    with v3.VCol(style="height:100%;padding:0;flex:1;min-width:0;"):
+                        VtkRemoteView(
+                            scene.plotter.ren_win,
+                            style="height:100%;width:100%;display:block;",
+                        )
+
+                    # Right panel — navigation controls
+                    with v3.VCol(
+                        cols="auto",
+                        style="width:290px;background:#0d0d1a;overflow-y:auto;height:100%;flex-shrink:0;",
+                    ):
+                        build_navigation_panel(server, scene)
+
+        with layout.footer as footer:
+            footer.color = "#0d0d1a"
+            footer.height = 36
+            build_info_panel(server, scene)
 
     return server, scene

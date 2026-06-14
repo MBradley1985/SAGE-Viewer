@@ -83,9 +83,15 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Error: par file not found: {par_path}", file=sys.stderr)
         sys.exit(1)
 
+    print(f"\nSAGE-Viewer {__version__}")
+    print(f"Par file : {par_path.resolve()}")
+    print(f"Workers  : {args.n_jobs}")
+    print("\n[1/4] Parsing par file and snapshot table...")
+
     # Import here so CLI --help/--version are fast
     from sage_viewer.app import create_app
 
+    print("[2/4] Loading initial snapshot (haloes + galaxies)...")
     server, scene = create_app(
         par_path=par_path,
         initial_snap=args.snap,
@@ -95,12 +101,11 @@ def main(argv: list[str] | None = None) -> None:
         max_halos=args.max_halos,
         max_galaxies=args.max_galaxies,
     )
+    print("[3/4] Building scene and Trame UI...")
 
-    print(f"\nSAGE-Viewer {__version__}")
-    print(f"Par file : {par_path.resolve()}")
     print(f"Snapshot : {scene.snap_label}")
-    print(f"Workers  : {args.n_jobs}")
-    print(f"\nOpen http://localhost:{args.port} in your browser\n")
+    print(f"[4/4] Starting server on port {args.port}...")
+    print(f"\n  --> Open http://localhost:{args.port} in your browser\n")
 
     server.start(port=args.port, open_browser=False)
 

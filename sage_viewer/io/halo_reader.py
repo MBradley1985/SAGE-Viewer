@@ -109,6 +109,8 @@ def load_halo_snapshot(
         tree_dir / f"{tree_name}.{i}"
         for i in range(first_file, last_file + 1)
     ]
+    n_files = len(tree_files)
+    print(f"  Haloes: reading {n_files} tree file(s) in parallel (snap {snap_num})...")
 
     results = Parallel(n_jobs=n_jobs)(
         delayed(_read_tree_file)(tf, snap_num, mass_cut, hubble_h)
@@ -119,6 +121,7 @@ def load_halo_snapshot(
     masses_list = [r[1] for r in results if len(r[1]) > 0]
 
     if not positions_list:
+        print(f"  Haloes: none found above mass cut ({mass_cut:.1e} Msun)")
         return HaloSnapshot.empty(snap_num)
 
     positions = np.vstack(positions_list)
@@ -130,4 +133,5 @@ def load_halo_snapshot(
         positions = positions[idx]
         masses = masses[idx]
 
+    print(f"  Haloes: {len(positions):,} loaded")
     return HaloSnapshot(positions=positions, masses=masses, snap_num=snap_num)

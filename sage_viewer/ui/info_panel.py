@@ -1,24 +1,17 @@
 from __future__ import annotations
 
-import numpy as np
 from trame.widgets import vuetify3 as v3
 
 from sage_viewer.scene.scene import Scene
 
 
 def build_info_panel(server, scene: Scene) -> None:
-    """Bottom status bar showing picked-point info.
-
-    PyVista's point-pick callback fires when the user clicks a point in the
-    render window. We look up the nearest halo and galaxy and display their
-    properties.
-    """
+    """Add pick-info label to the layout footer."""
     state = server.state
-
     state.pick_info = "Click a point to inspect"
 
     def _on_pick(mesh, pid):
-        if mesh is None:
+        if mesh is None or pid is None:
             state.pick_info = "No point selected"
             return
 
@@ -26,16 +19,15 @@ def build_info_panel(server, scene: Scene) -> None:
         if pos is None:
             return
 
-        lines = [f"Position: ({pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}) Mpc/h"]
+        lines = [f"({pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}) Mpc/h"]
 
-        # Nearest halo info
         snap = scene.current_snap
         halos, galaxies = scene._loader.get(snap)
 
         if halos.count > 0:
             idx = scene.camera._halo_index.nearest(tuple(pos))
             hm = halos.masses[idx]
-            lines.append(f"Nearest halo  Mvir = {hm:.2e} Msun  (idx {idx})")
+            lines.append(f"Halo Mvir = {hm:.2e} Msun (idx {idx})")
 
         if galaxies.count > 0:
             from scipy.spatial import KDTree as _KDT
@@ -44,8 +36,7 @@ def build_info_panel(server, scene: Scene) -> None:
             ss = galaxies.ssfr[gidx]
             gt = "central" if galaxies.gal_type[gidx] == 0 else "satellite"
             lines.append(
-                f"Nearest galaxy  M* = {sm:.2e} Msun  "
-                f"sSFR = {ss:.2e} yr⁻¹  ({gt}  idx {gidx})"
+                f"Galaxy M* = {sm:.2e} Msun  sSFR = {ss:.2e} yr⁻¹  ({gt}, idx {gidx})"
             )
 
         state.pick_info = "   |   ".join(lines)
@@ -56,8 +47,10 @@ def build_info_panel(server, scene: Scene) -> None:
         show_message=False,
     )
 
-    with v3.VFooter(color="#0d0d1a", height=36):
-        v3.VLabel(
-            ("pick_info",),
-            style="font-size:0.75rem; font-family:monospace; color:#9ca3af;",
-        )
+    v3.VLabel(
+        ("pick_info",),
+        style=(
+            "font-size:0.75rem; font-family:monospace;"
+            " color:#9ca3af; padding:0 12px; line-height:36px;"
+        ),
+    )
