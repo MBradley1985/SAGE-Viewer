@@ -26,7 +26,8 @@ _RANGES = {
     "ssfr":         (-14.0, -8.0),  # log10(yr^-1)
 }
 
-_GALAXY_SIZE_BINS = [s * GALAXY_SIZE_SCALE for s in HALO_SIZE_BINS]
+_GALAXY_SIZE_BINS    = [s * GALAXY_SIZE_SCALE for s in HALO_SIZE_BINS]
+_GALAXY_GAUSSIAN_BINS = [0.5, 0.625, 0.75, 0.875, 1.0]   # render sizes for gaussian mode
 _CENTRAL_CMAP    = "Blues"
 _SATELLITE_CMAP  = "Reds"
 
@@ -37,9 +38,9 @@ class GalaxyLayer:
     def __init__(
         self,
         plotter: pv.Plotter,
-        color_mode: ColorMode = "stellar_mass",
+        color_mode: ColorMode = "density",
         colormap: str = "plasma",
-        opacity: float = 0.17,
+        opacity: float = 0.40,
         visible: bool = True,
     ) -> None:
         self._pl = plotter
@@ -144,7 +145,7 @@ class GalaxyLayer:
             self._render_by_type(snap, sizes)
         else:
             colors = self._compute_colors(snap)
-            self._render_subset(snap.positions, colors, sizes, self._colormap)
+            self._render_gaussian(snap.positions, colors, sizes, self._colormap)
 
     def _render_by_type(self, snap: GalaxySnapshot, sizes: np.ndarray) -> None:
         mass_colors = normalize_log(snap.stellar_mass, *_RANGES["stellar_mass"])
@@ -154,11 +155,11 @@ class GalaxyLayer:
         ]:
             if not np.any(mask):
                 continue
-            self._render_subset(
+            self._render_gaussian(
                 snap.positions[mask], mass_colors[mask], sizes[mask], cmap
             )
 
-    def _render_subset(
+    def _render_gaussian(
         self,
         positions: np.ndarray,
         colors: np.ndarray,
@@ -176,8 +177,9 @@ class GalaxyLayer:
                 scalars="scalar",
                 cmap=cmap,
                 clim=[0.0, 1.0],
-                point_size=_GALAXY_SIZE_BINS[i],
-                render_points_as_spheres=True,
+                style="points_gaussian",
+                point_size=_GALAXY_GAUSSIAN_BINS[i],
+                emissive=False,
                 opacity=self._opacity,
                 show_scalar_bar=False,
             )

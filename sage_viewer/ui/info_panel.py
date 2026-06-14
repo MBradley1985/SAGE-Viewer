@@ -1,23 +1,39 @@
 from __future__ import annotations
 
+import time
+
 import numpy as np
 from scipy.spatial import KDTree
 from trame.widgets import vuetify3 as v3
 
 from sage_viewer.scene.scene import Scene
 
+_DOUBLE_CLICK_THRESHOLD = 0.45   # seconds between two clicks to count as double-click
+
 
 def build_info_panel(server, scene: Scene) -> None:
-    """Footer pick-info bar + left-click galaxy selection."""
+    """Footer pick-info bar + double-click galaxy selection."""
     state = server.state
-    state.pick_info = "Left-click any point to select the nearest galaxy"
+    state.pick_info = "Double-click any point to select the nearest galaxy"
+
+    _last_click: list[float] = [0.0]
 
     def _push():
         if hasattr(server.controller, "view_update"):
             server.controller.view_update()
 
     def _on_pick(point):
-        """PyVista 0.44+ passes the 3D world-space point directly."""
+        """Fires on every left-click; only selects on a fast second click."""
+        now = time.monotonic()
+        dt, _last_click[0] = now - _last_click[0], now
+        if dt > _DOUBLE_CLICK_THRESHOLD:
+            # First click — ignore; wait for the matching second click.
+            return
+
+        # Second click fired in time — reset the timer so the next click
+        # starts a fresh double-click cycle (avoids triple-click cascades).
+        _last_click[0] = 0.0
+
         if point is None:
             return
         point = np.asarray(point, dtype=np.float64)
@@ -51,14 +67,9 @@ def build_info_panel(server, scene: Scene) -> None:
             # run outside Trame's event dispatch and need an explicit flush)
             state.flush()
 
-            # Red circle scaled to camera distance
             gpos = galaxies.positions[gidx]
-            cam_pos = np.array(scene.plotter.camera.position)
-            dist = float(np.linalg.norm(cam_pos - gpos))
-            circle_r = max(dist * 0.008, 0.02)
             scene.camera._add_circle_indicator(
-                (float(gpos[0]), float(gpos[1]), float(gpos[2])),
-                circle_r,
+                (float(gpos[0]), float(gpos[1]), float(gpos[2])), 0.0
             )
             _push()
 

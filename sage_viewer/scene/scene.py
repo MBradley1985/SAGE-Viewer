@@ -33,6 +33,9 @@ class Scene:
 
         self._plotter = pv.Plotter(off_screen=off_screen, window_size=[1600, 900])
         self._plotter.set_background("black")
+        # Allow the camera to get arbitrarily close without hitting a clipping wall.
+        # Default tolerance is 0.01 (1 % of scene diagonal ≈ 1 Mpc/h for Millennium).
+        self._plotter.renderer.SetNearClippingPlaneTolerance(0.00001)
 
         self._halo_layer   = HaloLayer(self._plotter)
         self._galaxy_layer = GalaxyLayer(self._plotter)

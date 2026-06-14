@@ -77,6 +77,7 @@ def create_app(
             tb.color = "#1a1a2e"
             build_toolbar(server, scene)
 
+
         with layout.content:
             with v3.VSheet(
                 style=(

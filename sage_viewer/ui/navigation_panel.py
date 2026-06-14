@@ -43,10 +43,28 @@ _CMAPS = [
 
 
 _HALO_CB = {
-    "mvir": ("Mvir",  "10¹⁰",  "10¹⁵ M☉"),
-    "rvir": ("Rvir",  "0.03",  "3 Mpc/h"),
-    "vvir": ("Vvir",  "30",    "1000 km/s"),
+    "mvir": ("Mvir",    "10¹⁰",  "10¹⁵ M☉"),
+    "rvir": ("Rvir",    "0.03",  "3 Mpc/h"),
+    "vvir": ("Vvir",    "30",    "1000 km/s"),
 }
+
+_GAL_CB = {
+    "stellar_mass": ("M★",      "10⁸",    "10¹²·⁵ M☉"),
+    "ssfr":         ("sSFR",    "10⁻¹⁴", "10⁻⁸ yr⁻¹"),
+    "sfr":          ("SFR",     "10⁻³",  "10² M☉/yr"),
+    "cold_gas":     ("Mgas",    "10⁷",   "10¹¹·⁵ M☉"),
+    "bulge_mass":   ("Mbulge",  "10⁷",   "10¹² M☉"),
+    "density":      ("Density", "Low",   "High"),
+    "type":         ("Type",    "Central","Satellite"),
+}
+
+_CBAR_BASE = (
+    "height:8px;width:100%;border-radius:2px;"
+    "background:"
+)
+
+def _cbar_style(gradient: str) -> str:
+    return _CBAR_BASE + gradient
 
 
 def build_navigation_panel(server, scene: Scene) -> None:
@@ -69,13 +87,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.focus_active         = False
     state.nav_active_tab       = "layers"
 
-    # Colorbar state (reflects halo layer; updated when halo mode/cmap changes)
+    # Colorbar state — full style strings to avoid Vue concatenation issues
     from sage_viewer.utils.colormap import cmap_css_gradient
-    _cb_label, _cb_min, _cb_max = _HALO_CB[scene.halo_layer.color_mode]
-    state.colorbar_gradient = cmap_css_gradient(scene.halo_layer.colormap)
-    state.colorbar_label    = _cb_label
-    state.colorbar_min      = _cb_min
-    state.colorbar_max      = _cb_max
+    _h_label, _h_min, _h_max = _HALO_CB[scene.halo_layer.color_mode]
+    _g_label, _g_min, _g_max = _GAL_CB[scene.galaxy_layer.color_mode]
+    state.halo_cbar_style = _cbar_style(cmap_css_gradient(scene.halo_layer.colormap))
+    state.halo_cbar_min   = _h_min
+    state.halo_cbar_max   = _h_max
+    state.gal_cbar_style  = _cbar_style(cmap_css_gradient(scene.galaxy_layer.colormap))
+    state.gal_cbar_min    = _g_min
+    state.gal_cbar_max    = _g_max
 
     # Layer state
     state.halos_visible     = True
@@ -122,27 +143,31 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @state.change("halo_color_mode")
     def on_halo_mode(halo_color_mode, **_):
         scene.halo_layer.color_mode = halo_color_mode
-        label, lo, hi = _HALO_CB[halo_color_mode]
-        state.colorbar_label = label
-        state.colorbar_min   = lo
-        state.colorbar_max   = hi
+        _, lo, hi = _HALO_CB[halo_color_mode]
+        state.halo_cbar_min = lo
+        state.halo_cbar_max = hi
         _push()
 
     @state.change("galaxy_color_mode")
     def on_galaxy_mode(galaxy_color_mode, **_):
         scene.galaxy_layer.color_mode = galaxy_color_mode
+        _, lo, hi = _GAL_CB[galaxy_color_mode]
+        state.gal_cbar_min = lo
+        state.gal_cbar_max = hi
         _push()
 
     @state.change("halo_colormap")
     def on_halo_cmap(halo_colormap, **_):
         scene.halo_layer.colormap = halo_colormap
         from sage_viewer.utils.colormap import cmap_css_gradient
-        state.colorbar_gradient = cmap_css_gradient(halo_colormap)
+        state.halo_cbar_style = _cbar_style(cmap_css_gradient(halo_colormap))
         _push()
 
     @state.change("galaxy_colormap")
     def on_galaxy_cmap(galaxy_colormap, **_):
         scene.galaxy_layer.colormap = galaxy_colormap
+        from sage_viewer.utils.colormap import cmap_css_gradient
+        state.gal_cbar_style = _cbar_style(cmap_css_gradient(galaxy_colormap))
         _push()
 
     # ------------------------------------------------------------------
@@ -190,6 +215,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @ctrl.set("go_to_galaxy_enter")
     def on_go_to_galaxy_enter():
         _go_to_galaxy_at_radius(float(state.nav_gal_last_radius))
+
+    @ctrl.set("clear_indicator")
+    def on_clear_indicator():
+        scene.camera._clear_indicator()
+        _push()
 
     @ctrl.set("go_to_coords")
     def on_go_to_coords():
@@ -294,8 +324,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 density="compact",
             )
             for label, value in [
-                ("Halo",   "halo"),
-                ("Galaxy", "galaxy"),
+                ("Target", "target"),
                 ("Coords", "coords"),
                 ("Box",    "box"),
             ]:
@@ -339,7 +368,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSlider(
                         v_model=("halo_opacity",), label="Opacity",
-                        min=0.0, max=0.3, step=0.005,
+                        min=0.0, max=1.0, step=0.01,
                         thumb_label="always", color="cyan", hide_details=True,
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
@@ -354,6 +383,20 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         label="Colormap", hide_details=True,
                         variant="outlined", color="cyan", density="compact",
                     )
+                with v3.VSheet(color="transparent", style="padding:4px 0 8px;"):
+                    with v3.VSheet(
+                        color="transparent",
+                        style="display:flex;align-items:center;gap:4px;",
+                    ):
+                        v3.VLabel(
+                            "{{ halo_cbar_min }}",
+                            style="font-size:0.58rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
+                        )
+                        v3.VSheet(style=("halo_cbar_style",), color="transparent")
+                        v3.VLabel(
+                            "{{ halo_cbar_max }}",
+                            style="font-size:0.58rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
+                        )
 
                 v3.VDivider(style="margin:14px 0;")
 
@@ -387,12 +430,33 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         label="Colormap", hide_details=True,
                         variant="outlined", color="deep-purple", density="compact",
                     )
+                with v3.VSheet(color="transparent", style="padding:4px 0 8px;"):
+                    with v3.VSheet(
+                        color="transparent",
+                        style="display:flex;align-items:center;gap:4px;",
+                    ):
+                        v3.VLabel(
+                            "{{ gal_cbar_min }}",
+                            style="font-size:0.58rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
+                        )
+                        v3.VSheet(style=("gal_cbar_style",), color="transparent")
+                        v3.VLabel(
+                            "{{ gal_cbar_max }}",
+                            style="font-size:0.58rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
+                        )
 
-            # Halo
+            # Target (halo + galaxy combined)
             with v3.VSheet(
                 color="transparent",
-                v_show=("nav_active_tab === 'halo'",),
+                v_show=("nav_active_tab === 'target'",),
             ):
+                v3.VLabel(
+                    "HALO",
+                    style=(
+                        "font-size:0.68rem;font-weight:700;letter-spacing:0.06em;"
+                        "color:#7c3aed;display:block;padding:4px 0 6px;"
+                    ),
+                )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     _tf("nav_halo_idx", "Halo index")
                 with v3.VSheet(color="transparent", style=_FIELD):
@@ -403,11 +467,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         density="compact", click=ctrl.go_to_halo,
                     )
 
-            # Galaxy
-            with v3.VSheet(
-                color="transparent",
-                v_show=("nav_active_tab === 'galaxy'",),
-            ):
+                v3.VDivider(style="margin:12px 0;")
+
+                v3.VLabel(
+                    "GALAXY",
+                    style=(
+                        "font-size:0.68rem;font-weight:700;letter-spacing:0.06em;"
+                        "color:#7c3aed;display:block;padding:4px 0 6px;"
+                    ),
+                )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     with v3.VForm(submit=ctrl.go_to_galaxy_enter):
                         _tf("nav_gal_idx", "Galaxy index  (Enter to go)")
@@ -433,6 +501,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             click=ctrl.go_to_galaxy_3)
                     v3.VBtn("5", style="flex:1;", color="deep-purple",
                             click=ctrl.go_to_galaxy_5)
+
+                v3.VDivider(style="margin:14px 0 10px;")
+
+                v3.VBtn(
+                    "Clear Indicator",
+                    block=True, variant="outlined",
+                    color="red", density="compact",
+                    prepend_icon="mdi-close-circle-outline",
+                    click=ctrl.clear_indicator,
+                )
 
             # Coords
             with v3.VSheet(

@@ -17,6 +17,8 @@ _RANGES = {
     "vvir": (1.5, 3.0),     # log10(km/s)
 }
 
+_HALO_GAUSSIAN_BINS = [3.5, 3.625, 3.75, 3.875, 4.0]
+
 
 class HaloLayer:
     """Manages the halo point-cloud actor(s) inside a PyVista Plotter."""
@@ -25,8 +27,8 @@ class HaloLayer:
         self,
         plotter: pv.Plotter,
         color_mode: ColorMode = "mvir",
-        colormap: str = "Blues",
-        opacity: float = 0.025,
+        colormap: str = "viridis",
+        opacity: float = 0.10,
         visible: bool = True,
     ) -> None:
         self._pl = plotter
@@ -125,20 +127,29 @@ class HaloLayer:
 
         colors = self._compute_colors(snap)
         sizes  = halo_point_sizes(snap.masses)
-        masks  = size_bin_mask(sizes, HALO_SIZE_BINS)
 
+        self._render_gaussian(snap.positions, colors, sizes)
+
+    def _render_gaussian(
+        self,
+        positions: np.ndarray,
+        colors: np.ndarray,
+        sizes: np.ndarray,
+    ) -> None:
+        masks = size_bin_mask(sizes, HALO_SIZE_BINS)
         for i, mask in enumerate(masks):
             if not np.any(mask):
                 continue
-            cloud = pv.PolyData(snap.positions[mask])
+            cloud = pv.PolyData(positions[mask])
             cloud["scalar"] = colors[mask]
             actor = self._pl.add_mesh(
                 cloud,
                 scalars="scalar",
                 cmap=self._colormap,
                 clim=[0.0, 1.0],
-                point_size=HALO_SIZE_BINS[i],
-                render_points_as_spheres=True,
+                style="points_gaussian",
+                point_size=_HALO_GAUSSIAN_BINS[i],
+                emissive=False,
                 opacity=self._opacity,
                 show_scalar_bar=False,
             )
