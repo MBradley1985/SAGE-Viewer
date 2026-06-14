@@ -62,6 +62,14 @@ def mini_hdf5_path(tmp_path_factory) -> Path:
                 data=rng.uniform(0.1, 10.0, n).astype(np.float32),
             )
             grp.create_dataset(
+                "BulgeMass",
+                data=rng.uniform(0.0, 0.3, n).astype(np.float32),
+            )
+            grp.create_dataset(
+                "ColdGas",
+                data=rng.uniform(0.0, 0.5, n).astype(np.float32),
+            )
+            grp.create_dataset(
                 "SfrDisk",
                 data=rng.uniform(0.0, 0.01, n).astype(np.float32),
             )

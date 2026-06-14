@@ -10,10 +10,13 @@ import numpy as np
 @dataclass
 class GalaxySnapshot:
     positions: np.ndarray     # (N, 3) float32, Mpc/h
-    stellar_mass: np.ndarray  # (N,) float32, Msun
-    mvir: np.ndarray          # (N,) float32, 10^10 Msun/h (raw units)
-    ssfr: np.ndarray          # (N,) float32, yr^-1
-    gal_type: np.ndarray      # (N,) int32, 0=central 1+=satellite
+    stellar_mass: np.ndarray  # (N,)   float32, Msun
+    mvir: np.ndarray          # (N,)   float32, 10^10 Msun/h (raw)
+    sfr: np.ndarray           # (N,)   float32, Msun/yr
+    ssfr: np.ndarray          # (N,)   float32, yr^-1
+    cold_gas: np.ndarray      # (N,)   float32, Msun
+    bulge_mass: np.ndarray    # (N,)   float32, Msun
+    gal_type: np.ndarray      # (N,)   int32, 0=central 1+=satellite
     snap_num: int
 
     @property
@@ -22,11 +25,11 @@ class GalaxySnapshot:
 
     @classmethod
     def empty(cls, snap_num: int) -> "GalaxySnapshot":
+        z = np.empty(0, dtype=np.float32)
         return cls(
             positions=np.empty((0, 3), dtype=np.float32),
-            stellar_mass=np.empty(0, dtype=np.float32),
-            mvir=np.empty(0, dtype=np.float32),
-            ssfr=np.empty(0, dtype=np.float32),
+            stellar_mass=z, mvir=z, sfr=z, ssfr=z,
+            cold_gas=z, bulge_mass=z,
             gal_type=np.empty(0, dtype=np.int32),
             snap_num=snap_num,
         )
@@ -64,26 +67,30 @@ def load_galaxy_snapshot(
             return np.array(grp[field])
 
         try:
-            posx = _get("Posx")
-            posy = _get("Posy")
-            posz = _get("Posz")
-            stellar_mass_raw = _get("StellarMass")
-            mvir_raw = _get("Mvir")
-            sfr_disk = _get("SfrDisk")
-            sfr_bulge = _get("SfrBulge")
-            gal_type = _get("Type").astype(np.int32)
+            posx          = _get("Posx")
+            posy          = _get("Posy")
+            posz          = _get("Posz")
+            stellar_raw   = _get("StellarMass")
+            bulge_raw     = _get("BulgeMass")
+            cold_gas_raw  = _get("ColdGas")
+            mvir_raw      = _get("Mvir")
+            sfr_disk      = _get("SfrDisk")
+            sfr_bulge     = _get("SfrBulge")
+            gal_type      = _get("Type").astype(np.int32)
         except KeyError as e:
             raise KeyError(
                 f"Missing field {e} in {hdf5_path}:{group_key}"
             ) from e
 
-    # Unit conversions: StellarMass / Mvir stored as 10^10 Msun/h
-    stellar_mass = stellar_mass_raw.astype(np.float32) * 1.0e10 / hubble_h
-    sfr = (sfr_disk + sfr_bulge).astype(np.float32)
-    # sSFR in yr^-1; guard against zero mass
-    ssfr = sfr / np.where(stellar_mass > 0, stellar_mass, np.inf)
+    # All mass fields stored as 10^10 Msun/h → convert to Msun
+    f = 1.0e10 / hubble_h
+    stellar_mass = stellar_raw.astype(np.float32) * f
+    bulge_mass   = bulge_raw.astype(np.float32) * f
+    cold_gas     = cold_gas_raw.astype(np.float32) * f
+    sfr          = (sfr_disk + sfr_bulge).astype(np.float32)
+    ssfr         = sfr / np.where(stellar_mass > 0, stellar_mass, np.inf)
 
-    mask = (stellar_mass > min_stellar_mass) & (mvir_raw > 0)
+    mask    = (stellar_mass > min_stellar_mass) & (mvir_raw > 0)
     indices = np.where(mask)[0]
 
     if len(indices) > max_galaxies:
@@ -99,7 +106,10 @@ def load_galaxy_snapshot(
         positions=positions,
         stellar_mass=stellar_mass[indices],
         mvir=mvir_raw[indices].astype(np.float32),
+        sfr=sfr[indices],
         ssfr=ssfr[indices],
+        cold_gas=cold_gas[indices],
+        bulge_mass=bulge_mass[indices],
         gal_type=gal_type[indices],
         snap_num=snap_num,
     )

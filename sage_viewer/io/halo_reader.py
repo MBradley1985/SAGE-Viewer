@@ -31,10 +31,28 @@ HALO_DTYPE = np.dtype([
 ])
 
 
+_RHOCRIT0 = 27.75  # critical density at z=0, units: 10^10 Msun/h per (Mpc/h)^3
+_DELTA    = 200.0  # virial overdensity
+
+
+def _compute_rvir(mvir_tree: np.ndarray) -> np.ndarray:
+    """Rvir in Mpc/h from Mvir in 10^10 Msun/h (z=0 approximation)."""
+    return (mvir_tree / (4.0 / 3.0 * np.pi * _DELTA * _RHOCRIT0)) ** (1.0 / 3.0)
+
+
+def _compute_vvir(rvir: np.ndarray) -> np.ndarray:
+    """Vvir in km/s from Rvir in Mpc/h (z=0, H0=100h km/s/(Mpc/h))."""
+    # Vvir^2 = 50 * H0^2 * Rvir^2  with H0=100 km/s/(Mpc/h)
+    return np.sqrt(50.0) * 100.0 * rvir
+
+
 @dataclass
 class HaloSnapshot:
     positions: np.ndarray   # (N, 3) float32, Mpc/h
-    masses: np.ndarray      # (N,) float32, Msun
+    masses: np.ndarray      # (N,)   float32, Msun
+    vmax: np.ndarray        # (N,)   float32, km/s
+    rvir: np.ndarray        # (N,)   float32, Mpc/h  (computed from Mvir)
+    vvir: np.ndarray        # (N,)   float32, km/s   (computed from Rvir)
     snap_num: int
 
     @property
@@ -43,9 +61,10 @@ class HaloSnapshot:
 
     @classmethod
     def empty(cls, snap_num: int) -> "HaloSnapshot":
+        z = np.empty(0, dtype=np.float32)
         return cls(
             positions=np.empty((0, 3), dtype=np.float32),
-            masses=np.empty(0, dtype=np.float32),
+            masses=z, vmax=z, rvir=z, vvir=z,
             snap_num=snap_num,
         )
 
@@ -77,9 +96,16 @@ def _read_tree_file(
         return np.empty((0, 3), dtype=np.float32), np.empty(0, dtype=np.float32)
 
     # Mvir in tree files is in units of 1e10 Msun/h
-    masses = halos["Mvir"].astype(np.float32) * 1.0e10 / hubble_h
+    mvir_tree = halos["Mvir"].astype(np.float32)          # 10^10 Msun/h
+    masses    = mvir_tree * 1.0e10 / hubble_h              # Msun
     mass_mask = masses > mass_cut_msun
-    return halos["Pos"][mass_mask], masses[mass_mask]
+    return (
+        halos["Pos"][mass_mask],
+        masses[mass_mask],
+        halos["Vmax"].astype(np.float32)[mass_mask],
+        _compute_rvir(mvir_tree[mass_mask]),
+        _compute_vvir(_compute_rvir(mvir_tree[mass_mask])),
+    )
 
 
 def load_halo_snapshot(
@@ -112,26 +138,34 @@ def load_halo_snapshot(
     n_files = len(tree_files)
     print(f"  Haloes: reading {n_files} tree file(s) in parallel (snap {snap_num})...")
 
-    results = Parallel(n_jobs=n_jobs)(
+    # prefer="threads": file I/O releases the GIL so threads are fully parallel
+    # and avoid the semaphore / mmap leak that loky process pools produce
+    results = Parallel(n_jobs=n_jobs, prefer="threads")(
         delayed(_read_tree_file)(tf, snap_num, mass_cut, hubble_h)
         for tf in tree_files
     )
 
-    positions_list = [r[0] for r in results if len(r[0]) > 0]
-    masses_list = [r[1] for r in results if len(r[1]) > 0]
-
-    if not positions_list:
+    results = [r for r in results if len(r[0]) > 0]
+    if not results:
         print(f"  Haloes: none found above mass cut ({mass_cut:.1e} Msun)")
         return HaloSnapshot.empty(snap_num)
 
-    positions = np.vstack(positions_list)
-    masses = np.concatenate(masses_list)
+    positions = np.vstack([r[0] for r in results])
+    masses    = np.concatenate([r[1] for r in results])
+    vmax      = np.concatenate([r[2] for r in results])
+    rvir      = np.concatenate([r[3] for r in results])
+    vvir      = np.concatenate([r[4] for r in results])
 
     if len(positions) > max_halos:
         rng = np.random.default_rng(42)
         idx = rng.choice(len(positions), max_halos, replace=False)
-        positions = positions[idx]
-        masses = masses[idx]
+        positions, masses, vmax, rvir, vvir = (
+            positions[idx], masses[idx], vmax[idx], rvir[idx], vvir[idx]
+        )
 
     print(f"  Haloes: {len(positions):,} loaded")
-    return HaloSnapshot(positions=positions, masses=masses, snap_num=snap_num)
+    return HaloSnapshot(
+        positions=positions, masses=masses,
+        vmax=vmax, rvir=rvir, vvir=vvir,
+        snap_num=snap_num,
+    )

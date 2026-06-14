@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import threading
-import time
 from typing import Callable
 
 import pyvista as pv
@@ -15,9 +13,10 @@ from sage_viewer.scene.halo_layer import HaloLayer
 
 
 class Scene:
-    """Top-level owner of the PyVista plotter, data layers, and playback state.
+    """Owner of the PyVista plotter, data layers, and snapshot state.
 
-    Wired up by app.py and driven by Trame UI callbacks.
+    Playback animation is driven externally by the Trame async event loop
+    (see toolbar.py) so that all VTK calls stay on the main thread.
     """
 
     def __init__(
@@ -35,28 +34,22 @@ class Scene:
         self._plotter = pv.Plotter(off_screen=off_screen, window_size=[1600, 900])
         self._plotter.set_background("black")
 
-        self._halo_layer = HaloLayer(self._plotter)
+        self._halo_layer   = HaloLayer(self._plotter)
         self._galaxy_layer = GalaxyLayer(self._plotter)
-        self._camera = CameraController(self._plotter, config.box_size)
+        self._camera       = CameraController(self._plotter, config.box_size)
 
         self._current_snap: int = (
-            initial_snap
-            if initial_snap is not None
-            else snap_table.count - 1
+            initial_snap if initial_snap is not None else snap_table.count - 1
         )
-        self._playing = False
-        self._play_fps: float = 5.0
-        self._play_thread: threading.Thread | None = None
 
-        # Callbacks registered by the UI to receive state updates
         self._on_snap_change: list[Callable[[int], None]] = []
+        self._focus_region: dict | None = None   # stores last zoom params for re-masking
 
-        # Load the initial snapshot
         self.set_snapshot(self._current_snap)
         self._camera.reset()
 
     # ------------------------------------------------------------------
-    # Layer access
+    # Layer / plotter access
     # ------------------------------------------------------------------
 
     @property
@@ -84,12 +77,11 @@ class Scene:
         return self._snap_table.label(self._current_snap)
 
     # ------------------------------------------------------------------
-    # Snapshot control
+    # Snapshot control  (always called from main / Trame event-loop thread)
     # ------------------------------------------------------------------
 
     def set_snapshot(self, snap_num: int) -> None:
-        snap_num = int(snap_num)
-        snap_num = max(0, min(snap_num, self._snap_table.count - 1))
+        snap_num = max(0, min(int(snap_num), self._snap_table.count - 1))
         self._current_snap = snap_num
 
         halos, galaxies = self._loader.get(snap_num)
@@ -98,46 +90,80 @@ class Scene:
         self._camera.update_halo_index(halos.positions)
         self._camera.update_galaxy_positions(galaxies.positions)
 
+        # Re-apply any active focus mask to the new snapshot data
+        if self._focus_region is not None:
+            self._apply_focus_masks(halos.positions, galaxies.positions)
+
         for cb in self._on_snap_change:
             cb(snap_num)
 
-    def next_snapshot(self) -> None:
-        next_s = (self._current_snap + 1) % self._snap_table.count
-        self.set_snapshot(next_s)
-
-    def prev_snapshot(self) -> None:
-        prev_s = (self._current_snap - 1) % self._snap_table.count
-        self.set_snapshot(prev_s)
-
     # ------------------------------------------------------------------
-    # Playback
+    # Focus / spatial masking
     # ------------------------------------------------------------------
 
-    def play(self, fps: float = 5.0) -> None:
-        if self._playing:
+    def set_focus_box(
+        self,
+        xmin: float, xmax: float,
+        ymin: float, ymax: float,
+        zmin: float, zmax: float,
+    ) -> None:
+        self._focus_region = dict(type="box", xmin=xmin, xmax=xmax,
+                                  ymin=ymin, ymax=ymax, zmin=zmin, zmax=zmax)
+        halos, galaxies = self._loader.get(self._current_snap)
+        self._apply_focus_masks(halos.positions, galaxies.positions)
+
+    def set_focus_sphere(
+        self,
+        center: tuple[float, float, float],
+        radius: float,
+    ) -> None:
+        self._focus_region = dict(type="sphere", center=center, radius=radius)
+        halos, galaxies = self._loader.get(self._current_snap)
+        self._apply_focus_masks(halos.positions, galaxies.positions)
+
+    def clear_focus(self) -> None:
+        self._focus_region = None
+        self._halo_layer.set_mask(None)
+        self._galaxy_layer.set_mask(None)
+
+    def _apply_focus_masks(
+        self,
+        halo_pos: "np.ndarray",
+        gal_pos: "np.ndarray",
+    ) -> None:
+        import numpy as np
+        r = self._focus_region
+        if r is None:
             return
-        self._playing = True
-        self._play_fps = fps
-        self._play_thread = threading.Thread(
-            target=self._play_loop, daemon=True
-        )
-        self._play_thread.start()
+        if r["type"] == "box":
+            def _box_mask(pos):
+                if len(pos) == 0:
+                    return np.array([], dtype=bool)
+                return (
+                    (pos[:, 0] >= r["xmin"]) & (pos[:, 0] <= r["xmax"]) &
+                    (pos[:, 1] >= r["ymin"]) & (pos[:, 1] <= r["ymax"]) &
+                    (pos[:, 2] >= r["zmin"]) & (pos[:, 2] <= r["zmax"])
+                )
+            self._halo_layer.set_mask(_box_mask(halo_pos))
+            self._galaxy_layer.set_mask(_box_mask(gal_pos))
+        elif r["type"] == "sphere":
+            cx, cy, cz = r["center"]
+            rad = r["radius"]
+            def _sphere_mask(pos):
+                if len(pos) == 0:
+                    return np.array([], dtype=bool)
+                return np.linalg.norm(pos - np.array([cx, cy, cz]), axis=1) <= rad
+            self._halo_layer.set_mask(_sphere_mask(halo_pos))
+            self._galaxy_layer.set_mask(_sphere_mask(gal_pos))
 
-    def pause(self) -> None:
-        self._playing = False
+    def next_snap_num(self) -> int:
+        return (self._current_snap + 1) % self._snap_table.count
 
-    def stop(self) -> None:
-        self._playing = False
-        self.set_snapshot(self._snap_table.count - 1)
-
-    def _play_loop(self) -> None:
-        interval = 1.0 / max(self._play_fps, 0.1)
-        while self._playing:
-            self.next_snapshot()
-            time.sleep(interval)
+    def prev_snap_num(self) -> int:
+        return (self._current_snap - 1) % self._snap_table.count
 
     # ------------------------------------------------------------------
-    # UI callbacks
+    # Callbacks
     # ------------------------------------------------------------------
 
     def register_snap_change_callback(self, cb: Callable[[int], None]) -> None:
@@ -148,6 +174,5 @@ class Scene:
     # ------------------------------------------------------------------
 
     def close(self) -> None:
-        self._playing = False
         self._loader.shutdown()
         self._plotter.close()

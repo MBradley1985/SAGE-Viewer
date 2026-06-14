@@ -80,32 +80,44 @@ def create_app(
             build_toolbar(server, scene)
 
         with layout.content:
-            with v3.VContainer(
-                fluid=True,
-                style="height:100%;padding:0;margin:0;",
+            # Plain flexbox row — avoids Vuetify grid padding/margin quirks
+            with v3.VSheet(
+                style=(
+                    "display:flex;flex-direction:row;"
+                    "height:100%;width:100%;"
+                    "overflow:hidden;"
+                ),
+                rounded=False,
+                elevation=0,
+                color="#0a0a0f",
             ):
-                with v3.VRow(no_gutters=True, style="height:100%;margin:0;"):
+                # Left panel — layer controls
+                with v3.VSheet(
+                    style="width:270px;flex-shrink:0;overflow-y:auto;height:100%;",
+                    color="#0d0d1a",
+                    rounded=False,
+                    elevation=0,
+                ):
+                    build_layer_panel(server, scene)
 
-                    # Left panel — layer controls
-                    with v3.VCol(
-                        cols="auto",
-                        style="width:270px;background:#0d0d1a;overflow-y:auto;height:100%;flex-shrink:0;",
-                    ):
-                        build_layer_panel(server, scene)
+                # Centre — PyVista render window, fills remaining space
+                view = VtkRemoteView(
+                    scene.plotter.ren_win,
+                    style="flex:1;height:100%;display:block;min-width:0;",
+                    interactive_ratio=1,      # full resolution during mouse interaction
+                    interactive_quality=85,   # JPEG quality during interaction
+                    still_quality=100,        # full quality when still
+                )
+                server.controller.view_update = view.update
 
-                    # Centre — PyVista render window
-                    with v3.VCol(style="height:100%;padding:0;flex:1;min-width:0;"):
-                        VtkRemoteView(
-                            scene.plotter.ren_win,
-                            style="height:100%;width:100%;display:block;",
-                        )
-
-                    # Right panel — navigation controls
-                    with v3.VCol(
-                        cols="auto",
-                        style="width:290px;background:#0d0d1a;overflow-y:auto;height:100%;flex-shrink:0;",
-                    ):
-                        build_navigation_panel(server, scene)
+                # Right panel — navigation controls
+                with v3.VSheet(
+                    style="width:290px;flex-shrink:0;overflow-y:auto;height:100%;",
+                    color="#0d0d1a",
+                    rounded=False,
+                    elevation=0,
+                ):
+                    build_navigation_panel(server, scene)
 
         with layout.footer as footer:
             footer.color = "#0d0d1a"

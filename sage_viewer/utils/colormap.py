@@ -10,6 +10,16 @@ STELLAR_MASS_RANGE = (8.0, 12.5)     # log10(Msun)
 SSFR_RANGE = (-14.0, -8.0)           # log10(yr^-1)
 
 
+def normalize_log(
+    values: np.ndarray,
+    vmin: float,
+    vmax: float,
+) -> np.ndarray:
+    """Generic log10 normalisation to [0, 1]."""
+    log_v = np.log10(np.maximum(values, 1e-30))
+    return np.clip((log_v - vmin) / (vmax - vmin + 1e-10), 0.0, 1.0).astype(np.float32)
+
+
 def normalize_log_mass(
     mass: np.ndarray,
     vmin: float = STELLAR_MASS_RANGE[0],

@@ -5,6 +5,10 @@ import pyvista as pv
 
 from sage_viewer.utils.kdtree import NearestHaloIndex
 
+_INDICATOR_COLOR   = "#888888"
+_INDICATOR_OPACITY = 0.35
+_INDICATOR_WIDTH   = 1.5
+
 
 class CameraController:
     """High-level camera operations on top of a PyVista Plotter.
@@ -17,6 +21,7 @@ class CameraController:
         self._box_size = box_size
         self._halo_index: NearestHaloIndex = NearestHaloIndex()
         self._galaxy_positions: np.ndarray | None = None
+        self._indicator_actor = None
 
     # ------------------------------------------------------------------
     # Index updates (called by Scene on snapshot change)
@@ -30,16 +35,74 @@ class CameraController:
         self._galaxy_positions = positions
 
     # ------------------------------------------------------------------
+    # Zoom indicators
+    # ------------------------------------------------------------------
+
+    def _clear_indicator(self) -> None:
+        if self._indicator_actor is not None:
+            self._pl.remove_actor(self._indicator_actor)
+            self._indicator_actor = None
+
+    def _add_box_indicator(
+        self,
+        xmin: float, xmax: float,
+        ymin: float, ymax: float,
+        zmin: float, zmax: float,
+    ) -> None:
+        self._clear_indicator()
+        box = pv.Box(bounds=(xmin, xmax, ymin, ymax, zmin, zmax))
+        self._indicator_actor = self._pl.add_mesh(
+            box.extract_all_edges(),
+            color=_INDICATOR_COLOR,
+            opacity=_INDICATOR_OPACITY,
+            line_width=_INDICATOR_WIDTH,
+            render_lines_as_tubes=False,
+        )
+
+    def _add_sphere_indicator(
+        self,
+        center: tuple[float, float, float],
+        radius: float,
+    ) -> None:
+        self._clear_indicator()
+        sphere = pv.Sphere(radius=radius, center=center, theta_resolution=16, phi_resolution=16)
+        self._indicator_actor = self._pl.add_mesh(
+            sphere,
+            color=_INDICATOR_COLOR,
+            opacity=_INDICATOR_OPACITY,
+            style="wireframe",
+            line_width=_INDICATOR_WIDTH,
+        )
+
+    def _add_point_indicator(
+        self,
+        center: tuple[float, float, float],
+        radius: float = 1.0,
+    ) -> None:
+        """Small sphere marking a specific halo or galaxy position."""
+        self._clear_indicator()
+        sphere = pv.Sphere(radius=radius, center=center, theta_resolution=12, phi_resolution=12)
+        self._indicator_actor = self._pl.add_mesh(
+            sphere,
+            color=_INDICATOR_COLOR,
+            opacity=_INDICATOR_OPACITY,
+            style="wireframe",
+            line_width=_INDICATOR_WIDTH,
+        )
+
+    # ------------------------------------------------------------------
     # Navigation
     # ------------------------------------------------------------------
 
     def reset(self) -> None:
-        """Fit the full simulation box in view."""
+        """Fit the full simulation box in view, centred on the box midpoint."""
+        self._clear_indicator()
         half = self._box_size / 2.0
-        self._pl.camera.focal_point = (half, half, half)
-        self._pl.camera.position = (half, half, self._box_size * 2.5)
-        self._pl.camera.up = (0.0, 1.0, 0.0)
-        self._pl.reset_camera()
+        self._pl.camera_position = [
+            (half, half, self._box_size * 2.2),
+            (half, half, half),
+            (0.0, 1.0, 0.0),
+        ]
 
     def go_to_coords(
         self,
@@ -49,14 +112,19 @@ class CameraController:
         distance: float = 5.0,
     ) -> None:
         """Point camera at (x, y, z) from a given standoff distance."""
+        self._clear_indicator()
         self._pl.camera.focal_point = (x, y, z)
-        self._pl.camera.position = (x, y, z + distance)
-        self._pl.camera.up = (0.0, 1.0, 0.0)
+        self._pl.camera.position    = (x, y, z + distance)
+        self._pl.camera.up          = (0.0, 1.0, 0.0)
 
     def go_to_halo(self, halo_idx: int, distance: float = 5.0) -> None:
-        """Fly to the halo at index halo_idx in the current snapshot."""
+        """Fly to the halo at halo_idx and show a small sphere indicator."""
         pos = self._halo_index.position_of(halo_idx)
-        self.go_to_coords(float(pos[0]), float(pos[1]), float(pos[2]), distance)
+        cx, cy, cz = float(pos[0]), float(pos[1]), float(pos[2])
+        self._pl.camera.focal_point = (cx, cy, cz)
+        self._pl.camera.position    = (cx, cy, cz + distance)
+        self._pl.camera.up          = (0.0, 1.0, 0.0)
+        self._add_point_indicator((cx, cy, cz), radius=distance * 0.08)
 
     def go_to_nearest_halo(
         self,
@@ -65,44 +133,55 @@ class CameraController:
         z: float,
         distance: float = 5.0,
     ) -> int:
-        """Fly to the halo nearest to the given coordinates. Returns its index."""
         idx = self._halo_index.nearest((x, y, z))
         self.go_to_halo(idx, distance)
         return idx
 
-    def go_to_galaxy(self, galaxy_idx: int, distance: float = 2.0) -> None:
-        """Fly to the galaxy at index galaxy_idx in the current snapshot."""
+    def go_to_galaxy(self, galaxy_idx: int, radius: float = 3.0) -> tuple:
+        """Fly to galaxy_idx with standoff = radius; show a wireframe sphere.
+
+        Returns (cx, cy, cz) so callers can apply a focus sphere.
+        """
         if self._galaxy_positions is None or len(self._galaxy_positions) == 0:
-            return
+            return (0.0, 0.0, 0.0)
         pos = self._galaxy_positions[galaxy_idx]
-        self.go_to_coords(float(pos[0]), float(pos[1]), float(pos[2]), distance)
+        cx, cy, cz = float(pos[0]), float(pos[1]), float(pos[2])
+        fov_rad  = np.deg2rad(self._pl.camera.view_angle)
+        distance = radius / np.tan(fov_rad / 2.0) * 1.2
+        self._pl.camera.focal_point = (cx, cy, cz)
+        self._pl.camera.position    = (cx, cy, cz + distance)
+        self._pl.camera.up          = (0.0, 1.0, 0.0)
+        self._add_sphere_indicator((cx, cy, cz), radius)
+        return (cx, cy, cz)
 
     def zoom_to_radius(
         self,
         center: tuple[float, float, float],
         radius: float,
     ) -> None:
-        """Frame a sphere of the given radius centred at center."""
+        """Frame a sphere of the given radius and draw a wireframe sphere indicator."""
         cx, cy, cz = center
-        self._pl.camera.focal_point = center
-        # Stand back far enough that the sphere fills roughly 60 % of the FOV
-        fov_rad = np.deg2rad(self._pl.camera.view_angle)
+        fov_rad  = np.deg2rad(self._pl.camera.view_angle)
         distance = radius / np.tan(fov_rad / 2.0) * 1.2
-        self._pl.camera.position = (cx, cy, cz + distance)
-        self._pl.camera.up = (0.0, 1.0, 0.0)
+        self._pl.camera.focal_point = center
+        self._pl.camera.position    = (cx, cy, cz + distance)
+        self._pl.camera.up          = (0.0, 1.0, 0.0)
+        self._add_sphere_indicator(center, radius)
 
     def zoom_to_box(
         self,
-        xmin: float,
-        xmax: float,
-        ymin: float,
-        ymax: float,
-        zmin: float,
-        zmax: float,
+        xmin: float, xmax: float,
+        ymin: float, ymax: float,
+        zmin: float, zmax: float,
     ) -> None:
-        """Frame an arbitrary axis-aligned sub-box."""
+        """Frame an axis-aligned sub-box and draw a wireframe box indicator."""
         cx = (xmin + xmax) / 2.0
         cy = (ymin + ymax) / 2.0
         cz = (zmin + zmax) / 2.0
         radius = max(xmax - xmin, ymax - ymin, zmax - zmin) / 2.0
-        self.zoom_to_radius((cx, cy, cz), radius)
+        fov_rad  = np.deg2rad(self._pl.camera.view_angle)
+        distance = radius / np.tan(fov_rad / 2.0) * 1.2
+        self._pl.camera.focal_point = (cx, cy, cz)
+        self._pl.camera.position    = (cx, cy, cz + distance)
+        self._pl.camera.up          = (0.0, 1.0, 0.0)
+        self._add_box_indicator(xmin, xmax, ymin, ymax, zmin, zmax)

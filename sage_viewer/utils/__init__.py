@@ -1,4 +1,5 @@
 from sage_viewer.utils.colormap import (
+    normalize_log,
     normalize_log_mass,
     normalize_log_ssfr,
     compute_density_colors,
