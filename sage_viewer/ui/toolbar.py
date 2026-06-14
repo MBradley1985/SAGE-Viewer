@@ -121,21 +121,34 @@ def build_toolbar(server, scene: Scene) -> None:
 
     # Transport controls
     with v3.VBtnGroup(variant="outlined", density="compact"):
-        # Reverse toggle
         v3.VBtn(
             icon="mdi-swap-horizontal",
             click=ctrl.toggle_reverse,
-            color=("is_reverse ? 'cyan' : ''",),
+            color=("is_reverse ? 'cyan' : '#6b7280'",),
             title="Reverse direction",
         )
-        v3.VBtn(icon="mdi-play",  click=ctrl.play,  disabled=("is_playing",))
-        v3.VBtn(icon="mdi-pause", click=ctrl.pause, disabled=("!is_playing",))
-        v3.VBtn(icon="mdi-stop",  click=ctrl.stop,  title="Stop and return to z=0")
-        # Repeat toggle
+        v3.VBtn(
+            icon="mdi-play",
+            click=ctrl.play,
+            disabled=("is_playing",),
+            color=("#6b7280",),
+        )
+        v3.VBtn(
+            icon="mdi-pause",
+            click=ctrl.pause,
+            disabled=("!is_playing",),
+            color=("#6b7280",),
+        )
+        v3.VBtn(
+            icon="mdi-stop",
+            click=ctrl.stop,
+            color=("#6b7280",),
+            title="Stop and return to z=0",
+        )
         v3.VBtn(
             icon="mdi-repeat",
             click=ctrl.toggle_repeat,
-            color=("is_repeat ? 'cyan' : ''",),
+            color=("is_repeat ? 'cyan' : '#6b7280'",),
             title="Loop",
         )
 

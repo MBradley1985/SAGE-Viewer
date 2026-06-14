@@ -4,6 +4,7 @@ from pathlib import Path
 
 from trame.app import get_server
 from trame.ui.vuetify3 import SinglePageLayout
+from trame.widgets import html as thtml
 from trame.widgets import vuetify3 as v3
 from trame_vtk.modules.vtk import has_capabilities
 from trame_vtk.widgets.vtk import VtkRemoteView
@@ -14,7 +15,6 @@ from sage_viewer.io.snapshot_table import SnapshotTable
 from sage_viewer.parallel.loader import SnapshotLoader
 from sage_viewer.scene.scene import Scene
 from sage_viewer.ui.info_panel import build_info_panel
-from sage_viewer.ui.layer_panel import build_layer_panel
 from sage_viewer.ui.navigation_panel import build_navigation_panel
 from sage_viewer.ui.toolbar import build_toolbar
 
@@ -74,45 +74,47 @@ def create_app(
     with SinglePageLayout(server, full_height=True) as layout:
         layout.title.set_text("SAGE-Viewer")
 
+        # Prevent mouse wheel from changing number inputs or slider thumbs.
+        # Blurring the active element on wheel skips the value change while
+        # still letting the panel scroll normally.
+        with layout.head:
+            thtml.Script("""
+document.addEventListener('wheel', function(e) {
+    var el = document.activeElement;
+    if (!el) return;
+    if (el.tagName === 'INPUT' && el.type === 'number') { el.blur(); return; }
+    if (el.classList && el.classList.contains('v-slider-thumb')) { el.blur(); }
+}, { passive: true });
+""")
+
         with layout.toolbar as tb:
             tb.density = "compact"
             tb.color = "#1a1a2e"
             build_toolbar(server, scene)
 
         with layout.content:
-            # Plain flexbox row — avoids Vuetify grid padding/margin quirks
             with v3.VSheet(
                 style=(
                     "display:flex;flex-direction:row;"
-                    "height:100%;width:100%;"
-                    "overflow:hidden;"
+                    "height:100%;width:100%;overflow:hidden;"
                 ),
                 rounded=False,
                 elevation=0,
                 color="#0a0a0f",
             ):
-                # Left panel — layer controls
-                with v3.VSheet(
-                    style="width:270px;flex-shrink:0;overflow-y:auto;height:100%;",
-                    color="#0d0d1a",
-                    rounded=False,
-                    elevation=0,
-                ):
-                    build_layer_panel(server, scene)
-
-                # Centre — PyVista render window, fills remaining space
+                # Render window — fills all available space
                 view = VtkRemoteView(
                     scene.plotter.ren_win,
                     style="flex:1;height:100%;display:block;min-width:0;",
-                    interactive_ratio=1,      # full resolution during mouse interaction
-                    interactive_quality=85,   # JPEG quality during interaction
-                    still_quality=100,        # full quality when still
+                    interactive_ratio=1,
+                    interactive_quality=85,
+                    still_quality=100,
                 )
                 server.controller.view_update = view.update
 
-                # Right panel — navigation controls
+                # Right panel — layers + navigation tabs
                 with v3.VSheet(
-                    style="width:290px;flex-shrink:0;overflow-y:auto;height:100%;",
+                    style="width:300px;flex-shrink:0;height:100%;overflow:hidden;",
                     color="#0d0d1a",
                     rounded=False,
                     elevation=0,

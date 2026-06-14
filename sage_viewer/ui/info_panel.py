@@ -1,50 +1,75 @@
 from __future__ import annotations
 
+import numpy as np
+from scipy.spatial import KDTree
 from trame.widgets import vuetify3 as v3
 
 from sage_viewer.scene.scene import Scene
 
 
 def build_info_panel(server, scene: Scene) -> None:
-    """Add pick-info label to the layout footer."""
+    """Footer pick-info bar + left-click galaxy selection."""
     state = server.state
-    state.pick_info = "Click a point to inspect"
+    state.pick_info = "Left-click any point to select the nearest galaxy"
 
-    def _on_pick(mesh, pid):
-        if mesh is None or pid is None:
-            state.pick_info = "No point selected"
+    def _push():
+        if hasattr(server.controller, "view_update"):
+            server.controller.view_update()
+
+    def _on_pick(point):
+        """PyVista 0.44+ passes the 3D world-space point directly."""
+        if point is None:
+            return
+        point = np.asarray(point, dtype=np.float64)
+        if np.all(np.abs(point) < 1e-10):
             return
 
-        pos = mesh.points[pid] if pid < len(mesh.points) else None
-        if pos is None:
-            return
+        halos, galaxies = scene._loader.get(scene.current_snap)
+        lines = [f"({point[0]:.2f}, {point[1]:.2f}, {point[2]:.2f}) Mpc/h"]
 
-        lines = [f"({pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}) Mpc/h"]
-
-        snap = scene.current_snap
-        halos, galaxies = scene._loader.get(snap)
-
+        # Nearest halo info
         if halos.count > 0:
-            idx = scene.camera._halo_index.nearest(tuple(pos))
-            hm = halos.masses[idx]
-            lines.append(f"Halo Mvir = {hm:.2e} Msun (idx {idx})")
+            hidx = scene.camera._halo_index.nearest(tuple(point))
+            hm = halos.masses[hidx]
+            lines.append(f"Halo Mvir = {hm:.2e} Msun (idx {hidx})")
 
+        # Nearest galaxy — select it and update the nav panel
         if galaxies.count > 0:
-            from scipy.spatial import KDTree as _KDT
-            _, gidx = _KDT(galaxies.positions).query(pos)
+            _, gidx = KDTree(galaxies.positions).query(point)
+            gidx = int(gidx)
             sm = galaxies.stellar_mass[gidx]
             ss = galaxies.ssfr[gidx]
             gt = "central" if galaxies.gal_type[gidx] == 0 else "satellite"
             lines.append(
-                f"Galaxy M* = {sm:.2e} Msun  sSFR = {ss:.2e} yr⁻¹  ({gt}, idx {gidx})"
+                f"Galaxy M* = {sm:.2e} Msun  sSFR = {ss:.2e} yr⁻¹  "
+                f"({gt})  →  idx {gidx} selected"
             )
+
+            # Update the galaxy index field in the nav panel
+            state.nav_gal_idx = gidx
+            # Flush so the VTextField updates immediately (PyVista callbacks
+            # run outside Trame's event dispatch and need an explicit flush)
+            state.flush()
+
+            # Red circle scaled to camera distance
+            gpos = galaxies.positions[gidx]
+            cam_pos = np.array(scene.plotter.camera.position)
+            dist = float(np.linalg.norm(cam_pos - gpos))
+            circle_r = max(dist * 0.008, 0.02)
+            scene.camera._add_circle_indicator(
+                (float(gpos[0]), float(gpos[1]), float(gpos[2])),
+                circle_r,
+            )
+            _push()
 
         state.pick_info = "   |   ".join(lines)
 
     scene.plotter.enable_point_picking(
         callback=_on_pick,
-        use_picker=True,
         show_message=False,
+        show_point=False,
+        left_clicking=True,
+        tolerance=0.025,
     )
 
     v3.VLabel(
