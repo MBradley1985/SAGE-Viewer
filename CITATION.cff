@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use SAGE-Viewer in published work, please cite it as below."
+type: software
+title: "SAGE-Viewer: Interactive 3D Visualization for SAGE Galaxy Formation Outputs"
+version: 0.1.0
+date-released: "2026-06-14"
+url: "https://github.com/MBradley1985/SAGE-Viewer"
+repository-code: "https://github.com/MBradley1985/SAGE-Viewer"
+license: MIT
+authors:
+  - family-names: Bradley
+    given-names: Michael
+    email: mbrads85@live.com.au
+keywords:
+  - astronomy
+  - galaxy formation
+  - semi-analytic model
+  - dark matter
+  - visualization
+  - SAGE
+  - PyVista
+  - Trame

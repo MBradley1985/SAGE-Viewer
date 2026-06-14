@@ -1,0 +1,104 @@
+/* ------------------------------------------------------------------ */
+/* SAGE-Viewer dark theme overrides for MkDocs Material               */
+/* ------------------------------------------------------------------ */
+
+:root {
+  --sage-space:     #0a0a0f;
+  --sage-purple:    #7c3aed;
+  --sage-cyan:      #06b6d4;
+  --sage-text:      #e2e8f0;
+  --sage-muted:     #64748b;
+  --sage-surface:   #111827;
+  --sage-border:    #1e293b;
+}
+
+/* Body / page background */
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color:         var(--sage-space);
+  --md-default-fg-color:         var(--sage-text);
+  --md-code-bg-color:            var(--sage-surface);
+  --md-code-fg-color:            #a5f3fc;
+  --md-primary-fg-color:         var(--sage-purple);
+  --md-accent-fg-color:          var(--sage-cyan);
+  --md-typeset-a-color:          var(--sage-cyan);
+}
+
+/* Navigation sidebar */
+[data-md-color-scheme="slate"] .md-nav {
+  background: var(--sage-space);
+}
+
+[data-md-color-scheme="slate"] .md-nav__title {
+  color: var(--sage-purple);
+  font-weight: 700;
+}
+
+/* Admonition customisation */
+.md-typeset .admonition.note {
+  border-left-color: var(--sage-cyan);
+}
+
+.md-typeset .admonition.tip {
+  border-left-color: var(--sage-purple);
+}
+
+/* Code blocks */
+[data-md-color-scheme="slate"] .highlight pre {
+  background: #0f1729;
+  border-radius: 6px;
+  border: 1px solid var(--sage-border);
+}
+
+/* Inline code */
+[data-md-color-scheme="slate"] code {
+  background: var(--sage-surface);
+  color: #a5f3fc;
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+/* Tables */
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+  background: var(--sage-surface);
+  color: var(--sage-cyan);
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) tr:nth-child(even) td {
+  background: #0d1117;
+}
+
+/* ---- Custom field reference badges ---- */
+.halo-tag {
+  display: inline-block;
+  background: #1e3a5f;
+  color: #93c5fd;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.78em;
+  font-family: "JetBrains Mono", monospace;
+  border: 1px solid #3b82f6;
+  vertical-align: middle;
+}
+
+.galaxy-tag {
+  display: inline-block;
+  background: #2d1b4e;
+  color: #c4b5fd;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.78em;
+  font-family: "JetBrains Mono", monospace;
+  border: 1px solid #7c3aed;
+  vertical-align: middle;
+}
+
+/* Header anchor links colour */
+[data-md-color-scheme="slate"] .md-typeset h1,
+[data-md-color-scheme="slate"] .md-typeset h2,
+[data-md-color-scheme="slate"] .md-typeset h3 {
+  color: var(--sage-text);
+}
+
+[data-md-color-scheme="slate"] .headerlink {
+  color: var(--sage-muted);
+}

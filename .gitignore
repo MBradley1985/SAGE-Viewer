@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.tox/
+.venv/
+venv/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Docs
+docs/_build/
+docs/site/
+site/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Data (never commit simulation data)
+*.hdf5
+*.h5
+*.dat
+*.bin
+trees_*/
+*.a_list
+*.txt.bak
+
+# PyVista / VTK
+*.vtk
+*.vtp
+*.vtu
+*.pvd
+
+# Outputs
+output/
+movies/
+*.mp4
+*.gif
+*.png
