@@ -42,6 +42,13 @@ _CMAPS = [
 ]
 
 
+_HALO_CB = {
+    "mvir": ("Mvir",  "10¹⁰",  "10¹⁵ M☉"),
+    "rvir": ("Rvir",  "0.03",  "3 Mpc/h"),
+    "vvir": ("Vvir",  "30",    "1000 km/s"),
+}
+
+
 def build_navigation_panel(server, scene: Scene) -> None:
     state, ctrl = server.state, server.controller
 
@@ -62,6 +69,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.focus_active         = False
     state.nav_active_tab       = "layers"
 
+    # Colorbar state (reflects halo layer; updated when halo mode/cmap changes)
+    from sage_viewer.utils.colormap import cmap_css_gradient
+    _cb_label, _cb_min, _cb_max = _HALO_CB[scene.halo_layer.color_mode]
+    state.colorbar_gradient = cmap_css_gradient(scene.halo_layer.colormap)
+    state.colorbar_label    = _cb_label
+    state.colorbar_min      = _cb_min
+    state.colorbar_max      = _cb_max
+
     # Layer state
     state.halos_visible     = True
     state.galaxies_visible  = True
@@ -71,6 +86,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.galaxy_color_mode = scene.galaxy_layer.color_mode
     state.halo_colormap     = scene.halo_layer.colormap
     state.galaxy_colormap   = scene.galaxy_layer.colormap
+
 
     def _push():
         if hasattr(server.controller, "view_update"):
@@ -106,6 +122,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @state.change("halo_color_mode")
     def on_halo_mode(halo_color_mode, **_):
         scene.halo_layer.color_mode = halo_color_mode
+        label, lo, hi = _HALO_CB[halo_color_mode]
+        state.colorbar_label = label
+        state.colorbar_min   = lo
+        state.colorbar_max   = hi
         _push()
 
     @state.change("galaxy_color_mode")
@@ -116,6 +136,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @state.change("halo_colormap")
     def on_halo_cmap(halo_colormap, **_):
         scene.halo_layer.colormap = halo_colormap
+        from sage_viewer.utils.colormap import cmap_css_gradient
+        state.colorbar_gradient = cmap_css_gradient(halo_colormap)
         _push()
 
     @state.change("galaxy_colormap")
@@ -250,32 +272,27 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         v3.VDivider(style="flex-shrink:0;")
 
-        # ── Primary tab: LAYERS (above the others, full-width) ─────
-        v3.VBtn(
-            "LAYERS",
-            block=True,
-            variant="text",
-            density="compact",
-            click="nav_active_tab = 'layers'",
-            color=("nav_active_tab === 'layers' ? 'cyan' : '#6b7280'",),
-            style=(
-                "font-size:0.78rem;font-weight:700;letter-spacing:0.12em;"
-                "border-radius:0;flex-shrink:0;height:36px;"
-            ),
-        )
-
-        v3.VDivider(style="flex-shrink:0;")
-
-        # ── Secondary tab row: navigation tabs ─────────────────────
+        # ── Tab rows: Structure (full-width) + nav tabs below ──────
         with v3.VBtnToggle(
             v_model=("nav_active_tab",),
             mandatory=True,
             density="compact",
             style=(
                 "width:100%;flex-shrink:0;background:#111827;"
-                "border-radius:0;display:flex;"
+                "border-radius:0;display:flex;flex-wrap:wrap;"
             ),
         ):
+            v3.VBtn(
+                "Structure",
+                value="layers",
+                style=(
+                    "width:100%;font-size:0.72rem;font-weight:700;"
+                    "letter-spacing:0.08em;min-width:0;text-transform:none;"
+                ),
+                color=("nav_active_tab === 'layers' ? 'cyan' : '#6b7280'",),
+                variant="text",
+                density="compact",
+            )
             for label, value in [
                 ("Halo",   "halo"),
                 ("Galaxy", "galaxy"),

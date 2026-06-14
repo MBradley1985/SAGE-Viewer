@@ -4,7 +4,6 @@ from pathlib import Path
 
 from trame.app import get_server
 from trame.ui.vuetify3 import SinglePageLayout
-from trame.widgets import html as thtml
 from trame.widgets import vuetify3 as v3
 from trame_vtk.modules.vtk import has_capabilities
 from trame_vtk.widgets.vtk import VtkRemoteView
@@ -54,8 +53,7 @@ def create_app(
     server = get_server(client_type="vue3")
     server.enable_module(has_capabilities)
 
-    # Force Vuetify 3 into dark mode globally
-    server.state["$vuetify"] = {
+    _vuetify_config = {
         "theme": {
             "defaultTheme": "dark",
             "themes": {
@@ -71,21 +69,8 @@ def create_app(
         }
     }
 
-    with SinglePageLayout(server, full_height=True) as layout:
+    with SinglePageLayout(server, full_height=True, vuetify_config=_vuetify_config) as layout:
         layout.title.set_text("SAGE-Viewer")
-
-        # Prevent mouse wheel from changing number inputs or slider thumbs.
-        # Blurring the active element on wheel skips the value change while
-        # still letting the panel scroll normally.
-        with layout.head:
-            thtml.Script("""
-document.addEventListener('wheel', function(e) {
-    var el = document.activeElement;
-    if (!el) return;
-    if (el.tagName === 'INPUT' && el.type === 'number') { el.blur(); return; }
-    if (el.classList && el.classList.contains('v-slider-thumb')) { el.blur(); }
-}, { passive: true });
-""")
 
         with layout.toolbar as tb:
             tb.density = "compact"

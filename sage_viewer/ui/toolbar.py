@@ -117,6 +117,35 @@ def build_toolbar(server, scene: Scene) -> None:
     # ------------------------------------------------------------------
 
     v3.VToolbarTitle("SAGE-Viewer", style="font-size:1rem;min-width:120px;")
+
+    # Colorbar — reflects active halo colour mode; updated by navigation_panel handlers
+    with v3.VSheet(
+        color="transparent",
+        style=(
+            "display:flex;align-items:center;gap:6px;"
+            "padding:0 20px;min-width:200px;max-width:300px;"
+        ),
+    ):
+        v3.VLabel(
+            ("colorbar_label",),
+            style="font-size:0.62rem;color:#9ca3af;white-space:nowrap;",
+        )
+        v3.VLabel(
+            ("colorbar_min",),
+            style="font-size:0.58rem;color:#6b7280;white-space:nowrap;",
+        )
+        v3.VSheet(
+            style=(
+                "'height:8px;flex:1;min-width:60px;border-radius:2px;background:'"
+                " + colorbar_gradient"
+            ),
+            color="transparent",
+        )
+        v3.VLabel(
+            ("colorbar_max",),
+            style="font-size:0.58rem;color:#6b7280;white-space:nowrap;",
+        )
+
     v3.VSpacer()
 
     # Transport controls
@@ -131,18 +160,18 @@ def build_toolbar(server, scene: Scene) -> None:
             icon="mdi-play",
             click=ctrl.play,
             disabled=("is_playing",),
-            color=("#6b7280",),
+            color="#6b7280",
         )
         v3.VBtn(
             icon="mdi-pause",
             click=ctrl.pause,
             disabled=("!is_playing",),
-            color=("#6b7280",),
+            color="#6b7280",
         )
         v3.VBtn(
             icon="mdi-stop",
             click=ctrl.stop,
-            color=("#6b7280",),
+            color="#6b7280",
             title="Stop and return to z=0",
         )
         v3.VBtn(

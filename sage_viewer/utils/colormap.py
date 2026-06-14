@@ -4,6 +4,20 @@ import numpy as np
 from scipy.stats import gaussian_kde
 
 
+def cmap_css_gradient(name: str, n: int = 12) -> str:
+    """CSS linear-gradient string for a matplotlib colormap."""
+    import matplotlib.pyplot as plt
+    cmap = plt.get_cmap(name)
+    stops = []
+    for i in range(n):
+        t = i / (n - 1)
+        r, g, b, a = cmap(float(t))
+        stops.append(
+            f"rgba({int(r*255)},{int(g*255)},{int(b*255)},{a:.2f}) {int(t*100)}%"
+        )
+    return "linear-gradient(to right, " + ", ".join(stops) + ")"
+
+
 # Default scalar ranges (log10 units)
 HALO_MASS_RANGE = (10.0, 15.0)       # log10(Msun)
 STELLAR_MASS_RANGE = (8.0, 12.5)     # log10(Msun)
