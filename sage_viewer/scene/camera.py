@@ -22,6 +22,9 @@ class CameraController:
         self._halo_index: NearestHaloIndex = NearestHaloIndex()
         self._galaxy_positions: np.ndarray | None = None
         self._indicator_actor = None
+        self._member_actor = None     # multi-point gaussian splat for group members
+        self._central_actor = None    # thin white outline marking the FOF central
+        self._group_ring_actor = None # red ring sized to enclose the group
 
     # ------------------------------------------------------------------
     # Index updates (called by Scene on snapshot change)
@@ -45,8 +48,108 @@ class CameraController:
             else [self._indicator_actor]
         for a in actors:
             if a is not None:
-                self._pl.remove_actor(a)
+                self._pl.remove_actor(a, render=False)
         self._indicator_actor = None
+
+    def _clear_member_indicators(self) -> None:
+        if self._member_actor is None:
+            return
+        self._pl.remove_actor(self._member_actor, render=False)
+        self._member_actor = None
+
+    def _add_member_indicators(
+        self,
+        positions: "np.ndarray",
+    ) -> None:
+        """Highlight a set of group/cluster members as cyan gaussian points."""
+        self._clear_member_indicators()
+        if positions is None or len(positions) == 0:
+            return
+        cloud = pv.PolyData(np.asarray(positions, dtype=np.float64))
+        self._member_actor = self._pl.add_mesh(
+            cloud,
+            color="cyan",
+            point_size=24.0,
+            render_points_as_spheres=True,
+            opacity=0.55,
+            show_scalar_bar=False,
+            render=False,
+            reset_camera=False,
+        )
+
+    @property
+    def has_member_indicators(self) -> bool:
+        return self._member_actor is not None
+
+    # ---- White central marker -----------------------------------------
+
+    def _clear_central_indicator(self) -> None:
+        if self._central_actor is None:
+            return
+        self._pl.remove_actor(self._central_actor, render=False)
+        self._central_actor = None
+
+    def _add_central_indicator(self, center: tuple[float, float, float]) -> None:
+        """Thin white screen-space ring marking the FOF central."""
+        self._clear_central_indicator()
+        cloud = pv.PolyData(np.array([center], dtype=np.float64))
+        self._central_actor = self._pl.add_mesh(
+            cloud,
+            color="white",
+            point_size=22.0,
+            render_points_as_spheres=False,
+            opacity=0.95,
+            show_scalar_bar=False,
+            render=False,
+            reset_camera=False,
+        )
+
+    # ---- Group-sized red circle ---------------------------------------
+
+    def _clear_group_ring(self) -> None:
+        if self._group_ring_actor is None:
+            return
+        self._pl.remove_actor(self._group_ring_actor, render=False)
+        self._group_ring_actor = None
+
+    def _add_group_ring(
+        self,
+        center: tuple[float, float, float],
+        radius: float,
+    ) -> None:
+        """Red ring face-on to the camera, sized to enclose the whole group."""
+        self._clear_group_ring()
+        if radius <= 0:
+            return
+        c = np.array(center, dtype=np.float64)
+        cam = np.array(self._pl.camera.position, dtype=np.float64)
+        view = cam - c
+        norm = np.linalg.norm(view)
+        if norm < 1e-10:
+            return
+        view /= norm
+        up = np.array([0.0, 1.0, 0.0])
+        if abs(np.dot(view, up)) > 0.99:
+            up = np.array([1.0, 0.0, 0.0])
+        right = np.cross(view, up)
+        right /= np.linalg.norm(right)
+        up_perp = np.cross(right, view)
+        up_perp /= np.linalg.norm(up_perp)
+
+        theta = np.linspace(0, 2 * np.pi, 128, endpoint=False)
+        pts = c + radius * (
+            np.outer(np.cos(theta), right) + np.outer(np.sin(theta), up_perp)
+        )
+        pts = np.vstack([pts, pts[0]])     # close the ring
+        circle = pv.lines_from_points(pts)
+        self._group_ring_actor = self._pl.add_mesh(
+            circle,
+            color="red",
+            line_width=2.0,
+            opacity=0.9,
+            render=False,
+            reset_camera=False,
+        )
 
     def _add_box_indicator(
         self,

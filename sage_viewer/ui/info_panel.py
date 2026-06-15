@@ -103,12 +103,14 @@ def build_info_panel(server, scene: Scene) -> None:
 
     @state.change("nav_active_tab")
     def on_tab_for_picker(nav_active_tab, **_):
-        if nav_active_tab == "target":
+        # Picker is useful in both Target (per-galaxy info) and Environment
+        # (group inspection) tabs — they both rely on a clicked selection.
+        if nav_active_tab in ("target", "environment"):
             _enable_picker()
         else:
             _disable_picker()
-            # Also clear any lingering indicator so it isn't orphaned on other tabs
             scene.camera._clear_indicator()
+            scene.camera._clear_member_indicators()
             _push()
 
     v3.VLabel(

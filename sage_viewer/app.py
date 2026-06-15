@@ -56,12 +56,13 @@ def create_app(
     }
 
     _NAV_TABS = [
-        ("Structure", "layers"),
-        ("Filters",   "filters"),
-        ("Record",    "record"),
-        ("Target",    "target"),
-        ("Coords",    "coords"),
-        ("Box",       "box"),
+        ("Structure",   "layers"),
+        ("Filters",     "filters"),
+        ("Record",      "record"),
+        ("Target",      "target"),
+        ("Environment", "environment"),
+        ("Coords",      "coords"),
+        ("Box",         "box"),
     ]
 
     # ---- Model discovery ------------------------------------------------
@@ -327,6 +328,61 @@ def create_app(
                         ):
                             with html.Div(
                                 v_for=("row in galinfo_items",),
+                                key=("row.label",),
+                                style=(
+                                    "display:flex;justify-content:space-between;"
+                                    "padding:3px 0;border-bottom:1px solid #1f2937;"
+                                ),
+                            ):
+                                html.Span(
+                                    "{{ row.label }}",
+                                    style="color:#9ca3af;",
+                                )
+                                html.Span(
+                                    "{{ row.value }}",
+                                    style="font-family:monospace;text-align:right;color:#e2e8f0;",
+                                )
+
+                    # Group / cluster info panel — same right-hand position
+                    # as the Galaxy info card; the two are mutually exclusive
+                    # (opening one closes the other) so they never overlap.
+                    with v3.VCard(
+                        v_show=("groupinfo_show && nav_active_tab === 'environment'",),
+                        style=(
+                            "position:absolute;top:32px;right:24px;"
+                            "min-width:260px;max-width:320px;"
+                            "background:rgba(17,24,39,0.85);"
+                            "backdrop-filter:blur(6px);"
+                            "border:1px solid #374151;"
+                            "color:#e2e8f0;"
+                            "z-index:5;"
+                        ),
+                        elevation=8,
+                    ):
+                        with v3.VCardTitle(
+                            style=(
+                                "display:flex;align-items:center;"
+                                "font-size:0.85rem;letter-spacing:0.06em;"
+                                "padding:10px 12px 6px;"
+                            ),
+                        ):
+                            v3.VIcon("mdi-account-group-outline",
+                                     size="small", color="cyan",
+                                     style="margin-right:6px;")
+                            html.Span("Group info")
+                            v3.VSpacer()
+                            v3.VBtn(
+                                icon="mdi-close",
+                                size="x-small",
+                                variant="text",
+                                click=server.controller.hide_group_info,
+                            )
+                        v3.VDivider()
+                        with v3.VCardText(
+                            style="padding:8px 12px;font-size:0.72rem;",
+                        ):
+                            with html.Div(
+                                v_for=("row in groupinfo_items",),
                                 key=("row.label",),
                                 style=(
                                     "display:flex;justify-content:space-between;"

@@ -87,8 +87,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.focus_active         = False
     state.nav_active_tab       = "layers"
 
+    # Group info panel state (mirrors galinfo_*)
+    state.groupinfo_show  = False
+    state.groupinfo_items = []
+
     # ── Filter state (log10 ranges where appropriate) ──────────
     state.filter_halo_mvir   = [10.0, 15.0]   # log10 Msun
+    state.filter_halo_rvir   = [0.0, 3.0]     # Mpc/h (raw)
+    state.filter_halo_vvir   = [0.0, 1000.0]  # km/s   (raw)
     state.filter_gal_smass   = [8.0, 12.5]    # log10 Msun
     state.filter_gal_ssfr    = [-14.0, -8.0]  # log10 yr^-1
     state.filter_gal_bt      = [0.0, 1.0]     # bulge/total
@@ -154,12 +160,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
         import numpy as np
         halos, galaxies = scene._loader.get(scene.current_snap)
 
-        # Halo: Mvir range
-        h_lo, h_hi = state.filter_halo_mvir
-        h_log = np.log10(np.maximum(halos.masses, 1.0))
-        h_mask = (h_log >= float(h_lo)) & (h_log <= float(h_hi))
-        # If filter is full range, set None to skip masking work
-        if float(h_lo) <= 10.0 + 1e-6 and float(h_hi) >= 15.0 - 1e-6:
+        # Halo filters: Mvir (log10 M☉), Rvir (Mpc/h), Vvir (km/s)
+        m_lo, m_hi   = state.filter_halo_mvir
+        r_lo, r_hi   = state.filter_halo_rvir
+        v_lo, v_hi   = state.filter_halo_vvir
+
+        h_mvir_log = np.log10(np.maximum(halos.masses, 1.0))
+
+        h_mask = (
+            (h_mvir_log >= float(m_lo)) & (h_mvir_log <= float(m_hi)) &
+            (halos.rvir >= float(r_lo)) & (halos.rvir <= float(r_hi)) &
+            (halos.vvir >= float(v_lo)) & (halos.vvir <= float(v_hi))
+        )
+        # Skip masking work entirely if all three sliders are at full range
+        full = (
+            float(m_lo) <= 10.0 + 1e-6 and float(m_hi) >= 15.0 - 1e-6
+            and float(r_lo) <=  0.0 + 1e-6 and float(r_hi) >=  3.0 - 1e-6
+            and float(v_lo) <=  0.0 + 1e-6 and float(v_hi) >= 1000.0 - 1e-6
+        )
+        if full:
             h_mask = None
         scene.halo_layer.set_filter_mask(h_mask)
 
@@ -248,7 +267,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
     scene.register_snap_change_callback(lambda _n: _apply_filters())
 
     @state.change(
-        "filter_halo_mvir", "filter_gal_smass", "filter_gal_ssfr",
+        "filter_halo_mvir", "filter_halo_rvir", "filter_halo_vvir",
+        "filter_gal_smass", "filter_gal_ssfr",
         "filter_gal_bt", "filter_gal_type",
         "filter_gal_bhmass", "filter_gal_ics",
         "filter_gal_ffb", "filter_gal_cgm", "filter_gal_env",
@@ -266,6 +286,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @ctrl.set("reset_filters")
     def on_reset_filters():
         state.filter_halo_mvir  = [10.0, 15.0]
+        state.filter_halo_rvir  = [0.0, 3.0]
+        state.filter_halo_vvir  = [0.0, 1000.0]
         state.filter_gal_smass  = [8.0, 12.5]
         state.filter_gal_ssfr   = [-14.0, -8.0]
         state.filter_gal_bt     = [0.0, 1.0]
@@ -381,8 +403,39 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @ctrl.set("clear_indicator")
     def on_clear_indicator():
         scene.camera._clear_indicator()
-        state.galinfo_show = False
-        state.galinfo_items = []
+        scene.camera._clear_member_indicators()
+        scene.camera._clear_central_indicator()
+        scene.camera._clear_group_ring()
+        state.galinfo_show   = False
+        state.galinfo_items  = []
+        state.groupinfo_show = False
+        state.groupinfo_items = []
+        state.flush()
+        _push()
+
+    @ctrl.set("go_to_env_halo")
+    def on_go_to_env_halo():
+        """Fly to the chosen halo and snap nav_gal_idx to the FOF central there."""
+        try:
+            hidx = int(state.nav_halo_idx)
+            d    = float(state.nav_distance)
+        except (TypeError, ValueError):
+            return
+        try:
+            halo_pos = scene.camera._halo_index.position_of(hidx)
+        except Exception:
+            return
+        scene.camera.go_to_halo(hidx, d)
+        # Resolve to nearest galaxy so Group Info / Highlight Members work
+        import numpy as np
+        _, galaxies = scene._loader.get(scene.current_snap)
+        if galaxies.count > 0:
+            d2 = np.sum((galaxies.positions - np.array(halo_pos)) ** 2, axis=1)
+            state.nav_gal_idx = int(np.argmin(d2))
+        if _focused():
+            scene.set_focus_sphere(
+                (float(halo_pos[0]), float(halo_pos[1]), float(halo_pos[2])), d
+            )
         state.flush()
         _push()
 
@@ -417,6 +470,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
         )
         state.galinfo_items = [{"label": k, "value": v} for k, v in info.items()]
         state.galinfo_show  = True
+        # Close any open group-info card so they don't overlap
+        state.groupinfo_show = False
+        scene.camera._clear_group_ring()
+        scene.camera._clear_central_indicator()
         state.flush()
         _push()
 
@@ -424,6 +481,97 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def on_hide_galaxy_info():
         state.galinfo_show = False
         state.flush()
+
+    def _find_central_pos_and_extent(galaxies, gidx) -> tuple:
+        """Return (central_position, group_extent_mpch, central_idx_in_galaxies)."""
+        import numpy as np
+        from sage_viewer.utils.group_info import member_indices
+        members = member_indices(galaxies, gidx)
+        if len(members) == 0:
+            return None, 0.0, -1
+        pos = galaxies.positions[members]
+        gt  = galaxies.gal_type[members]
+        # Prefer the type==0 central; fall back to the geometric centre
+        central_mask = (gt == 0)
+        if central_mask.any():
+            central_idx_local = int(np.argmax(central_mask))
+            central_pos = pos[central_idx_local]
+            central_idx = int(members[central_idx_local])
+        else:
+            central_pos = pos.mean(axis=0)
+            central_idx = -1
+        extent = float(np.linalg.norm(pos - central_pos, axis=1).max()) if len(pos) else 0.0
+        return central_pos, extent, central_idx
+
+    @ctrl.set("show_group_info")
+    def on_show_group_info():
+        from sage_viewer.utils.group_info import build_group_info
+        import numpy as np
+        try:
+            gidx = int(state.nav_gal_idx)
+        except (TypeError, ValueError):
+            return
+        _, galaxies = scene._loader.get(scene.current_snap)
+        if gidx < 0 or gidx >= galaxies.count:
+            return
+        info = build_group_info(
+            galaxies=galaxies,
+            fields_available=scene.primary.fields_available,
+            idx=gidx,
+            hubble_h=scene._cfg.hubble_h,
+        )
+        state.groupinfo_items = [{"label": k, "value": v} for k, v in info.items()]
+        state.groupinfo_show  = True
+        # Mutually exclusive with the galaxy info panel
+        state.galinfo_show    = False
+
+        # Place a red ring sized to enclose the whole group, with a thin
+        # white outline on the central galaxy.
+        central_pos, extent, central_idx = _find_central_pos_and_extent(galaxies, gidx)
+        if central_pos is not None:
+            scene.camera._clear_indicator()        # remove any small galaxy dot
+            radius = max(extent * 1.05, 0.05)
+            scene.camera._add_group_ring(
+                (float(central_pos[0]), float(central_pos[1]), float(central_pos[2])),
+                radius,
+            )
+            scene.camera._add_central_indicator(
+                (float(central_pos[0]), float(central_pos[1]), float(central_pos[2]))
+            )
+        state.flush()
+        _push()
+
+    @ctrl.set("hide_group_info")
+    def on_hide_group_info():
+        state.groupinfo_show = False
+        scene.camera._clear_group_ring()
+        scene.camera._clear_central_indicator()
+        state.flush()
+        _push()
+
+    @ctrl.set("highlight_group_members")
+    def on_highlight_group_members():
+        """Toggle: first click highlights members, second click clears them."""
+        # If already highlighted, treat as toggle-off and clear
+        if scene.camera.has_member_indicators:
+            scene.camera._clear_member_indicators()
+            _push()
+            return
+
+        from sage_viewer.utils.group_info import member_indices
+        try:
+            gidx = int(state.nav_gal_idx)
+        except (TypeError, ValueError):
+            return
+        _, galaxies = scene._loader.get(scene.current_snap)
+        if gidx < 0 or gidx >= galaxies.count:
+            return
+        members = member_indices(galaxies, gidx)
+        if len(members) == 0:
+            return
+        others = members[members != gidx]
+        scene.camera._add_member_indicators(galaxies.positions[others])
+        _push()
 
     # ------------------------------------------------------------------
     # Record / screenshot controllers
@@ -779,21 +927,26 @@ def build_navigation_panel(server, scene: Scene) -> None:
             style=(
                 "width:100%;flex-shrink:0;background:#111827;"
                 "border-radius:0;display:flex;flex-wrap:wrap;"
+                # Extra bottom padding so the last row of tab labels isn't
+                # cut off by the divider beneath the toggle.
+                "padding-bottom:6px;"
             ),
         ):
             for label, value in [
-                ("Structure", "layers"),
-                ("Filters",   "filters"),
-                ("Record",    "record"),
-                ("Target",    "target"),
-                ("Coords",    "coords"),
-                ("Box",       "box"),
+                ("Structure",   "layers"),
+                ("Filters",     "filters"),
+                ("Record",      "record"),
+                ("Target",      "target"),
+                ("Environment", "environment"),
+                ("Coords",      "coords"),
+                ("Box",         "box"),
             ]:
                 v3.VBtn(
                     label, value=value,
                     style=(
                         "flex:0 0 33.333%;font-size:0.72rem;letter-spacing:0;"
-                        "min-width:0;text-transform:none;font-weight:700;"
+                        "min-width:0;min-height:32px;text-transform:none;"
+                        "font-weight:700;"
                     ),
                     color=(
                         "nav_active_tab === '{}' ? 'cyan' : '#6b7280'".format(value),
@@ -993,6 +1146,81 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     click=ctrl.clear_indicator,
                 )
 
+            # Environment tab — group/cluster-level selection & inspection
+            with v3.VSheet(
+                color="transparent",
+                v_show=("nav_active_tab === 'environment'",),
+            ):
+                v3.VLabel(
+                    "HALO  (pick a FOF group)",
+                    style=(
+                        "font-size:0.68rem;font-weight:700;letter-spacing:0.06em;"
+                        "color:#7c3aed;display:block;padding:4px 0 6px;"
+                    ),
+                )
+                with v3.VSheet(color="transparent", style=_FIELD):
+                    _tf("nav_halo_idx", "Halo index")
+                with v3.VSheet(color="transparent", style=_FIELD):
+                    _tf("nav_distance", "Standoff (Mpc/h)")
+                with v3.VSheet(color="transparent", style=_BTN):
+                    v3.VBtn(
+                        "Go", block=True, color="cyan",
+                        density="compact", click=ctrl.go_to_env_halo,
+                    )
+
+                v3.VDivider(style="margin:12px 0;")
+
+                v3.VLabel(
+                    "ENVIRONMENT FILTER",
+                    style=(
+                        "font-size:0.68rem;font-weight:700;letter-spacing:0.06em;"
+                        "color:#7c3aed;display:block;padding:4px 0 6px;"
+                    ),
+                )
+                v3.VLabel(
+                    "Restrict view to galaxies in this class (host M_FOF)",
+                    style="font-size:0.6rem;color:#9ca3af;padding:0 0 4px;display:block;",
+                )
+                v3.VSelect(
+                    v_model=("filter_gal_env",),
+                    items=([
+                        {"title": "All",                          "value": "all"},
+                        {"title": "Field      (< 10¹¹ M☉)",       "value": "field"},
+                        {"title": "Isolated   (10¹¹–10¹²·⁵ M☉)",  "value": "isolated"},
+                        {"title": "Group      (10¹²·⁵–10¹⁴ M☉)",  "value": "group"},
+                        {"title": "Cluster    (> 10¹⁴ M☉)",       "value": "cluster"},
+                    ],),
+                    hide_details=True, variant="outlined",
+                    color="deep-purple", density="compact",
+                    disabled=("!model_fields.central_mvir",),
+                )
+
+                v3.VDivider(style="margin:14px 0 10px;")
+
+                v3.VBtn(
+                    "Group Info",
+                    block=True, color="deep-purple",
+                    density="compact",
+                    prepend_icon="mdi-account-group-outline",
+                    click=ctrl.show_group_info,
+                    style="margin-bottom:6px;",
+                )
+                v3.VBtn(
+                    "Highlight Members",
+                    block=True, color="cyan", variant="outlined",
+                    density="compact",
+                    prepend_icon="mdi-bullseye-arrow",
+                    click=ctrl.highlight_group_members,
+                    style="margin-bottom:6px;",
+                )
+                v3.VBtn(
+                    "Clear",
+                    block=True, variant="outlined",
+                    color="red", density="compact",
+                    prepend_icon="mdi-close-circle-outline",
+                    click=ctrl.clear_indicator,
+                )
+
             # Coords
             with v3.VSheet(
                 color="transparent",
@@ -1035,101 +1263,102 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 color="transparent",
                 v_show=("nav_active_tab === 'filters'",),
             ):
-                v3.VLabel(
-                    "DARK MATTER HALOES",
-                    style=(
-                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
-                        "color:#7c3aed;padding:6px 0 8px;display:block;"
-                    ),
+                _FSEC = (
+                    "font-size:0.62rem;font-weight:700;letter-spacing:0.08em;"
+                    "color:#7c3aed;padding:2px 0 2px;display:block;"
                 )
-                v3.VLabel(
-                    "Mvir range  (log₁₀ M☉)",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:6px 0 2px;",
+                _FLBL = (
+                    "font-size:0.6rem;color:#9ca3af;display:block;"
+                    "padding:2px 0 0;"
                 )
+                _FSLD = "padding:0;margin-top:-4px;margin-bottom:-2px;"
+                _FSEL = (
+                    "--v-input-control-height:30px;"
+                    "font-size:0.7rem;margin-top:1px;"
+                )
+
+                v3.VLabel("DARK MATTER HALOES", style=_FSEC)
+                v3.VLabel("Mvir  (log₁₀ M☉)", style=_FLBL)
                 v3.VRangeSlider(
                     v_model=("filter_halo_mvir",),
                     min=10.0, max=15.0, step=0.1,
                     thumb_label=True, color="cyan",
                     density="compact", hide_details=True,
+                    style=_FSLD,
+                )
+                v3.VLabel("Rvir  (Mpc/h)", style=_FLBL)
+                v3.VRangeSlider(
+                    v_model=("filter_halo_rvir",),
+                    min=0.0, max=3.0, step=0.05,
+                    thumb_label=True, color="cyan",
+                    density="compact", hide_details=True,
+                    style=_FSLD,
+                )
+                v3.VLabel("Vvir  (km/s)", style=_FLBL)
+                v3.VRangeSlider(
+                    v_model=("filter_halo_vvir",),
+                    min=0.0, max=1000.0, step=10.0,
+                    thumb_label=True, color="cyan",
+                    density="compact", hide_details=True,
+                    style=_FSLD,
                 )
 
-                v3.VDivider(style="margin:14px 0;")
+                v3.VDivider(style="margin:4px 0 2px;")
 
-                v3.VLabel(
-                    "GALAXIES",
-                    style=(
-                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
-                        "color:#7c3aed;padding:6px 0 8px;display:block;"
-                    ),
-                )
-                v3.VLabel(
-                    "Stellar mass  (log₁₀ M☉)",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:6px 0 2px;",
-                )
+                v3.VLabel("GALAXIES", style=_FSEC)
+                v3.VLabel("Stellar mass  (log₁₀ M☉)", style=_FLBL)
                 v3.VRangeSlider(
                     v_model=("filter_gal_smass",),
                     min=8.0, max=12.5, step=0.1,
                     thumb_label=True, color="deep-purple",
                     density="compact", hide_details=True,
+                    style=_FSLD,
                 )
-                v3.VLabel(
-                    "sSFR  (log₁₀ yr⁻¹)",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
-                )
+                v3.VLabel("sSFR  (log₁₀ yr⁻¹)", style=_FLBL)
                 v3.VRangeSlider(
                     v_model=("filter_gal_ssfr",),
                     min=-14.0, max=-8.0, step=0.1,
                     thumb_label=True, color="deep-purple",
                     density="compact", hide_details=True,
+                    style=_FSLD,
                 )
-                v3.VLabel(
-                    "B / T  (bulge / stellar)",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
-                )
+                v3.VLabel("B / T  (bulge / stellar)", style=_FLBL)
                 v3.VRangeSlider(
                     v_model=("filter_gal_bt",),
                     min=0.0, max=1.0, step=0.02,
                     thumb_label=True, color="deep-purple",
                     density="compact", hide_details=True,
+                    style=_FSLD,
                 )
-                v3.VLabel(
-                    "Stellar age  (Gyr, mass-weighted)",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
-                )
+                v3.VLabel("Stellar age  (Gyr, mass-weighted)", style=_FLBL)
                 v3.VRangeSlider(
                     v_model=("filter_gal_age",),
                     min=0.0, max=14.0, step=0.1,
                     thumb_label=True, color="deep-purple",
                     density="compact", hide_details=True,
                     disabled=("!model_fields.mean_age",),
+                    style=_FSLD,
                 )
-                v3.VLabel(
-                    "BH mass  (log₁₀ M☉)",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
-                )
+                v3.VLabel("BH mass  (log₁₀ M☉)", style=_FLBL)
                 v3.VRangeSlider(
                     v_model=("filter_gal_bhmass",),
                     min=0.0, max=10.0, step=0.1,
                     thumb_label=True, color="deep-purple",
                     density="compact", hide_details=True,
                     disabled=("!model_fields.bh_mass",),
+                    style=_FSLD,
                 )
-                v3.VLabel(
-                    "ICS mass  (log₁₀ M☉)",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
-                )
+                v3.VLabel("ICS mass  (log₁₀ M☉)", style=_FLBL)
                 v3.VRangeSlider(
                     v_model=("filter_gal_ics",),
                     min=0.0, max=12.0, step=0.1,
                     thumb_label=True, color="deep-purple",
                     density="compact", hide_details=True,
                     disabled=("!model_fields.ics_mass",),
+                    style=_FSLD,
                 )
 
-                v3.VLabel(
-                    "Type",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
-                )
+                v3.VLabel("Type", style=_FLBL)
                 v3.VSelect(
                     v_model=("filter_gal_type",),
                     items=([
@@ -1139,12 +1368,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ],),
                     hide_details=True, variant="outlined",
                     color="deep-purple", density="compact",
+                    style=_FSEL,
                 )
 
-                v3.VLabel(
-                    "FFB regime",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
-                )
+                v3.VLabel("FFB regime", style=_FLBL)
                 v3.VSelect(
                     v_model=("filter_gal_ffb",),
                     items=([
@@ -1155,12 +1382,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     hide_details=True, variant="outlined",
                     color="deep-purple", density="compact",
                     disabled=("!model_fields.ffb_regime",),
+                    style=_FSEL,
                 )
 
-                v3.VLabel(
-                    "CGM / Hot regime",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
-                )
+                v3.VLabel("CGM / Hot regime", style=_FLBL)
                 v3.VSelect(
                     v_model=("filter_gal_cgm",),
                     items=([
@@ -1171,32 +1396,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     hide_details=True, variant="outlined",
                     color="deep-purple", density="compact",
                     disabled=("!model_fields.cgm_regime",),
+                    style=_FSEL,
                 )
 
-                v3.VLabel(
-                    "Environment  (host M_FOF)",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
-                )
-                v3.VSelect(
-                    v_model=("filter_gal_env",),
-                    items=([
-                        {"title": "All",                          "value": "all"},
-                        {"title": "Field      (< 10¹¹ M☉)",       "value": "field"},
-                        {"title": "Isolated   (10¹¹–10¹²·⁵ M☉)",  "value": "isolated"},
-                        {"title": "Group      (10¹²·⁵–10¹⁴ M☉)",  "value": "group"},
-                        {"title": "Cluster    (> 10¹⁴ M☉)",       "value": "cluster"},
-                    ],),
-                    hide_details=True, variant="outlined",
-                    color="deep-purple", density="compact",
-                    disabled=("!model_fields.central_mvir",),
-                )
-
-                v3.VDivider(style="margin:14px 0 10px;")
+                v3.VDivider(style="margin:6px 0 4px;")
 
                 v3.VBtn(
                     "Reset Filters",
                     block=True, variant="outlined",
                     color="red", density="compact",
+                    size="small",
                     prepend_icon="mdi-restore",
                     click=ctrl.reset_filters,
                 )
