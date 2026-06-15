@@ -103,8 +103,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.filter_gal_ics     = [0.0, 12.0]    # log10 Msun (0 includes zero-ICS gals)
     state.filter_gal_ffb     = "any"          # any | yes | no   (FFBRegime)
     state.filter_gal_cgm     = "any"          # any | cold | hot (Regime 0/1)
-    state.filter_gal_env     = "all"          # all | field | isolated | group | cluster
-    state.filter_gal_age     = [0.0, 14.0]    # Gyr  (mass-weighted stellar age)
+    # Environment categories — each checkbox toggles inclusion of that class.
+    # When all four are checked the filter is a no-op (= "show all").
+    state.env_show_field    = True
+    state.env_show_isolated = True
+    state.env_show_group    = True
+    state.env_show_cluster  = True
+    state.filter_gal_age    = [0.0, 14.0]    # Gyr  (mass-weighted stellar age)
 
     # ── Galaxy info panel ──────────────────────────────────────
     state.galinfo_show  = False
@@ -244,20 +249,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 else:
                     g_mask &= (ages == 0) | age_mask
 
-            # Environment from host (FOF) Mvir
-            env = str(state.filter_gal_env)
-            if env != "all" and fields.get("central_mvir", False):
+            # Environment categories — checkbox-driven; subset → mask
+            show_f = bool(state.env_show_field)
+            show_i = bool(state.env_show_isolated)
+            show_g = bool(state.env_show_group)
+            show_c = bool(state.env_show_cluster)
+            all_on = show_f and show_i and show_g and show_c
+            if not all_on and fields.get("central_mvir", False):
                 cm = galaxies.central_mvir
-                cm_safe = np.maximum(cm, 1.0)
-                log_cm = np.log10(cm_safe)
-                if env == "field":
-                    g_mask &= log_cm < 11.0
-                elif env == "isolated":
-                    g_mask &= (log_cm >= 11.0) & (log_cm < 12.5)
-                elif env == "group":
-                    g_mask &= (log_cm >= 12.5) & (log_cm < 14.0)
-                elif env == "cluster":
-                    g_mask &= log_cm >= 14.0
+                log_cm = np.log10(np.maximum(cm, 1.0))
+                cat_mask = np.zeros(galaxies.count, dtype=bool)
+                if show_f:
+                    cat_mask |= log_cm < 11.0
+                if show_i:
+                    cat_mask |= (log_cm >= 11.0) & (log_cm < 12.5)
+                if show_g:
+                    cat_mask |= (log_cm >= 12.5) & (log_cm < 14.0)
+                if show_c:
+                    cat_mask |= log_cm >= 14.0
+                g_mask &= cat_mask
 
             scene.galaxy_layer.set_filter_mask(g_mask)
 
@@ -271,7 +281,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
         "filter_gal_smass", "filter_gal_ssfr",
         "filter_gal_bt", "filter_gal_type",
         "filter_gal_bhmass", "filter_gal_ics",
-        "filter_gal_ffb", "filter_gal_cgm", "filter_gal_env",
+        "filter_gal_ffb", "filter_gal_cgm",
+        "env_show_field", "env_show_isolated",
+        "env_show_group", "env_show_cluster",
         "filter_gal_age",
     )
     def on_filter_change(**_):
@@ -296,7 +308,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.filter_gal_ics    = [0.0, 12.0]
         state.filter_gal_ffb    = "any"
         state.filter_gal_cgm    = "any"
-        state.filter_gal_env    = "all"
+        state.env_show_field    = True
+        state.env_show_isolated = True
+        state.env_show_group    = True
+        state.env_show_cluster  = True
         state.filter_gal_age    = [0.0, 14.0]
         state.flush()
 
@@ -404,8 +419,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def on_clear_indicator():
         scene.camera._clear_indicator()
         scene.camera._clear_member_indicators()
-        scene.camera._clear_central_indicator()
-        scene.camera._clear_group_ring()
         state.galinfo_show   = False
         state.galinfo_items  = []
         state.groupinfo_show = False
@@ -421,6 +434,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
             d    = float(state.nav_distance)
         except (TypeError, ValueError):
             return
+        halos, galaxies = scene._loader.get(scene.current_snap)
+        if hidx < 0 or hidx >= halos.count:
+            return  # invalid halo index — silently bail
         try:
             halo_pos = scene.camera._halo_index.position_of(hidx)
         except Exception:
@@ -428,7 +444,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
         scene.camera.go_to_halo(hidx, d)
         # Resolve to nearest galaxy so Group Info / Highlight Members work
         import numpy as np
-        _, galaxies = scene._loader.get(scene.current_snap)
         if galaxies.count > 0:
             d2 = np.sum((galaxies.positions - np.array(halo_pos)) ** 2, axis=1)
             state.nav_gal_idx = int(np.argmin(d2))
@@ -472,8 +487,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.galinfo_show  = True
         # Close any open group-info card so they don't overlap
         state.groupinfo_show = False
-        scene.camera._clear_group_ring()
-        scene.camera._clear_central_indicator()
         state.flush()
         _push()
 
@@ -525,18 +538,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
         # Mutually exclusive with the galaxy info panel
         state.galinfo_show    = False
 
-        # Place a red ring sized to enclose the whole group, with a thin
-        # white outline on the central galaxy.
-        central_pos, extent, central_idx = _find_central_pos_and_extent(galaxies, gidx)
+        # Place the standard small red circle on the FOF central — same
+        # indicator style used by the Galaxy info action.
+        central_pos, _extent, _central_idx = _find_central_pos_and_extent(galaxies, gidx)
         if central_pos is not None:
-            scene.camera._clear_indicator()        # remove any small galaxy dot
-            radius = max(extent * 1.05, 0.05)
-            scene.camera._add_group_ring(
+            scene.camera._add_circle_indicator(
                 (float(central_pos[0]), float(central_pos[1]), float(central_pos[2])),
-                radius,
-            )
-            scene.camera._add_central_indicator(
-                (float(central_pos[0]), float(central_pos[1]), float(central_pos[2]))
+                0.0,
             )
         state.flush()
         _push()
@@ -544,17 +552,22 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @ctrl.set("hide_group_info")
     def on_hide_group_info():
         state.groupinfo_show = False
-        scene.camera._clear_group_ring()
-        scene.camera._clear_central_indicator()
         state.flush()
         _push()
+
+    # Cache the last-highlighted set so re-toggling re-shows the SAME
+    # positions even if the snapshot or nav_gal_idx have drifted in between.
+    _highlight_cache: dict = {"positions": None, "gidx": -1, "snap": -1}
 
     @ctrl.set("highlight_group_members")
     def on_highlight_group_members():
         """Toggle: first click highlights members, second click clears them."""
-        # If already highlighted, treat as toggle-off and clear
-        if scene.camera.has_member_indicators:
-            scene.camera._clear_member_indicators()
+        cam = scene.camera
+
+        # Toggle off — but keep the cache so a third click reproduces the same
+        # set of positions.
+        if cam.has_member_indicators:
+            cam._clear_member_indicators()
             _push()
             return
 
@@ -563,14 +576,29 @@ def build_navigation_panel(server, scene: Scene) -> None:
             gidx = int(state.nav_gal_idx)
         except (TypeError, ValueError):
             return
-        _, galaxies = scene._loader.get(scene.current_snap)
-        if gidx < 0 or gidx >= galaxies.count:
-            return
-        members = member_indices(galaxies, gidx)
-        if len(members) == 0:
-            return
-        others = members[members != gidx]
-        scene.camera._add_member_indicators(galaxies.positions[others])
+
+        cur_snap = scene.current_snap
+        cached = (
+            _highlight_cache["positions"] is not None
+            and _highlight_cache["gidx"] == gidx
+            and _highlight_cache["snap"] == cur_snap
+        )
+        if cached:
+            # Reuse the previous positions verbatim
+            cam._add_member_indicators(_highlight_cache["positions"])
+        else:
+            _, galaxies = scene._loader.get(cur_snap)
+            if gidx < 0 or gidx >= galaxies.count:
+                return
+            members = member_indices(galaxies, gidx)
+            if len(members) == 0:
+                return
+            others = members[members != gidx]
+            positions = galaxies.positions[others].copy()
+            cam._add_member_indicators(positions)
+            _highlight_cache["positions"] = positions
+            _highlight_cache["gidx"]      = gidx
+            _highlight_cache["snap"]      = cur_snap
         _push()
 
     # ------------------------------------------------------------------
@@ -919,17 +947,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         v3.VDivider(style="flex-shrink:0;")
 
-        # ── Tab rows: 3-up grid, primary row + secondary row ───────
+        # ── Tab rows: 3-up grid wrapping to multiple rows ───────────
+        # NOTE: VBtnToggle's `density="compact"` clamps the wrapper to a
+        # single row of buttons via a fixed --v-btn-height.  We force
+        # height:auto so wrapped rows are actually visible.
         with v3.VBtnToggle(
             v_model=("nav_active_tab",),
             mandatory=True,
-            density="compact",
             style=(
                 "width:100%;flex-shrink:0;background:#111827;"
                 "border-radius:0;display:flex;flex-wrap:wrap;"
-                # Extra bottom padding so the last row of tab labels isn't
-                # cut off by the divider beneath the toggle.
-                "padding-bottom:6px;"
+                "height:auto;min-height:108px;padding-bottom:6px;"
             ),
         ):
             for label, value in [
@@ -945,7 +973,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     label, value=value,
                     style=(
                         "flex:0 0 33.333%;font-size:0.72rem;letter-spacing:0;"
-                        "min-width:0;min-height:32px;text-transform:none;"
+                        "min-width:0;height:34px;text-transform:none;"
                         "font-weight:700;"
                     ),
                     color=(
@@ -1178,21 +1206,44 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 v3.VLabel(
-                    "Restrict view to galaxies in this class (host M_FOF)",
+                    "Show galaxies in these classes (host M_FOF)",
                     style="font-size:0.6rem;color:#9ca3af;padding:0 0 4px;display:block;",
                 )
-                v3.VSelect(
-                    v_model=("filter_gal_env",),
-                    items=([
-                        {"title": "All",                          "value": "all"},
-                        {"title": "Field      (< 10¹¹ M☉)",       "value": "field"},
-                        {"title": "Isolated   (10¹¹–10¹²·⁵ M☉)",  "value": "isolated"},
-                        {"title": "Group      (10¹²·⁵–10¹⁴ M☉)",  "value": "group"},
-                        {"title": "Cluster    (> 10¹⁴ M☉)",       "value": "cluster"},
-                    ],),
-                    hide_details=True, variant="outlined",
-                    color="deep-purple", density="compact",
+                _ENV_CB_STYLE = (
+                    "margin-top:-6px;margin-bottom:-8px;"
+                    "--v-input-control-height:24px;"
+                )
+                v3.VCheckbox(
+                    v_model=("env_show_field",),
+                    label="Field        (< 10¹¹ M☉)",
+                    hide_details=True, density="compact",
+                    color="deep-purple",
                     disabled=("!model_fields.central_mvir",),
+                    style=_ENV_CB_STYLE,
+                )
+                v3.VCheckbox(
+                    v_model=("env_show_isolated",),
+                    label="Isolated   (10¹¹–10¹²·⁵ M☉)",
+                    hide_details=True, density="compact",
+                    color="deep-purple",
+                    disabled=("!model_fields.central_mvir",),
+                    style=_ENV_CB_STYLE,
+                )
+                v3.VCheckbox(
+                    v_model=("env_show_group",),
+                    label="Group      (10¹²·⁵–10¹⁴ M☉)",
+                    hide_details=True, density="compact",
+                    color="deep-purple",
+                    disabled=("!model_fields.central_mvir",),
+                    style=_ENV_CB_STYLE,
+                )
+                v3.VCheckbox(
+                    v_model=("env_show_cluster",),
+                    label="Cluster    (> 10¹⁴ M☉)",
+                    hide_details=True, density="compact",
+                    color="deep-purple",
+                    disabled=("!model_fields.central_mvir",),
+                    style=_ENV_CB_STYLE,
                 )
 
                 v3.VDivider(style="margin:14px 0 10px;")

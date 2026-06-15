@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12 *)",
-      "Bash(xargs kill -9)"
-    ]
-  }
-}

@@ -43,11 +43,13 @@ def build_info_panel(server, scene: Scene) -> None:
         halos, galaxies = scene._loader.get(scene.current_snap)
         lines = [f"({point[0]:.2f}, {point[1]:.2f}, {point[2]:.2f}) Mpc/h"]
 
-        # Nearest halo info
+        # Nearest halo — record into nav_halo_idx so the Environment tab's
+        # halo selector reflects what the user just double-clicked.
         if halos.count > 0:
             hidx = scene.camera._halo_index.nearest(tuple(point))
             hm = halos.masses[hidx]
             lines.append(f"Halo Mvir = {hm:.2e} Msun (idx {hidx})")
+            state.nav_halo_idx = int(hidx)
 
         # Nearest galaxy — select it and update the nav panel
         if galaxies.count > 0:
@@ -112,6 +114,7 @@ def build_info_panel(server, scene: Scene) -> None:
             scene.camera._clear_indicator()
             scene.camera._clear_member_indicators()
             _push()
+
 
     v3.VLabel(
         ("pick_info",),
