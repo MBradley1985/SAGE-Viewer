@@ -93,8 +93,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.filter_gal_ssfr    = [-14.0, -8.0]  # log10 yr^-1
     state.filter_gal_bt      = [0.0, 1.0]     # bulge/total
     state.filter_gal_type    = "both"         # both | central | satellite
-    state.filter_gal_bhmass  = [4.0, 10.0]    # log10 Msun
-    state.filter_gal_ics     = [6.0, 12.0]    # log10 Msun
+    state.filter_gal_bhmass  = [0.0, 10.0]    # log10 Msun (0 includes zero-BH gals)
+    state.filter_gal_ics     = [0.0, 12.0]    # log10 Msun (0 includes zero-ICS gals)
     state.filter_gal_ffb     = "any"          # any | yes | no   (FFBRegime)
     state.filter_gal_cgm     = "any"          # any | cold | hot (Regime 0/1)
     state.filter_gal_env     = "all"          # all | field | isolated | group | cluster
@@ -233,8 +233,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.filter_gal_ssfr   = [-14.0, -8.0]
         state.filter_gal_bt     = [0.0, 1.0]
         state.filter_gal_type   = "both"
-        state.filter_gal_bhmass = [4.0, 10.0]
-        state.filter_gal_ics    = [6.0, 12.0]
+        state.filter_gal_bhmass = [0.0, 10.0]
+        state.filter_gal_ics    = [0.0, 12.0]
         state.filter_gal_ffb    = "any"
         state.filter_gal_cgm    = "any"
         state.filter_gal_env    = "all"
@@ -787,6 +787,27 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     density="compact", hide_details=True,
                 )
                 v3.VLabel(
+                    "BH mass  (log₁₀ M☉)",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VRangeSlider(
+                    v_model=("filter_gal_bhmass",),
+                    min=0.0, max=10.0, step=0.1,
+                    thumb_label=True, color="deep-purple",
+                    density="compact", hide_details=True,
+                )
+                v3.VLabel(
+                    "ICS mass  (log₁₀ M☉)",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VRangeSlider(
+                    v_model=("filter_gal_ics",),
+                    min=0.0, max=12.0, step=0.1,
+                    thumb_label=True, color="deep-purple",
+                    density="compact", hide_details=True,
+                )
+
+                v3.VLabel(
                     "Type",
                     style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
                 )
@@ -799,27 +820,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ],),
                     hide_details=True, variant="outlined",
                     color="deep-purple", density="compact",
-                )
-
-                v3.VLabel(
-                    "BH mass  (log₁₀ M☉)",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
-                )
-                v3.VRangeSlider(
-                    v_model=("filter_gal_bhmass",),
-                    min=4.0, max=10.0, step=0.1,
-                    thumb_label=True, color="deep-purple",
-                    density="compact", hide_details=True,
-                )
-                v3.VLabel(
-                    "ICS mass  (log₁₀ M☉)",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
-                )
-                v3.VRangeSlider(
-                    v_model=("filter_gal_ics",),
-                    min=6.0, max=12.0, step=0.1,
-                    thumb_label=True, color="deep-purple",
-                    density="compact", hide_details=True,
                 )
 
                 v3.VLabel(
@@ -844,9 +844,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VSelect(
                     v_model=("filter_gal_cgm",),
                     items=([
-                        {"title": "Any",   "value": "any"},
-                        {"title": "Cold",  "value": "cold"},
-                        {"title": "Hot",   "value": "hot"},
+                        {"title": "Any",                     "value": "any"},
+                        {"title": "CGM galaxies",            "value": "cold"},
+                        {"title": "Hot atmosphere galaxies", "value": "hot"},
                     ],),
                     hide_details=True, variant="outlined",
                     color="deep-purple", density="compact",

@@ -33,7 +33,7 @@ class GalaxyLayer:
         plotter: pv.Plotter,
         color_mode: ColorMode = "density",
         colormap: str = "plasma",
-        opacity: float = 0.40,
+        opacity: float = 1.0,
         visible: bool = True,
     ) -> None:
         self._pl = plotter
