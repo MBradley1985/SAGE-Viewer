@@ -46,7 +46,7 @@ def galaxy_point_sizes(
 def galaxy_world_radii(
     stellar_mass: np.ndarray,
     r_min: float = 0.025,   # Mpc/h  (low-mass end)
-    r_max: float = 0.25,    # Mpc/h  (high-mass end)
+    r_max: float = 0.35,    # Mpc/h  (high-mass end)
     mass_range: tuple[float, float] = STELLAR_MASS_RANGE,
 ) -> np.ndarray:
     """Per-galaxy world-space gaussian radius (Mpc/h), scaling with stellar mass."""

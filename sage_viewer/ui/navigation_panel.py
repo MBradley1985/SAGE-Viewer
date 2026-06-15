@@ -103,6 +103,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.recording_active   = False
     state.recording_frames   = 0
     state.recording_dir      = ""
+    state.last_screenshot    = ""
+    state.last_movie         = ""
+    state.movie_fps          = 10
+    state.movie_resolution   = "native"   # native | hd | uhd
+    state.movie_format       = "gif"      # gif | mov | png
+    state.screenshot_label   = ""
+    state.movie_label        = ""
+    state.movie_loop         = True   # only used for GIF output
 
     # Colorbar state — full style strings to avoid Vue concatenation issues
     from sage_viewer.utils.colormap import cmap_css_gradient
@@ -225,6 +233,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
     )
     def on_filter_change(**_):
         _apply_filters()
+
+    @ctrl.set("reset_opacities")
+    def on_reset_opacities():
+        state.halo_opacity   = 0.10
+        state.galaxy_opacity = 1.0
+        state.flush()
 
     @ctrl.set("reset_filters")
     def on_reset_filters():
@@ -349,58 +363,265 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # Record / screenshot controllers
     # ------------------------------------------------------------------
 
-    _record_state: dict = {"active": False, "dir": None, "frames": 0, "cb": None}
+    _record_state: dict = {
+        "active": False, "dir": None, "frames": 0, "cb": None,
+        "fps": 10, "format": "gif", "scale": 1, "movie_base": "movie",
+    }
+    _session_state: dict = {"dir": None}
 
-    def _screenshot_path(prefix: str = "sage") -> "pathlib.Path":
+    _RES_SCALE = {"native": 1, "hd": 2, "uhd": 4}
+
+    def _get_session_dir() -> "pathlib.Path":
+        """Lazily create one session folder per app launch."""
         import datetime
-        import pathlib
-        outdir = pathlib.Path.home() / "sage_screenshots"
-        outdir.mkdir(exist_ok=True)
+        if _session_state["dir"] is None:
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            sess = _make_outdir("sage_outputs") / f"session_{ts}"
+            sess.mkdir(parents=True, exist_ok=True)
+            _session_state["dir"] = sess
+        return _session_state["dir"]
+
+    def _safe_label(label: str) -> str:
+        """Sanitize a user-typed label into a safe filename fragment."""
+        import re
+        s = re.sub(r"[^\w\-]+", "_", str(label or "").strip())
+        return s.strip("_")
+
+    def _resolve_name(user_label: str, prefix: str) -> str:
+        """Return '<prefix>_<label>' if labelled, else '<prefix>_<timestamp>'."""
+        import datetime
+        label = _safe_label(user_label)
+        if label:
+            return f"{prefix}_{label}"
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        return outdir / f"{prefix}_{ts}.png"
+        return f"{prefix}_{ts}"
+
+    def _capture_image(scale: int = 1):
+        """Capture the current render window as a vtkImageData."""
+        import vtk
+        rw = scene.plotter.ren_win
+        rw.Render()
+        w2i = vtk.vtkWindowToImageFilter()
+        w2i.SetInput(rw)
+        w2i.SetScale(int(scale), int(scale))
+        w2i.SetInputBufferTypeToRGB()
+        w2i.ReadFrontBufferOff()
+        w2i.Update()
+        return w2i.GetOutput()
+
+    def _save_image(image, path) -> None:
+        """Write a vtkImageData to disk; format inferred from extension."""
+        import vtk
+        ext = str(path).lower().rsplit(".", 1)[-1]
+        if ext in ("jpg", "jpeg"):
+            writer = vtk.vtkJPEGWriter()
+            writer.SetQuality(95)
+        elif ext in ("tif", "tiff"):
+            writer = vtk.vtkTIFFWriter()
+        else:
+            writer = vtk.vtkPNGWriter()
+        writer.SetFileName(str(path))
+        writer.SetInputData(image)
+        writer.Write()
+
+    def _make_outdir(sub: str) -> "pathlib.Path":
+        import pathlib
+        # Anchor outputs inside the SAGE-Viewer repo (gitignored)
+        # __file__ = .../SAGE-Viewer/sage_viewer/ui/navigation_panel.py
+        repo_root = pathlib.Path(__file__).resolve().parents[2]
+        outdir = repo_root / sub
+        outdir.mkdir(parents=True, exist_ok=True)
+        return outdir
+
+    def _take_screenshot(ext: str) -> None:
+        try:
+            sess = _get_session_dir()
+            name = _resolve_name(state.screenshot_label, "screenshot")
+            path = sess / f"{name}.{ext}"
+            # If a file with this name already exists (user re-used label),
+            # append a short timestamp so we don't overwrite.
+            if path.exists():
+                import datetime
+                ts = datetime.datetime.now().strftime("%H%M%S")
+                path = sess / f"{name}_{ts}.{ext}"
+            img = _capture_image(scale=1)
+            _save_image(img, path)
+            state.last_screenshot = str(path)
+        except Exception as e:
+            state.last_screenshot = f"ERROR: {e!s}"
+        state.flush()
 
     @ctrl.set("take_screenshot")
     def on_take_screenshot():
-        path = _screenshot_path("snap")
-        scene.plotter.screenshot(str(path))
-        state.pick_info = f"Screenshot saved: {path}"
-        state.flush()
+        _take_screenshot("png")
+
+    @ctrl.set("screenshot_png")
+    def on_screenshot_png():
+        _take_screenshot("png")
+
+    @ctrl.set("screenshot_jpg")
+    def on_screenshot_jpg():
+        _take_screenshot("jpg")
+
+    @ctrl.set("screenshot_tiff")
+    def on_screenshot_tiff():
+        _take_screenshot("tiff")
+
+    # ------------------------------------------------------------------
+    # Recording — PNG frames during playback, finalized to GIF/MOV at stop
+    # ------------------------------------------------------------------
+
+    _record_task: list = [None]   # asyncio.Task | None
+
+    async def _record_loop():
+        import asyncio
+        interval = 1.0 / max(1, int(_record_state["fps"]))
+        try:
+            while _record_state["active"]:
+                outpath = (
+                    _record_state["dir"]
+                    / f"frame_{_record_state['frames']:05d}.png"
+                )
+                try:
+                    img = _capture_image(scale=_record_state["scale"])
+                    _save_image(img, outpath)
+                    _record_state["frames"] += 1
+                    state.recording_frames = _record_state["frames"]
+                    state.flush()
+                except Exception as e:
+                    state.last_movie = f"ERROR capturing frame: {e!s}"
+                    state.flush()
+                    break
+                await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            pass
 
     @ctrl.set("start_recording")
     def on_start_recording():
         if _record_state["active"]:
             return
-        import datetime
-        import pathlib
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        outdir = pathlib.Path.home() / "sage_recordings" / f"run_{ts}"
-        outdir.mkdir(parents=True, exist_ok=True)
-        _record_state["active"] = True
-        _record_state["dir"]    = outdir
-        _record_state["frames"] = 0
+        import asyncio
+        sess = _get_session_dir()
+        movie_base = _resolve_name(state.movie_label, "movie")
+        # Frames go to a temp subdir prefixed with "_" inside the session.
+        # On finalize (gif/mov) the temp dir is deleted; for PNG seq we rename it.
+        frames_dir = sess / f"_{movie_base}_frames"
+        if frames_dir.exists():
+            for f in frames_dir.glob("*"):
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+        frames_dir.mkdir(parents=True, exist_ok=True)
+
+        scale = _RES_SCALE.get(str(state.movie_resolution), 1)
+        fps   = max(1, int(state.movie_fps))
+        _record_state.update({
+            "active": True, "dir": frames_dir, "frames": 0,
+            "fps": fps,
+            "format": str(state.movie_format),
+            "scale": scale,
+            "movie_base": movie_base,
+            "session": sess,
+        })
         state.recording_active = True
-        state.recording_dir    = str(outdir)
+        state.recording_dir    = str(frames_dir)
         state.recording_frames = 0
-
-        def _on_snap_for_record(snap_num: int) -> None:
-            if not _record_state["active"]:
-                return
-            outpath = outdir / f"frame_{snap_num:04d}.png"
-            scene.plotter.screenshot(str(outpath))
-            _record_state["frames"] += 1
-            state.recording_frames = _record_state["frames"]
-            state.flush()
-
-        _record_state["cb"] = _on_snap_for_record
-        scene.register_snap_change_callback(_on_snap_for_record)
-        # Also capture the current frame as frame 0
-        _on_snap_for_record(scene.current_snap)
         state.flush()
+        # Schedule the capture loop as a separate task so this handler returns
+        # immediately and Trame can process the Stop click while we record.
+        _record_task[0] = asyncio.ensure_future(_record_loop())
+
+    def _remove_dir(frames_dir) -> None:
+        """Recursively remove a frames temp directory."""
+        import pathlib
+        import shutil
+        try:
+            shutil.rmtree(pathlib.Path(frames_dir))
+        except OSError:
+            pass
+
+    def _finalize_movie(
+        frames_dir, session_dir, movie_base: str, fps: int, fmt: str,
+        gif_loop: bool = True,
+    ) -> str:
+        """Convert PNG sequence in frames_dir → <session>/<movie_base>.<fmt>.
+        For PNG sequence, renames the temp frames dir to <session>/<movie_base>/.
+        On successful gif/mov, the temp frames dir is removed."""
+        import subprocess
+        import pathlib
+        frames_dir = pathlib.Path(frames_dir)
+        session_dir = pathlib.Path(session_dir)
+
+        if fmt == "png":
+            target = session_dir / movie_base
+            if target.exists():
+                import datetime
+                target = session_dir / f"{movie_base}_{datetime.datetime.now():%H%M%S}"
+            frames_dir.rename(target)
+            return str(target)
+
+        out_path = session_dir / f"{movie_base}.{fmt}"
+        if out_path.exists():
+            import datetime
+            out_path = session_dir / f"{movie_base}_{datetime.datetime.now():%H%M%S}.{fmt}"
+
+        if fmt == "gif":
+            try:
+                import imageio.v2 as imageio
+                pngs = sorted(frames_dir.glob("frame_*.png"))
+                if not pngs:
+                    _remove_dir(frames_dir)
+                    return "ERROR: no frames captured"
+                imgs = [imageio.imread(p) for p in pngs]
+                # loop=0 = infinite, loop=1 = play once with no further repeats
+                imageio.mimsave(out_path, imgs, fps=fps, loop=0 if gif_loop else 1)
+                _remove_dir(frames_dir)
+                return str(out_path)
+            except Exception as e:
+                return f"ERROR (gif): {e!s}"
+
+        if fmt == "mov":
+            cmd = [
+                "ffmpeg", "-y",
+                "-framerate", str(fps),
+                "-i", str(frames_dir / "frame_%05d.png"),
+                "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
+                str(out_path),
+            ]
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                if proc.returncode != 0:
+                    return f"ERROR (mov): ffmpeg returned {proc.returncode}: {proc.stderr[-300:]}"
+                _remove_dir(frames_dir)
+                return str(out_path)
+            except FileNotFoundError:
+                return "ERROR: ffmpeg not found in PATH"
+            except Exception as e:
+                return f"ERROR (mov): {e!s}"
+
+        return f"ERROR: unknown format {fmt!r}"
 
     @ctrl.set("stop_recording")
     def on_stop_recording():
+        if not _record_state["active"]:
+            return
         _record_state["active"] = False
         state.recording_active = False
+        state.flush()
+        # Cancel the capture task so no new frames get written before finalize
+        if _record_task[0] is not None and not _record_task[0].done():
+            _record_task[0].cancel()
+        result = _finalize_movie(
+            frames_dir=_record_state["dir"],
+            session_dir=_record_state["session"],
+            movie_base=_record_state["movie_base"],
+            fps=_record_state["fps"],
+            fmt=_record_state["format"],
+            gif_loop=bool(state.movie_loop),
+        )
+        state.last_movie = result
         state.flush()
 
     @ctrl.set("go_to_coords")
@@ -619,6 +840,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             "{{ gal_cbar_max }}",
                             style="font-size:0.58rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
                         )
+
+                v3.VDivider(style="margin:14px 0 10px;")
+
+                v3.VBtn(
+                    "Reset Opacities",
+                    block=True, variant="outlined",
+                    color="red", density="compact",
+                    prepend_icon="mdi-restore",
+                    click=ctrl.reset_opacities,
+                )
 
             # Target (halo + galaxy combined)
             with v3.VSheet(
@@ -891,6 +1122,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         "color:#7c3aed;padding:6px 0 8px;display:block;"
                     ),
                 )
+                v3.VTextField(
+                    v_model=("screenshot_label",),
+                    label="Label (optional)",
+                    hide_details=True, variant="outlined",
+                    bg_color="#1a1a2e", density="compact",
+                    style="padding-bottom:8px;",
+                )
                 v3.VBtn(
                     "Take Screenshot",
                     block=True, color="cyan",
@@ -898,9 +1136,32 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     prepend_icon="mdi-camera",
                     click=ctrl.take_screenshot,
                 )
+                with v3.VRow(no_gutters=True, style="gap:6px;padding-top:6px;"):
+                    with v3.VCol(style="padding:0;"):
+                        v3.VBtn(
+                            "PNG", block=True, variant="outlined",
+                            color="cyan", density="compact",
+                            click=ctrl.screenshot_png,
+                        )
+                    with v3.VCol(style="padding:0;"):
+                        v3.VBtn(
+                            "JPG", block=True, variant="outlined",
+                            color="cyan", density="compact",
+                            click=ctrl.screenshot_jpg,
+                        )
+                    with v3.VCol(style="padding:0;"):
+                        v3.VBtn(
+                            "TIFF", block=True, variant="outlined",
+                            color="cyan", density="compact",
+                            click=ctrl.screenshot_tiff,
+                        )
                 v3.VLabel(
-                    "Saved to ~/sage_screenshots/",
-                    style="font-size:0.62rem;color:#6b7280;display:block;padding:6px 0;",
+                    "Saved to <SAGE-Viewer>/sage_outputs/session_*/",
+                    style="font-size:0.62rem;color:#6b7280;display:block;padding:6px 0 2px;",
+                )
+                v3.VLabel(
+                    "{{ last_screenshot ? 'Last: ' + last_screenshot : '' }}",
+                    style="font-size:0.58rem;color:#6b7280;display:block;word-break:break-all;",
                 )
 
                 v3.VDivider(style="margin:14px 0;")
@@ -912,12 +1173,66 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         "color:#7c3aed;padding:6px 0 8px;display:block;"
                     ),
                 )
-                v3.VLabel(
-                    "Captures one PNG per snapshot during playback. "
-                    "Combine to MP4 afterward with ffmpeg.",
-                    style="font-size:0.62rem;color:#9ca3af;display:block;line-height:1.4;padding:0 0 8px;",
+                v3.VTextField(
+                    v_model=("movie_label",),
+                    label="Label (optional)",
+                    hide_details=True, variant="outlined",
+                    bg_color="#1a1a2e", density="compact",
+                    style="padding-bottom:8px;",
                 )
-                with v3.VRow(no_gutters=True, style="gap:6px;"):
+                v3.VLabel(
+                    "FPS (output)  {{ '— ' + movie_fps }}",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:4px 0 2px;",
+                )
+                v3.VSlider(
+                    v_model=("movie_fps",),
+                    min=1, max=60, step=1,
+                    thumb_label=True, color="cyan",
+                    density="compact", hide_details=True,
+                )
+
+                v3.VLabel(
+                    "Resolution",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VSelect(
+                    v_model=("movie_resolution",),
+                    items=([
+                        {"title": "Native  (1×)",       "value": "native"},
+                        {"title": "High   (2× window)", "value": "hd"},
+                        {"title": "Ultra  (4× window)", "value": "uhd"},
+                    ],),
+                    hide_details=True, variant="outlined",
+                    color="cyan", density="compact",
+                )
+
+                v3.VLabel(
+                    "Output format",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VSelect(
+                    v_model=("movie_format",),
+                    items=([
+                        {"title": "GIF",          "value": "gif"},
+                        {"title": "MOV  (H.264)", "value": "mov"},
+                        {"title": "PNG sequence", "value": "png"},
+                    ],),
+                    hide_details=True, variant="outlined",
+                    color="cyan", density="compact",
+                )
+
+                # GIF-only: repeat (loop) checkbox
+                v3.VCheckbox(
+                    v_model=("movie_loop",),
+                    label="Loop GIF forever",
+                    v_show=("movie_format === 'gif'",),
+                    color="cyan",
+                    density="compact",
+                    hide_details=True,
+                    style="padding-top:4px;",
+                )
+
+                with v3.VRow(no_gutters=True, style="gap:6px;padding-top:10px;"):
                     with v3.VCol(style="padding:0;"):
                         v3.VBtn(
                             "Start", block=True, color="red",
@@ -940,6 +1255,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
                 )
                 v3.VLabel(
-                    "{{ recording_dir ? 'Output: ' + recording_dir : '' }}",
-                    style="font-size:0.58rem;color:#6b7280;display:block;word-break:break-all;",
+                    "{{ last_movie ? 'Last: ' + last_movie : '' }}",
+                    style="font-size:0.58rem;color:#6b7280;display:block;word-break:break-all;padding:4px 0;",
                 )

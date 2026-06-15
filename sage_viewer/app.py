@@ -69,12 +69,44 @@ def create_app(
         }
     }
 
+    _NAV_TABS = [
+        ("Structure", "layers"),
+        ("Filters",   "filters"),
+        ("Record",    "record"),
+        ("Target",    "target"),
+        ("Coords",    "coords"),
+        ("Box",       "box"),
+    ]
+
     with SinglePageLayout(server, full_height=True, vuetify_config=_vuetify_config) as layout:
         layout.title.set_text("SAGE-Viewer")
+        # Hide the default VAppBarNavIcon — replaced by our custom menu button below
+        layout.icon.style = "display:none;"
 
         with layout.toolbar as tb:
             tb.density = "compact"
             tb.color = "#1a1a2e"
+
+            # Tab dropdown menu — sits in the natural nav-icon position
+            with v3.VMenu():
+                with v3.Template(v_slot_activator="{ props }"):
+                    v3.VBtn(
+                        icon="mdi-menu",
+                        variant="text",
+                        density="compact",
+                        v_bind="props",
+                        title="Tab menu",
+                    )
+                with v3.VList(density="compact", bg_color="#1a1a2e"):
+                    for label, value in _NAV_TABS:
+                        v3.VListItem(
+                            title=label,
+                            value=value,
+                            click=f"nav_active_tab = '{value}'",
+                            active=(f"nav_active_tab === '{value}'",),
+                            color="cyan",
+                        )
+
             build_toolbar(server, scene)
 
 
@@ -92,9 +124,11 @@ def create_app(
                 view = VtkRemoteView(
                     scene.plotter.ren_win,
                     style="flex:1;height:100%;display:block;min-width:0;",
-                    interactive_ratio=1,
-                    interactive_quality=85,
-                    still_quality=100,
+                    # Lower quality / ratio during motion drastically reduces
+                    # the per-frame JPEG size — the limiting factor on smoothness.
+                    interactive_ratio=0.75,
+                    interactive_quality=60,
+                    still_quality=85,
                 )
                 server.controller.view_update = view.update
 

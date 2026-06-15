@@ -87,7 +87,7 @@ def build_toolbar(server, scene: Scene) -> None:
         scene.set_snapshot(snap)
         state.snap_num   = snap
         state.snap_label = scene.snap_label
-        state.flush()
+        # No state.flush() here — let Trame batch state with the next render
         _push()
 
     # ------------------------------------------------------------------
@@ -111,6 +111,9 @@ def build_toolbar(server, scene: Scene) -> None:
         stop_evt.clear()
         state.is_playing = True
         state.flush()
+        # Tell VTK "we want fast frames" so it picks low-cost rendering paths
+        rw = scene.plotter.ren_win
+        rw.SetDesiredUpdateRate(15.0)
         try:
             while not stop_evt.is_set():
                 fps      = _FPS.get(float(state.play_speed), 3)
@@ -135,6 +138,7 @@ def build_toolbar(server, scene: Scene) -> None:
                 except asyncio.TimeoutError:
                     pass
         finally:
+            rw.SetDesiredUpdateRate(0.0001)   # back to high-quality rendering
             state.is_playing = False
             state.flush()
 
@@ -178,23 +182,28 @@ def build_toolbar(server, scene: Scene) -> None:
 
     async def _rotate_loop():
         interval = 1.0 / _ROT_RATE_FPS
-        while _ctl["rotate_mode"] != "off":
-            mode = _ctl["rotate_mode"]
-            sign, deg_per_sec = _parse_rotate(mode)
-            if sign == 0:
-                break
-            delta  = sign * deg_per_sec * interval
-            cam    = scene.plotter.camera
-            focal  = np.array(cam.focal_point, dtype=np.float64)
-            pos    = np.array(cam.position,    dtype=np.float64)
-            r      = pos - focal
-            angle  = np.deg2rad(delta)
-            c, s   = np.cos(angle), np.sin(angle)
-            rm     = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
-            cam.position = tuple(focal + rm @ r)
-            cam.up       = (0.0, 1.0, 0.0)
-            _push()
-            await asyncio.sleep(interval)
+        rw = scene.plotter.ren_win
+        rw.SetDesiredUpdateRate(_ROT_RATE_FPS)
+        try:
+            while _ctl["rotate_mode"] != "off":
+                mode = _ctl["rotate_mode"]
+                sign, deg_per_sec = _parse_rotate(mode)
+                if sign == 0:
+                    break
+                delta  = sign * deg_per_sec * interval
+                cam    = scene.plotter.camera
+                focal  = np.array(cam.focal_point, dtype=np.float64)
+                pos    = np.array(cam.position,    dtype=np.float64)
+                r      = pos - focal
+                angle  = np.deg2rad(delta)
+                c, s   = np.cos(angle), np.sin(angle)
+                rm     = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+                cam.position = tuple(focal + rm @ r)
+                cam.up       = (0.0, 1.0, 0.0)
+                _push()
+                await asyncio.sleep(interval)
+        finally:
+            rw.SetDesiredUpdateRate(0.0001)   # back to high-quality rendering
 
     @state.change("rotate_mode")
     def on_rotate_mode(rotate_mode, **_):

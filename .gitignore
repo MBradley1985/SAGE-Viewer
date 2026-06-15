@@ -50,6 +50,14 @@ trees_*/
 # Outputs
 output/
 movies/
+sage_screenshots/
+sage_recordings/
+sage_outputs/
 *.mp4
+*.mov
 *.gif
 *.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
