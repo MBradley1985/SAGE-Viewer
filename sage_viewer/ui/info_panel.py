@@ -75,13 +75,41 @@ def build_info_panel(server, scene: Scene) -> None:
 
         state.pick_info = "   |   ".join(lines)
 
-    scene.plotter.enable_point_picking(
-        callback=_on_pick,
-        show_message=False,
-        show_point=False,
-        left_clicking=True,
-        tolerance=0.025,
-    )
+    # Picker is only useful when actively selecting a target. Enable it only
+    # when the Target tab is active so that clicks on other tabs don't trigger
+    # an expensive ray-cast + render cycle.
+    _picker_enabled = [False]
+
+    def _enable_picker() -> None:
+        if _picker_enabled[0]:
+            return
+        scene.plotter.enable_point_picking(
+            callback=_on_pick,
+            show_message=False,
+            show_point=False,
+            left_clicking=True,
+            tolerance=0.025,
+        )
+        _picker_enabled[0] = True
+
+    def _disable_picker() -> None:
+        if not _picker_enabled[0]:
+            return
+        try:
+            scene.plotter.disable_picking()
+        except Exception:
+            pass
+        _picker_enabled[0] = False
+
+    @state.change("nav_active_tab")
+    def on_tab_for_picker(nav_active_tab, **_):
+        if nav_active_tab == "target":
+            _enable_picker()
+        else:
+            _disable_picker()
+            # Also clear any lingering indicator so it isn't orphaned on other tabs
+            scene.camera._clear_indicator()
+            _push()
 
     v3.VLabel(
         ("pick_info",),

@@ -80,6 +80,9 @@ class SnapshotLoader:
             min_stellar_mass=self._min_stellar_mass,
             max_galaxies=self._max_galaxies,
             hubble_h=self._cfg.hubble_h,
+            scale_factors=self._snap_table.scale_factors,
+            omega_m=self._cfg.omega,
+            omega_l=self._cfg.omega_lambda,
         )
         return halos, galaxies
 

@@ -20,6 +20,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to SAGE .par file (e.g. input/millennium.par)",
     )
     p.add_argument(
+        "--par-dir",
+        metavar="DIR",
+        default=None,
+        help=(
+            "Directory to scan for additional .par files (default: parent dir "
+            "of --par). The menu lists all .par files found here so you can "
+            "switch between or overlay multiple models."
+        ),
+    )
+    p.add_argument(
         "--snap",
         type=int,
         default=None,
@@ -94,6 +104,7 @@ def main(argv: list[str] | None = None) -> None:
     print("[2/4] Loading initial snapshot (haloes + galaxies)...")
     server, scene = create_app(
         par_path=par_path,
+        par_dir=args.par_dir,
         initial_snap=args.snap,
         n_jobs=args.n_jobs,
         min_halo_mass=args.min_halo_mass,

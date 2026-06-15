@@ -34,6 +34,8 @@ class HaloLayer:
         self._opacity = opacity
         self._visible = visible
         self._actors: list = []
+        self._cloud:  pv.PolyData | None = None   # persistent geometry
+        self._render_params: tuple = ()           # tracks need-to-rebuild
         self._snapshot: HaloSnapshot | None = None
         self._focus_mask: np.ndarray | None = None
         self._filter_mask: np.ndarray | None = None
@@ -113,13 +115,14 @@ class HaloLayer:
 
     def _clear_actors(self) -> None:
         for actor in self._actors:
-            self._pl.remove_actor(actor)
+            self._pl.remove_actor(actor, render=False)
         self._actors.clear()
 
     def _redraw(self) -> None:
-        self._clear_actors()
         snap = self._snapshot
         if snap is None or snap.count == 0:
+            self._clear_actors()
+            self._cloud = None
             return
 
         # Combined focus + filter mask
@@ -135,12 +138,29 @@ class HaloLayer:
                 snap_num=snap.snap_num,
             )
             if snap.count == 0:
+                self._clear_actors()
+                self._cloud = None
                 return
 
         colors = self._compute_colors(snap)
         radii  = halo_world_radii(snap.masses)
 
-        self._render_gaussian(snap.positions, colors, radii)
+        # Use in-place update when only the data has changed AND the point
+        # count is identical — otherwise we'd leave VTK pointing at freed
+        # memory (the mapper / shader caches array pointers).
+        target_params = (self._colormap, self._opacity)
+        can_reuse = (
+            self._cloud is not None
+            and self._actors
+            and self._render_params == target_params
+            and self._cloud.n_points == len(snap.positions)
+        )
+        if can_reuse:
+            self._update_in_place(snap.positions, colors, radii)
+        else:
+            self._clear_actors()
+            self._render_gaussian(snap.positions, colors, radii)
+            self._render_params = target_params
 
     def _render_gaussian(
         self,
@@ -162,14 +182,33 @@ class HaloLayer:
             emissive=False,
             opacity=self._opacity,
             show_scalar_bar=False,
+            render=False,
+            reset_camera=False,
         )
-        # Size each splat in world coordinates (Mpc/h) rather than screen pixels.
         mapper = actor.mapper
         mapper.SetScaleArray("radius")
         mapper.SetScaleFactor(1.0)
         if not self._visible:
             actor.SetVisibility(False)
+        self._cloud = cloud
         self._actors.append(actor)
+
+    def _update_in_place(
+        self,
+        positions: np.ndarray,
+        colors: np.ndarray,
+        radii: np.ndarray,
+    ) -> None:
+        """Update the persistent PolyData's points/scalars without rebuilding
+        the actor/mapper/shader pipeline. Avoids the ~50–100 ms VTK setup cost
+        per snapshot transition."""
+        cloud = self._cloud
+        if cloud is None:
+            return
+        cloud.points         = positions
+        cloud["scalar"]      = colors
+        cloud["radius"]      = radii
+        cloud.Modified()
 
     def _compute_colors(self, snap: HaloSnapshot) -> np.ndarray:
         vmin, vmax = _RANGES[self._color_mode]

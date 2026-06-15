@@ -98,6 +98,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.filter_gal_ffb     = "any"          # any | yes | no   (FFBRegime)
     state.filter_gal_cgm     = "any"          # any | cold | hot (Regime 0/1)
     state.filter_gal_env     = "all"          # all | field | isolated | group | cluster
+    state.filter_gal_age     = [0.0, 14.0]    # Gyr  (mass-weighted stellar age)
+
+    # ── Galaxy info panel ──────────────────────────────────────
+    state.galinfo_show  = False
+    state.galinfo_items = []   # list[{label, value}] for the panel
 
     # ── Record state ───────────────────────────────────────────
     state.recording_active   = False
@@ -183,29 +188,46 @@ def build_navigation_panel(server, scene: Scene) -> None:
             elif t == "satellite":
                 g_mask &= galaxies.gal_type > 0
 
-            bh_lo, bh_hi = state.filter_gal_bhmass
-            bh_log = np.log10(np.maximum(galaxies.bh_mass, 1.0))
-            g_mask &= (bh_log >= float(bh_lo)) & (bh_log <= float(bh_hi))
+            fields = scene.primary.fields_available
 
-            ics_lo, ics_hi = state.filter_gal_ics
-            ics_log = np.log10(np.maximum(galaxies.ics_mass, 1.0))
-            g_mask &= (ics_log >= float(ics_lo)) & (ics_log <= float(ics_hi))
+            if fields.get("bh_mass", False):
+                bh_lo, bh_hi = state.filter_gal_bhmass
+                bh_log = np.log10(np.maximum(galaxies.bh_mass, 1.0))
+                g_mask &= (bh_log >= float(bh_lo)) & (bh_log <= float(bh_hi))
 
-            ffb = str(state.filter_gal_ffb)
-            if ffb == "yes":
-                g_mask &= galaxies.ffb_regime != 0
-            elif ffb == "no":
-                g_mask &= galaxies.ffb_regime == 0
+            if fields.get("ics_mass", False):
+                ics_lo, ics_hi = state.filter_gal_ics
+                ics_log = np.log10(np.maximum(galaxies.ics_mass, 1.0))
+                g_mask &= (ics_log >= float(ics_lo)) & (ics_log <= float(ics_hi))
 
-            cgm = str(state.filter_gal_cgm)
-            if cgm == "cold":
-                g_mask &= galaxies.cgm_regime == 0
-            elif cgm == "hot":
-                g_mask &= galaxies.cgm_regime == 1
+            if fields.get("ffb_regime", False):
+                ffb = str(state.filter_gal_ffb)
+                if ffb == "yes":
+                    g_mask &= galaxies.ffb_regime != 0
+                elif ffb == "no":
+                    g_mask &= galaxies.ffb_regime == 0
+
+            if fields.get("cgm_regime", False):
+                cgm = str(state.filter_gal_cgm)
+                if cgm == "cold":
+                    g_mask &= galaxies.cgm_regime == 0
+                elif cgm == "hot":
+                    g_mask &= galaxies.cgm_regime == 1
+
+            if fields.get("mean_age", False):
+                age_lo, age_hi = state.filter_gal_age
+                ages = galaxies.mean_age
+                # 0-age galaxies are those with no SFH data — keep them visible
+                # only when the slider includes 0 to avoid hiding everything.
+                age_mask = (ages >= float(age_lo)) & (ages <= float(age_hi))
+                if float(age_lo) > 0.0:
+                    g_mask &= age_mask
+                else:
+                    g_mask &= (ages == 0) | age_mask
 
             # Environment from host (FOF) Mvir
             env = str(state.filter_gal_env)
-            if env != "all":
+            if env != "all" and fields.get("central_mvir", False):
                 cm = galaxies.central_mvir
                 cm_safe = np.maximum(cm, 1.0)
                 log_cm = np.log10(cm_safe)
@@ -230,6 +252,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         "filter_gal_bt", "filter_gal_type",
         "filter_gal_bhmass", "filter_gal_ics",
         "filter_gal_ffb", "filter_gal_cgm", "filter_gal_env",
+        "filter_gal_age",
     )
     def on_filter_change(**_):
         _apply_filters()
@@ -252,6 +275,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.filter_gal_ffb    = "any"
         state.filter_gal_cgm    = "any"
         state.filter_gal_env    = "all"
+        state.filter_gal_age    = [0.0, 14.0]
         state.flush()
 
     # ------------------------------------------------------------------
@@ -357,7 +381,49 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @ctrl.set("clear_indicator")
     def on_clear_indicator():
         scene.camera._clear_indicator()
+        state.galinfo_show = False
+        state.galinfo_items = []
+        state.flush()
         _push()
+
+    _GALINFO_STANDOFF_MPC = 30.0   # camera distance from the galaxy
+    _GALINFO_FOCUS_MPC    = 10.0   # focus sphere radius (mask region)
+
+    @ctrl.set("show_galaxy_info")
+    def on_show_galaxy_info():
+        from sage_viewer.utils.galaxy_info import build_galaxy_info
+        try:
+            gidx = int(state.nav_gal_idx)
+        except (TypeError, ValueError):
+            return
+        _, galaxies = scene._loader.get(scene.current_snap)
+        if gidx < 0 or gidx >= galaxies.count:
+            return
+
+        # Zoom out to 30 Mpc/h standoff but focus-mask to a tighter 10 Mpc/h
+        # sphere around the target — gives a clean local neighbourhood view.
+        center = scene.camera.go_to_galaxy(gidx, _GALINFO_STANDOFF_MPC)
+        if center != (0.0, 0.0, 0.0):
+            scene.set_focus_sphere(center, _GALINFO_FOCUS_MPC)
+            state.focus_active = True
+            state.nav_gal_last_radius = _GALINFO_FOCUS_MPC
+
+        info = build_galaxy_info(
+            galaxies=galaxies,
+            fields_available=scene.primary.fields_available,
+            idx=gidx,
+            snap_table=scene._snap_table,
+            hubble_h=scene._cfg.hubble_h,
+        )
+        state.galinfo_items = [{"label": k, "value": v} for k, v in info.items()]
+        state.galinfo_show  = True
+        state.flush()
+        _push()
+
+    @ctrl.set("hide_galaxy_info")
+    def on_hide_galaxy_info():
+        state.galinfo_show = False
+        state.flush()
 
     # ------------------------------------------------------------------
     # Record / screenshot controllers
@@ -765,7 +831,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VSlider(
                         v_model=("halo_opacity",), label="Opacity",
                         min=0.0, max=1.0, step=0.01,
-                        thumb_label="always", color="cyan", hide_details=True,
+                        thumb_label=True, color="cyan", hide_details=True,
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
@@ -812,7 +878,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VSlider(
                         v_model=("galaxy_opacity",), label="Opacity",
                         min=0.0, max=1.0, step=0.01,
-                        thumb_label="always", color="deep-purple", hide_details=True,
+                        thumb_label=True, color="deep-purple", hide_details=True,
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
@@ -909,6 +975,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             click=ctrl.go_to_galaxy_5)
 
                 v3.VDivider(style="margin:14px 0 10px;")
+
+                v3.VBtn(
+                    "Galaxy Info",
+                    block=True, color="deep-purple",
+                    density="compact",
+                    prepend_icon="mdi-information-outline",
+                    click=ctrl.show_galaxy_info,
+                    style="margin-bottom:6px;",
+                )
 
                 v3.VBtn(
                     "Clear Indicator",
@@ -1018,6 +1093,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     density="compact", hide_details=True,
                 )
                 v3.VLabel(
+                    "Stellar age  (Gyr, mass-weighted)",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VRangeSlider(
+                    v_model=("filter_gal_age",),
+                    min=0.0, max=14.0, step=0.1,
+                    thumb_label=True, color="deep-purple",
+                    density="compact", hide_details=True,
+                    disabled=("!model_fields.mean_age",),
+                )
+                v3.VLabel(
                     "BH mass  (log₁₀ M☉)",
                     style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
                 )
@@ -1026,6 +1112,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     min=0.0, max=10.0, step=0.1,
                     thumb_label=True, color="deep-purple",
                     density="compact", hide_details=True,
+                    disabled=("!model_fields.bh_mass",),
                 )
                 v3.VLabel(
                     "ICS mass  (log₁₀ M☉)",
@@ -1036,6 +1123,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     min=0.0, max=12.0, step=0.1,
                     thumb_label=True, color="deep-purple",
                     density="compact", hide_details=True,
+                    disabled=("!model_fields.ics_mass",),
                 )
 
                 v3.VLabel(
@@ -1066,6 +1154,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ],),
                     hide_details=True, variant="outlined",
                     color="deep-purple", density="compact",
+                    disabled=("!model_fields.ffb_regime",),
                 )
 
                 v3.VLabel(
@@ -1081,6 +1170,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ],),
                     hide_details=True, variant="outlined",
                     color="deep-purple", density="compact",
+                    disabled=("!model_fields.cgm_regime",),
                 )
 
                 v3.VLabel(
@@ -1098,6 +1188,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ],),
                     hide_details=True, variant="outlined",
                     color="deep-purple", density="compact",
+                    disabled=("!model_fields.central_mvir",),
                 )
 
                 v3.VDivider(style="margin:14px 0 10px;")

@@ -42,6 +42,8 @@ class GalaxyLayer:
         self._opacity = opacity
         self._visible = visible
         self._actors: list = []
+        self._cloud:  pv.PolyData | None = None   # persistent geometry
+        self._render_params: tuple = ()           # tracks need-to-rebuild
         self._snapshot: GalaxySnapshot | None = None
         self._focus_mask: np.ndarray | None = None
         self._filter_mask: np.ndarray | None = None
@@ -124,13 +126,14 @@ class GalaxyLayer:
 
     def _clear_actors(self) -> None:
         for actor in self._actors:
-            self._pl.remove_actor(actor)
+            self._pl.remove_actor(actor, render=False)
         self._actors.clear()
 
     def _redraw(self) -> None:
-        self._clear_actors()
         snap = self._snapshot
         if snap is None or snap.count == 0:
+            self._clear_actors()
+            self._cloud = None
             return
 
         # Combined focus + filter mask
@@ -151,18 +154,56 @@ class GalaxyLayer:
                 ffb_regime=snap.ffb_regime[mask],
                 cgm_regime=snap.cgm_regime[mask],
                 central_mvir=snap.central_mvir[mask],
+                h2_mass=snap.h2_mass[mask],
+                galaxy_id=snap.galaxy_id[mask],
+                central_id=snap.central_id[mask],
+                time_of_infall=snap.time_of_infall[mask],
+                mean_age=snap.mean_age[mask],
                 snap_num=snap.snap_num,
             )
             if snap.count == 0:
+                self._clear_actors()
+                self._cloud = None
                 return
 
         radii = galaxy_world_radii(snap.stellar_mass)
 
+        # In-place update is only safe for the single-actor path (non-"type").
         if self._color_mode == "type":
+            self._clear_actors()
+            self._cloud = None
+            self._render_params = ()
             self._render_by_type(snap, radii)
+            return
+
+        colors = self._compute_colors(snap)
+        target_params = (self._color_mode, self._colormap, self._opacity)
+        can_reuse = (
+            self._cloud is not None
+            and self._actors
+            and self._render_params == target_params
+            and self._cloud.n_points == len(snap.positions)
+        )
+        if can_reuse:
+            self._update_in_place(snap.positions, colors, radii)
         else:
-            colors = self._compute_colors(snap)
+            self._clear_actors()
             self._render_gaussian(snap.positions, colors, radii, self._colormap)
+            self._render_params = target_params
+
+    def _update_in_place(
+        self,
+        positions: np.ndarray,
+        colors: np.ndarray,
+        radii: np.ndarray,
+    ) -> None:
+        cloud = self._cloud
+        if cloud is None:
+            return
+        cloud.points    = positions
+        cloud["scalar"] = colors
+        cloud["radius"] = radii
+        cloud.Modified()
 
     def _render_by_type(self, snap: GalaxySnapshot, radii: np.ndarray) -> None:
         mass_colors = normalize_log(snap.stellar_mass, *_RANGES["stellar_mass"])
@@ -197,6 +238,8 @@ class GalaxyLayer:
             emissive=False,
             opacity=self._opacity,
             show_scalar_bar=False,
+            render=False,
+            reset_camera=False,
         )
         # Make the gaussian splats sized in world coordinates (Mpc/h) via
         # the per-point "radius" array rather than fixed screen pixels.
@@ -205,6 +248,7 @@ class GalaxyLayer:
         mapper.SetScaleFactor(1.0)
         if not self._visible:
             actor.SetVisibility(False)
+        self._cloud = cloud
         self._actors.append(actor)
 
     def _compute_colors(self, snap: GalaxySnapshot) -> np.ndarray:

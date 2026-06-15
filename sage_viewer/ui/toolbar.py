@@ -38,7 +38,7 @@ _ROTATE_ITEMS = [
     {"title": "CCW 60°/s",  "value": "ccw_60"},
 ]
 
-_ROT_RATE_FPS = 20   # rotation render rate
+_ROT_RATE_FPS = 12   # rotation render rate — lower = less load, larger steps
 
 def _parse_rotate(mode: str) -> tuple[float, float]:
     """Return (sign, deg_per_second) for a rotate_mode string, or (0, 0) for off."""
