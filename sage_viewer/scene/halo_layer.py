@@ -7,7 +7,7 @@ import pyvista as pv
 
 from sage_viewer.io.halo_reader import HaloSnapshot
 from sage_viewer.utils.colormap import compute_density_colors, normalize_log
-from sage_viewer.utils.sizing import HALO_SIZE_BINS, halo_point_sizes, size_bin_mask
+from sage_viewer.utils.sizing import halo_world_radii
 
 ColorMode = Literal["mvir", "rvir", "vvir"]
 
@@ -16,9 +16,6 @@ _RANGES = {
     "rvir": (-1.5, 0.5),    # log10(Mpc/h)
     "vvir": (1.5, 3.0),     # log10(km/s)
 }
-
-_HALO_GAUSSIAN_BINS = [3.5, 3.625, 3.75, 3.875, 4.0]
-
 
 class HaloLayer:
     """Manages the halo point-cloud actor(s) inside a PyVista Plotter."""
@@ -126,36 +123,38 @@ class HaloLayer:
                 return
 
         colors = self._compute_colors(snap)
-        sizes  = halo_point_sizes(snap.masses)
+        radii  = halo_world_radii(snap.masses)
 
-        self._render_gaussian(snap.positions, colors, sizes)
+        self._render_gaussian(snap.positions, colors, radii)
 
     def _render_gaussian(
         self,
         positions: np.ndarray,
         colors: np.ndarray,
-        sizes: np.ndarray,
+        radii: np.ndarray,
     ) -> None:
-        masks = size_bin_mask(sizes, HALO_SIZE_BINS)
-        for i, mask in enumerate(masks):
-            if not np.any(mask):
-                continue
-            cloud = pv.PolyData(positions[mask])
-            cloud["scalar"] = colors[mask]
-            actor = self._pl.add_mesh(
-                cloud,
-                scalars="scalar",
-                cmap=self._colormap,
-                clim=[0.0, 1.0],
-                style="points_gaussian",
-                point_size=_HALO_GAUSSIAN_BINS[i],
-                emissive=False,
-                opacity=self._opacity,
-                show_scalar_bar=False,
-            )
-            if not self._visible:
-                actor.SetVisibility(False)
-            self._actors.append(actor)
+        if len(positions) == 0:
+            return
+        cloud = pv.PolyData(positions)
+        cloud["scalar"] = colors
+        cloud["radius"] = radii
+        actor = self._pl.add_mesh(
+            cloud,
+            scalars="scalar",
+            cmap=self._colormap,
+            clim=[0.0, 1.0],
+            style="points_gaussian",
+            emissive=False,
+            opacity=self._opacity,
+            show_scalar_bar=False,
+        )
+        # Size each splat in world coordinates (Mpc/h) rather than screen pixels.
+        mapper = actor.mapper
+        mapper.SetScaleArray("radius")
+        mapper.SetScaleFactor(1.0)
+        if not self._visible:
+            actor.SetVisibility(False)
+        self._actors.append(actor)
 
     def _compute_colors(self, snap: HaloSnapshot) -> np.ndarray:
         vmin, vmax = _RANGES[self._color_mode]

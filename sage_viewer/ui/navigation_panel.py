@@ -73,11 +73,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # Navigation state
     state.nav_halo_idx         = 0
     state.nav_gal_idx          = 0
-    state.nav_gal_last_radius  = 1.0
+    state.nav_gal_last_radius  = 5.0   # 5 Mpc/h
     state.nav_x                = round(scene._cfg.box_size / 2, 2)
     state.nav_y                = round(scene._cfg.box_size / 2, 2)
     state.nav_z                = round(scene._cfg.box_size / 2, 2)
-    state.nav_distance         = 5.0
+    state.nav_distance         = 5.0   # 5 Mpc/h
     state.nav_box_xmin         = 0.0
     state.nav_box_xmax         = round(scene._cfg.box_size / 2, 2)
     state.nav_box_ymin         = 0.0
@@ -202,15 +202,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     @ctrl.set("go_to_galaxy_1")
     def on_go_to_galaxy_1():
-        _go_to_galaxy_at_radius(1.0)
+        _go_to_galaxy_at_radius(3.0)    # 3 Mpc/h
 
     @ctrl.set("go_to_galaxy_3")
     def on_go_to_galaxy_3():
-        _go_to_galaxy_at_radius(3.0)
+        _go_to_galaxy_at_radius(5.0)    # 5 Mpc/h
 
     @ctrl.set("go_to_galaxy_5")
     def on_go_to_galaxy_5():
-        _go_to_galaxy_at_radius(5.0)
+        _go_to_galaxy_at_radius(10.0)   # 10 Mpc/h
 
     @ctrl.set("go_to_galaxy_enter")
     def on_go_to_galaxy_enter():
@@ -495,11 +495,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     variant="outlined", density="compact",
                     style="width:100%;",
                 ):
-                    v3.VBtn("1", style="flex:1;", color="deep-purple",
+                    v3.VBtn("3",  style="flex:1;", color="deep-purple",
                             click=ctrl.go_to_galaxy_1)
-                    v3.VBtn("3", style="flex:1;", color="deep-purple",
+                    v3.VBtn("5",  style="flex:1;", color="deep-purple",
                             click=ctrl.go_to_galaxy_3)
-                    v3.VBtn("5", style="flex:1;", color="deep-purple",
+                    v3.VBtn("10", style="flex:1;", color="deep-purple",
                             click=ctrl.go_to_galaxy_5)
 
                 v3.VDivider(style="margin:14px 0 10px;")

@@ -7,12 +7,7 @@ import pyvista as pv
 
 from sage_viewer.io.galaxy_reader import GalaxySnapshot
 from sage_viewer.utils.colormap import compute_density_colors, normalize_log
-from sage_viewer.utils.sizing import (
-    GALAXY_SIZE_SCALE,
-    HALO_SIZE_BINS,
-    galaxy_point_sizes,
-    size_bin_mask,
-)
+from sage_viewer.utils.sizing import galaxy_world_radii
 
 ColorMode = Literal[
     "stellar_mass", "ssfr", "sfr", "cold_gas", "bulge_mass", "density", "type"
@@ -26,8 +21,6 @@ _RANGES = {
     "ssfr":         (-14.0, -8.0),  # log10(yr^-1)
 }
 
-_GALAXY_SIZE_BINS    = [s * GALAXY_SIZE_SCALE for s in HALO_SIZE_BINS]
-_GALAXY_GAUSSIAN_BINS = [0.5, 0.625, 0.75, 0.875, 1.0]   # render sizes for gaussian mode
 _CENTRAL_CMAP    = "Blues"
 _SATELLITE_CMAP  = "Reds"
 
@@ -139,15 +132,15 @@ class GalaxyLayer:
             if snap.count == 0:
                 return
 
-        sizes = galaxy_point_sizes(snap.stellar_mass)
+        radii = galaxy_world_radii(snap.stellar_mass)
 
         if self._color_mode == "type":
-            self._render_by_type(snap, sizes)
+            self._render_by_type(snap, radii)
         else:
             colors = self._compute_colors(snap)
-            self._render_gaussian(snap.positions, colors, sizes, self._colormap)
+            self._render_gaussian(snap.positions, colors, radii, self._colormap)
 
-    def _render_by_type(self, snap: GalaxySnapshot, sizes: np.ndarray) -> None:
+    def _render_by_type(self, snap: GalaxySnapshot, radii: np.ndarray) -> None:
         mass_colors = normalize_log(snap.stellar_mass, *_RANGES["stellar_mass"])
         for mask, cmap in [
             (snap.gal_type == 0, _CENTRAL_CMAP),
@@ -156,36 +149,39 @@ class GalaxyLayer:
             if not np.any(mask):
                 continue
             self._render_gaussian(
-                snap.positions[mask], mass_colors[mask], sizes[mask], cmap
+                snap.positions[mask], mass_colors[mask], radii[mask], cmap
             )
 
     def _render_gaussian(
         self,
         positions: np.ndarray,
         colors: np.ndarray,
-        sizes: np.ndarray,
+        radii: np.ndarray,
         cmap: str,
     ) -> None:
-        masks = size_bin_mask(sizes, _GALAXY_SIZE_BINS)
-        for i, mask in enumerate(masks):
-            if not np.any(mask):
-                continue
-            cloud = pv.PolyData(positions[mask])
-            cloud["scalar"] = colors[mask]
-            actor = self._pl.add_mesh(
-                cloud,
-                scalars="scalar",
-                cmap=cmap,
-                clim=[0.0, 1.0],
-                style="points_gaussian",
-                point_size=_GALAXY_GAUSSIAN_BINS[i],
-                emissive=False,
-                opacity=self._opacity,
-                show_scalar_bar=False,
-            )
-            if not self._visible:
-                actor.SetVisibility(False)
-            self._actors.append(actor)
+        if len(positions) == 0:
+            return
+        cloud = pv.PolyData(positions)
+        cloud["scalar"] = colors
+        cloud["radius"] = radii
+        actor = self._pl.add_mesh(
+            cloud,
+            scalars="scalar",
+            cmap=cmap,
+            clim=[0.0, 1.0],
+            style="points_gaussian",
+            emissive=False,
+            opacity=self._opacity,
+            show_scalar_bar=False,
+        )
+        # Make the gaussian splats sized in world coordinates (Mpc/h) via
+        # the per-point "radius" array rather than fixed screen pixels.
+        mapper = actor.mapper
+        mapper.SetScaleArray("radius")
+        mapper.SetScaleFactor(1.0)
+        if not self._visible:
+            actor.SetVisibility(False)
+        self._actors.append(actor)
 
     def _compute_colors(self, snap: GalaxySnapshot) -> np.ndarray:
         if self._color_mode == "density":

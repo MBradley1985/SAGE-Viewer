@@ -43,6 +43,36 @@ def galaxy_point_sizes(
     return (size_min + norm * (size_max - size_min)).astype(np.float32)
 
 
+def galaxy_world_radii(
+    stellar_mass: np.ndarray,
+    r_min: float = 0.025,   # Mpc/h  (low-mass end)
+    r_max: float = 0.25,    # Mpc/h  (high-mass end)
+    mass_range: tuple[float, float] = STELLAR_MASS_RANGE,
+) -> np.ndarray:
+    """Per-galaxy world-space gaussian radius (Mpc/h), scaling with stellar mass."""
+    if len(stellar_mass) == 0:
+        return np.array([], dtype=np.float32)
+    log_m = np.log10(np.maximum(stellar_mass, 1.0))
+    vmin, vmax = mass_range
+    norm = np.clip((log_m - vmin) / (vmax - vmin + 1e-10), 0.0, 1.0)
+    return (r_min + norm * (r_max - r_min)).astype(np.float32)
+
+
+def halo_world_radii(
+    masses: np.ndarray,
+    r_min: float = 0.15,    # Mpc/h  (low-mass end)
+    r_max: float = 1.5,     # Mpc/h  (high-mass end)
+    mass_range: tuple[float, float] = HALO_MASS_RANGE,
+) -> np.ndarray:
+    """Per-halo world-space gaussian radius (Mpc/h), scaling with Mvir."""
+    if len(masses) == 0:
+        return np.array([], dtype=np.float32)
+    log_m = np.log10(np.maximum(masses, 1.0))
+    vmin, vmax = mass_range
+    norm = np.clip((log_m - vmin) / (vmax - vmin + 1e-10), 0.0, 1.0)
+    return (r_min + norm * (r_max - r_min)).astype(np.float32)
+
+
 def size_bin_mask(
     sizes: np.ndarray, bin_edges: list[float]
 ) -> list[np.ndarray]:
