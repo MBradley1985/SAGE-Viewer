@@ -35,7 +35,8 @@ class HaloLayer:
         self._visible = visible
         self._actors: list = []
         self._snapshot: HaloSnapshot | None = None
-        self._mask: np.ndarray | None = None
+        self._focus_mask: np.ndarray | None = None
+        self._filter_mask: np.ndarray | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -87,10 +88,24 @@ class HaloLayer:
         self._redraw()
 
     def set_mask(self, mask: "np.ndarray | None") -> None:
-        """Boolean mask selecting which points to render. None = show all."""
-        self._mask = mask
+        self.set_focus_mask(mask)
+
+    def set_focus_mask(self, mask: "np.ndarray | None") -> None:
+        self._focus_mask = mask
         if self._snapshot is not None:
             self._redraw()
+
+    def set_filter_mask(self, mask: "np.ndarray | None") -> None:
+        self._filter_mask = mask
+        if self._snapshot is not None:
+            self._redraw()
+
+    def _combined_mask(self) -> "np.ndarray | None":
+        if self._focus_mask is None:
+            return self._filter_mask
+        if self._filter_mask is None:
+            return self._focus_mask
+        return self._focus_mask & self._filter_mask
 
     # ------------------------------------------------------------------
     # Internal
@@ -107,16 +122,16 @@ class HaloLayer:
         if snap is None or snap.count == 0:
             return
 
-        # Apply spatial focus mask if set
-        if self._mask is not None and len(self._mask) == snap.count:
-            import dataclasses
+        # Combined focus + filter mask
+        mask = self._combined_mask()
+        if mask is not None and len(mask) == snap.count:
             from sage_viewer.io.halo_reader import HaloSnapshot as _HS
             snap = _HS(
-                positions=snap.positions[self._mask],
-                masses=snap.masses[self._mask],
-                vmax=snap.vmax[self._mask],
-                rvir=snap.rvir[self._mask],
-                vvir=snap.vvir[self._mask],
+                positions=snap.positions[mask],
+                masses=snap.masses[mask],
+                vmax=snap.vmax[mask],
+                rvir=snap.rvir[mask],
+                vvir=snap.vvir[mask],
                 snap_num=snap.snap_num,
             )
             if snap.count == 0:

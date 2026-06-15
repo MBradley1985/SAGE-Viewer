@@ -59,7 +59,7 @@ _GAL_CB = {
 }
 
 _CBAR_BASE = (
-    "height:8px;width:100%;border-radius:2px;"
+    "height:8px;flex:1;min-width:0;border-radius:2px;"
     "background:"
 )
 
@@ -86,6 +86,23 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.nav_box_zmax         = round(scene._cfg.box_size / 2, 2)
     state.focus_active         = False
     state.nav_active_tab       = "layers"
+
+    # ── Filter state (log10 ranges where appropriate) ──────────
+    state.filter_halo_mvir   = [10.0, 15.0]   # log10 Msun
+    state.filter_gal_smass   = [8.0, 12.5]    # log10 Msun
+    state.filter_gal_ssfr    = [-14.0, -8.0]  # log10 yr^-1
+    state.filter_gal_bt      = [0.0, 1.0]     # bulge/total
+    state.filter_gal_type    = "both"         # both | central | satellite
+    state.filter_gal_bhmass  = [4.0, 10.0]    # log10 Msun
+    state.filter_gal_ics     = [6.0, 12.0]    # log10 Msun
+    state.filter_gal_ffb     = "any"          # any | yes | no   (FFBRegime)
+    state.filter_gal_cgm     = "any"          # any | cold | hot (Regime 0/1)
+    state.filter_gal_env     = "all"          # all | field | isolated | group | cluster
+
+    # ── Record state ───────────────────────────────────────────
+    state.recording_active   = False
+    state.recording_frames   = 0
+    state.recording_dir      = ""
 
     # Colorbar state — full style strings to avoid Vue concatenation issues
     from sage_viewer.utils.colormap import cmap_css_gradient
@@ -115,6 +132,113 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     def _focused() -> bool:
         return bool(state.focus_active)
+
+    # ------------------------------------------------------------------
+    # Filter recompute — runs whenever any filter changes OR snapshot changes
+    # ------------------------------------------------------------------
+
+    def _apply_filters() -> None:
+        import numpy as np
+        halos, galaxies = scene._loader.get(scene.current_snap)
+
+        # Halo: Mvir range
+        h_lo, h_hi = state.filter_halo_mvir
+        h_log = np.log10(np.maximum(halos.masses, 1.0))
+        h_mask = (h_log >= float(h_lo)) & (h_log <= float(h_hi))
+        # If filter is full range, set None to skip masking work
+        if float(h_lo) <= 10.0 + 1e-6 and float(h_hi) >= 15.0 - 1e-6:
+            h_mask = None
+        scene.halo_layer.set_filter_mask(h_mask)
+
+        # Galaxy: stellar mass, sSFR, B/T, type
+        if galaxies.count == 0:
+            scene.galaxy_layer.set_filter_mask(None)
+        else:
+            g_mask = np.ones(galaxies.count, dtype=bool)
+
+            sm_lo, sm_hi = state.filter_gal_smass
+            sm_log = np.log10(np.maximum(galaxies.stellar_mass, 1.0))
+            g_mask &= (sm_log >= float(sm_lo)) & (sm_log <= float(sm_hi))
+
+            ss_lo, ss_hi = state.filter_gal_ssfr
+            ssfr_log = np.log10(np.maximum(galaxies.ssfr, 1e-30))
+            g_mask &= (ssfr_log >= float(ss_lo)) & (ssfr_log <= float(ss_hi))
+
+            bt_lo, bt_hi = state.filter_gal_bt
+            sm_safe = np.maximum(galaxies.stellar_mass, 1.0)
+            bt = galaxies.bulge_mass / sm_safe
+            g_mask &= (bt >= float(bt_lo)) & (bt <= float(bt_hi))
+
+            t = str(state.filter_gal_type)
+            if t == "central":
+                g_mask &= galaxies.gal_type == 0
+            elif t == "satellite":
+                g_mask &= galaxies.gal_type > 0
+
+            bh_lo, bh_hi = state.filter_gal_bhmass
+            bh_log = np.log10(np.maximum(galaxies.bh_mass, 1.0))
+            g_mask &= (bh_log >= float(bh_lo)) & (bh_log <= float(bh_hi))
+
+            ics_lo, ics_hi = state.filter_gal_ics
+            ics_log = np.log10(np.maximum(galaxies.ics_mass, 1.0))
+            g_mask &= (ics_log >= float(ics_lo)) & (ics_log <= float(ics_hi))
+
+            ffb = str(state.filter_gal_ffb)
+            if ffb == "yes":
+                g_mask &= galaxies.ffb_regime != 0
+            elif ffb == "no":
+                g_mask &= galaxies.ffb_regime == 0
+
+            cgm = str(state.filter_gal_cgm)
+            if cgm == "cold":
+                g_mask &= galaxies.cgm_regime == 0
+            elif cgm == "hot":
+                g_mask &= galaxies.cgm_regime == 1
+
+            # Environment from host (FOF) Mvir
+            env = str(state.filter_gal_env)
+            if env != "all":
+                cm = galaxies.central_mvir
+                cm_safe = np.maximum(cm, 1.0)
+                log_cm = np.log10(cm_safe)
+                if env == "field":
+                    g_mask &= log_cm < 11.0
+                elif env == "isolated":
+                    g_mask &= (log_cm >= 11.0) & (log_cm < 12.5)
+                elif env == "group":
+                    g_mask &= (log_cm >= 12.5) & (log_cm < 14.0)
+                elif env == "cluster":
+                    g_mask &= log_cm >= 14.0
+
+            scene.galaxy_layer.set_filter_mask(g_mask)
+
+        _push()
+
+    # Re-apply on every snapshot change (new data, masks must be rebuilt)
+    scene.register_snap_change_callback(lambda _n: _apply_filters())
+
+    @state.change(
+        "filter_halo_mvir", "filter_gal_smass", "filter_gal_ssfr",
+        "filter_gal_bt", "filter_gal_type",
+        "filter_gal_bhmass", "filter_gal_ics",
+        "filter_gal_ffb", "filter_gal_cgm", "filter_gal_env",
+    )
+    def on_filter_change(**_):
+        _apply_filters()
+
+    @ctrl.set("reset_filters")
+    def on_reset_filters():
+        state.filter_halo_mvir  = [10.0, 15.0]
+        state.filter_gal_smass  = [8.0, 12.5]
+        state.filter_gal_ssfr   = [-14.0, -8.0]
+        state.filter_gal_bt     = [0.0, 1.0]
+        state.filter_gal_type   = "both"
+        state.filter_gal_bhmass = [4.0, 10.0]
+        state.filter_gal_ics    = [6.0, 12.0]
+        state.filter_gal_ffb    = "any"
+        state.filter_gal_cgm    = "any"
+        state.filter_gal_env    = "all"
+        state.flush()
 
     # ------------------------------------------------------------------
     # Layer change handlers
@@ -221,6 +345,64 @@ def build_navigation_panel(server, scene: Scene) -> None:
         scene.camera._clear_indicator()
         _push()
 
+    # ------------------------------------------------------------------
+    # Record / screenshot controllers
+    # ------------------------------------------------------------------
+
+    _record_state: dict = {"active": False, "dir": None, "frames": 0, "cb": None}
+
+    def _screenshot_path(prefix: str = "sage") -> "pathlib.Path":
+        import datetime
+        import pathlib
+        outdir = pathlib.Path.home() / "sage_screenshots"
+        outdir.mkdir(exist_ok=True)
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        return outdir / f"{prefix}_{ts}.png"
+
+    @ctrl.set("take_screenshot")
+    def on_take_screenshot():
+        path = _screenshot_path("snap")
+        scene.plotter.screenshot(str(path))
+        state.pick_info = f"Screenshot saved: {path}"
+        state.flush()
+
+    @ctrl.set("start_recording")
+    def on_start_recording():
+        if _record_state["active"]:
+            return
+        import datetime
+        import pathlib
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        outdir = pathlib.Path.home() / "sage_recordings" / f"run_{ts}"
+        outdir.mkdir(parents=True, exist_ok=True)
+        _record_state["active"] = True
+        _record_state["dir"]    = outdir
+        _record_state["frames"] = 0
+        state.recording_active = True
+        state.recording_dir    = str(outdir)
+        state.recording_frames = 0
+
+        def _on_snap_for_record(snap_num: int) -> None:
+            if not _record_state["active"]:
+                return
+            outpath = outdir / f"frame_{snap_num:04d}.png"
+            scene.plotter.screenshot(str(outpath))
+            _record_state["frames"] += 1
+            state.recording_frames = _record_state["frames"]
+            state.flush()
+
+        _record_state["cb"] = _on_snap_for_record
+        scene.register_snap_change_callback(_on_snap_for_record)
+        # Also capture the current frame as frame 0
+        _on_snap_for_record(scene.current_snap)
+        state.flush()
+
+    @ctrl.set("stop_recording")
+    def on_stop_recording():
+        _record_state["active"] = False
+        state.recording_active = False
+        state.flush()
+
     @ctrl.set("go_to_coords")
     def on_go_to_coords():
         x, y, z, d = (
@@ -302,7 +484,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         v3.VDivider(style="flex-shrink:0;")
 
-        # ── Tab rows: Structure (full-width) + nav tabs below ──────
+        # ── Tab rows: 3-up grid, primary row + secondary row ───────
         with v3.VBtnToggle(
             v_model=("nav_active_tab",),
             mandatory=True,
@@ -312,27 +494,19 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 "border-radius:0;display:flex;flex-wrap:wrap;"
             ),
         ):
-            v3.VBtn(
-                "Structure",
-                value="layers",
-                style=(
-                    "width:100%;font-size:0.72rem;font-weight:700;"
-                    "letter-spacing:0.08em;min-width:0;text-transform:none;"
-                ),
-                color=("nav_active_tab === 'layers' ? 'cyan' : '#6b7280'",),
-                variant="text",
-                density="compact",
-            )
             for label, value in [
-                ("Target", "target"),
-                ("Coords", "coords"),
-                ("Box",    "box"),
+                ("Structure", "layers"),
+                ("Filters",   "filters"),
+                ("Record",    "record"),
+                ("Target",    "target"),
+                ("Coords",    "coords"),
+                ("Box",       "box"),
             ]:
                 v3.VBtn(
                     label, value=value,
                     style=(
-                        "flex:1;font-size:0.72rem;letter-spacing:0;"
-                        "min-width:0;text-transform:none;"
+                        "flex:0 0 33.333%;font-size:0.72rem;letter-spacing:0;"
+                        "min-width:0;text-transform:none;font-weight:700;"
                     ),
                     color=(
                         "nav_active_tab === '{}' ? 'cyan' : '#6b7280'".format(value),
@@ -343,10 +517,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         v3.VDivider(style="flex-shrink:0;")
 
-        # ── Tab content ────────────────────────────────────────────
+        # ── Tab content (overflow-y:scroll keeps scrollbar space stable
+        #    across tab switches so the render view never resizes)
         with v3.VSheet(
             color="transparent",
-            style="flex:1;overflow-y:auto;padding:10px 12px;",
+            style="flex:1;overflow-y:scroll;padding:10px 12px;",
         ):
             # Layers
             with v3.VSheet(
@@ -548,3 +723,223 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         "Zoom", block=True, color="cyan",
                         density="compact", click=ctrl.zoom_to_box,
                     )
+
+            # ── FILTERS tab ────────────────────────────────────
+            with v3.VSheet(
+                color="transparent",
+                v_show=("nav_active_tab === 'filters'",),
+            ):
+                v3.VLabel(
+                    "DARK MATTER HALOES",
+                    style=(
+                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
+                        "color:#7c3aed;padding:6px 0 8px;display:block;"
+                    ),
+                )
+                v3.VLabel(
+                    "Mvir range  (log₁₀ M☉)",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:6px 0 2px;",
+                )
+                v3.VRangeSlider(
+                    v_model=("filter_halo_mvir",),
+                    min=10.0, max=15.0, step=0.1,
+                    thumb_label=True, color="cyan",
+                    density="compact", hide_details=True,
+                )
+
+                v3.VDivider(style="margin:14px 0;")
+
+                v3.VLabel(
+                    "GALAXIES",
+                    style=(
+                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
+                        "color:#7c3aed;padding:6px 0 8px;display:block;"
+                    ),
+                )
+                v3.VLabel(
+                    "Stellar mass  (log₁₀ M☉)",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:6px 0 2px;",
+                )
+                v3.VRangeSlider(
+                    v_model=("filter_gal_smass",),
+                    min=8.0, max=12.5, step=0.1,
+                    thumb_label=True, color="deep-purple",
+                    density="compact", hide_details=True,
+                )
+                v3.VLabel(
+                    "sSFR  (log₁₀ yr⁻¹)",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VRangeSlider(
+                    v_model=("filter_gal_ssfr",),
+                    min=-14.0, max=-8.0, step=0.1,
+                    thumb_label=True, color="deep-purple",
+                    density="compact", hide_details=True,
+                )
+                v3.VLabel(
+                    "B / T  (bulge / stellar)",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VRangeSlider(
+                    v_model=("filter_gal_bt",),
+                    min=0.0, max=1.0, step=0.02,
+                    thumb_label=True, color="deep-purple",
+                    density="compact", hide_details=True,
+                )
+                v3.VLabel(
+                    "Type",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VSelect(
+                    v_model=("filter_gal_type",),
+                    items=([
+                        {"title": "All",         "value": "both"},
+                        {"title": "Centrals",    "value": "central"},
+                        {"title": "Satellites",  "value": "satellite"},
+                    ],),
+                    hide_details=True, variant="outlined",
+                    color="deep-purple", density="compact",
+                )
+
+                v3.VLabel(
+                    "BH mass  (log₁₀ M☉)",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VRangeSlider(
+                    v_model=("filter_gal_bhmass",),
+                    min=4.0, max=10.0, step=0.1,
+                    thumb_label=True, color="deep-purple",
+                    density="compact", hide_details=True,
+                )
+                v3.VLabel(
+                    "ICS mass  (log₁₀ M☉)",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VRangeSlider(
+                    v_model=("filter_gal_ics",),
+                    min=6.0, max=12.0, step=0.1,
+                    thumb_label=True, color="deep-purple",
+                    density="compact", hide_details=True,
+                )
+
+                v3.VLabel(
+                    "FFB regime",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VSelect(
+                    v_model=("filter_gal_ffb",),
+                    items=([
+                        {"title": "Any",          "value": "any"},
+                        {"title": "FFB only",     "value": "yes"},
+                        {"title": "Non-FFB only", "value": "no"},
+                    ],),
+                    hide_details=True, variant="outlined",
+                    color="deep-purple", density="compact",
+                )
+
+                v3.VLabel(
+                    "CGM / Hot regime",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VSelect(
+                    v_model=("filter_gal_cgm",),
+                    items=([
+                        {"title": "Any",   "value": "any"},
+                        {"title": "Cold",  "value": "cold"},
+                        {"title": "Hot",   "value": "hot"},
+                    ],),
+                    hide_details=True, variant="outlined",
+                    color="deep-purple", density="compact",
+                )
+
+                v3.VLabel(
+                    "Environment  (host M_FOF)",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VSelect(
+                    v_model=("filter_gal_env",),
+                    items=([
+                        {"title": "All",                          "value": "all"},
+                        {"title": "Field      (< 10¹¹ M☉)",       "value": "field"},
+                        {"title": "Isolated   (10¹¹–10¹²·⁵ M☉)",  "value": "isolated"},
+                        {"title": "Group      (10¹²·⁵–10¹⁴ M☉)",  "value": "group"},
+                        {"title": "Cluster    (> 10¹⁴ M☉)",       "value": "cluster"},
+                    ],),
+                    hide_details=True, variant="outlined",
+                    color="deep-purple", density="compact",
+                )
+
+                v3.VDivider(style="margin:14px 0 10px;")
+
+                v3.VBtn(
+                    "Reset Filters",
+                    block=True, variant="outlined",
+                    color="red", density="compact",
+                    prepend_icon="mdi-restore",
+                    click=ctrl.reset_filters,
+                )
+
+            # ── RECORD tab ─────────────────────────────────────
+            with v3.VSheet(
+                color="transparent",
+                v_show=("nav_active_tab === 'record'",),
+            ):
+                v3.VLabel(
+                    "SCREENSHOT",
+                    style=(
+                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
+                        "color:#7c3aed;padding:6px 0 8px;display:block;"
+                    ),
+                )
+                v3.VBtn(
+                    "Take Screenshot",
+                    block=True, color="cyan",
+                    density="compact",
+                    prepend_icon="mdi-camera",
+                    click=ctrl.take_screenshot,
+                )
+                v3.VLabel(
+                    "Saved to ~/sage_screenshots/",
+                    style="font-size:0.62rem;color:#6b7280;display:block;padding:6px 0;",
+                )
+
+                v3.VDivider(style="margin:14px 0;")
+
+                v3.VLabel(
+                    "RECORD MOVIE",
+                    style=(
+                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
+                        "color:#7c3aed;padding:6px 0 8px;display:block;"
+                    ),
+                )
+                v3.VLabel(
+                    "Captures one PNG per snapshot during playback. "
+                    "Combine to MP4 afterward with ffmpeg.",
+                    style="font-size:0.62rem;color:#9ca3af;display:block;line-height:1.4;padding:0 0 8px;",
+                )
+                with v3.VRow(no_gutters=True, style="gap:6px;"):
+                    with v3.VCol(style="padding:0;"):
+                        v3.VBtn(
+                            "Start", block=True, color="red",
+                            density="compact",
+                            prepend_icon="mdi-record-circle-outline",
+                            click=ctrl.start_recording,
+                            disabled=("recording_active",),
+                        )
+                    with v3.VCol(style="padding:0;"):
+                        v3.VBtn(
+                            "Stop", block=True, color="#6b7280",
+                            density="compact",
+                            prepend_icon="mdi-stop",
+                            click=ctrl.stop_recording,
+                            disabled=("!recording_active",),
+                        )
+
+                v3.VLabel(
+                    "{{ recording_active ? '● Recording — ' + recording_frames + ' frames' : 'Idle' }}",
+                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                )
+                v3.VLabel(
+                    "{{ recording_dir ? 'Output: ' + recording_dir : '' }}",
+                    style="font-size:0.58rem;color:#6b7280;display:block;word-break:break-all;",
+                )

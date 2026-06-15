@@ -38,7 +38,7 @@ _ROTATE_ITEMS = [
     {"title": "CCW 60°/s",  "value": "ccw_60"},
 ]
 
-_ROT_RATE_FPS = 30   # rotation render rate
+_ROT_RATE_FPS = 20   # rotation render rate
 
 def _parse_rotate(mode: str) -> tuple[float, float]:
     """Return (sign, deg_per_second) for a rotate_mode string, or (0, 0) for off."""
@@ -61,9 +61,19 @@ def build_toolbar(server, scene: Scene) -> None:
     state.is_repeat   = False
     state.rotate_mode = "off"
 
-    # Use a plain dict so async coroutines see mutations immediately
-    _ctl = {"playing": False, "reverse": False, "repeat": False,
-            "rotating": False, "rotate_mode": "off"}
+    # Plain dict — direction/repeat flags read from the play coroutine
+    _ctl = {"reverse": False, "repeat": False, "rotate_mode": "off"}
+
+    # asyncio.Event drives pause/stop without relying on state-proxy reactivity.
+    # Created lazily on first use so we bind to the running loop.
+    _stop_evt: list[asyncio.Event | None] = [None]
+    _play_task: list[asyncio.Task | None] = [None]
+    _rotate_task: list[asyncio.Task | None] = [None]
+
+    def _get_stop_evt() -> asyncio.Event:
+        if _stop_evt[0] is None:
+            _stop_evt[0] = asyncio.Event()
+        return _stop_evt[0]
 
     scene.register_snap_change_callback(
         lambda n: state.update({"snap_num": n, "snap_label": scene.snap_label})
@@ -77,6 +87,7 @@ def build_toolbar(server, scene: Scene) -> None:
         scene.set_snapshot(snap)
         state.snap_num   = snap
         state.snap_label = scene.snap_label
+        state.flush()
         _push()
 
     # ------------------------------------------------------------------
@@ -85,54 +96,69 @@ def build_toolbar(server, scene: Scene) -> None:
 
     @state.change("snap_num")
     def on_snap_slider(snap_num, **_):
-        if not _ctl["playing"]:
+        if _play_task[0] is None or _play_task[0].done():
             scene.set_snapshot(int(snap_num))
+            state.snap_label = scene.snap_label
+            state.flush()
             _push()
 
     # ------------------------------------------------------------------
-    # Playback
+    # Playback — driven by a single task + asyncio.Event for instant stop
     # ------------------------------------------------------------------
+
+    async def _play_loop():
+        stop_evt = _get_stop_evt()
+        stop_evt.clear()
+        state.is_playing = True
+        state.flush()
+        try:
+            while not stop_evt.is_set():
+                fps      = _FPS.get(float(state.play_speed), 3)
+                interval = 1.0 / fps
+
+                if _ctl["reverse"]:
+                    next_snap = (scene.current_snap - 1) % snap_count
+                    at_end    = next_snap == 0
+                else:
+                    next_snap = (scene.current_snap + 1) % snap_count
+                    at_end    = next_snap == snap_count - 1
+
+                _go_to(next_snap)
+
+                if at_end and not _ctl["repeat"]:
+                    break
+
+                # Sleep but break early if stop fires
+                try:
+                    await asyncio.wait_for(stop_evt.wait(), timeout=interval)
+                    break
+                except asyncio.TimeoutError:
+                    pass
+        finally:
+            state.is_playing = False
+            state.flush()
 
     @ctrl.set("play")
     async def on_play():
-        if _ctl["playing"]:
+        if _play_task[0] is not None and not _play_task[0].done():
             return
-        _ctl["playing"] = True
-        state.is_playing = True
-
-        while True:
-            # yield first so any queued pause/stop events run before we check the flag
-            await asyncio.sleep(0)
-            if not _ctl["playing"]:
-                break
-
-            fps      = _FPS.get(float(state.play_speed), 3)
-            interval = 1.0 / fps
-
-            if _ctl["reverse"]:
-                next_snap = (scene.current_snap - 1) % snap_count
-                at_end    = next_snap == 0
-            else:
-                next_snap = (scene.current_snap + 1) % snap_count
-                at_end    = next_snap == snap_count - 1
-
-            _go_to(next_snap)
-
-            if at_end and not _ctl["repeat"]:
-                _ctl["playing"] = False
-                state.is_playing = False
-                break
-
-            await asyncio.sleep(interval)
+        _play_task[0] = asyncio.ensure_future(_play_loop())
 
     @ctrl.set("pause")
     def on_pause():
-        _ctl["playing"] = False
+        if _stop_evt[0] is not None:
+            _stop_evt[0].set()
+        if _play_task[0] is not None and not _play_task[0].done():
+            _play_task[0].cancel()
         state.is_playing = False
+        state.flush()
 
     @ctrl.set("stop")
     def on_stop():
-        _ctl["playing"] = False
+        if _stop_evt[0] is not None:
+            _stop_evt[0].set()
+        if _play_task[0] is not None and not _play_task[0].done():
+            _play_task[0].cancel()
         state.is_playing = False
         _go_to(snap_count - 1)
 
@@ -147,16 +173,12 @@ def build_toolbar(server, scene: Scene) -> None:
         state.is_repeat = _ctl["repeat"]
 
     # ------------------------------------------------------------------
-    # Rotation
+    # Rotation — smaller per-frame angle for smoothness
     # ------------------------------------------------------------------
 
     async def _rotate_loop():
-        _ctl["rotating"] = True
         interval = 1.0 / _ROT_RATE_FPS
-        while _ctl["rotating"]:
-            await asyncio.sleep(0)   # flush pending events
-            if not _ctl["rotating"]:
-                break
+        while _ctl["rotate_mode"] != "off":
             mode = _ctl["rotate_mode"]
             sign, deg_per_sec = _parse_rotate(mode)
             if sign == 0:
@@ -173,15 +195,16 @@ def build_toolbar(server, scene: Scene) -> None:
             cam.up       = (0.0, 1.0, 0.0)
             _push()
             await asyncio.sleep(interval)
-        _ctl["rotating"] = False
 
     @state.change("rotate_mode")
     def on_rotate_mode(rotate_mode, **_):
         _ctl["rotate_mode"] = rotate_mode
         if rotate_mode == "off":
-            _ctl["rotating"] = False
-        elif not _ctl["rotating"]:
-            asyncio.ensure_future(_rotate_loop())
+            if _rotate_task[0] is not None and not _rotate_task[0].done():
+                _rotate_task[0].cancel()
+            return
+        if _rotate_task[0] is None or _rotate_task[0].done():
+            _rotate_task[0] = asyncio.ensure_future(_rotate_loop())
 
     # ------------------------------------------------------------------
     # Widgets
@@ -221,9 +244,9 @@ def build_toolbar(server, scene: Scene) -> None:
             color="cyan", density="compact",
         )
 
-    # Snapshot label chip — use text= prop for reactive binding
+    # Snapshot label chip — Mustache interpolation for reactive content
     v3.VChip(
-        text=("snap_label",),
+        "{{ snap_label }}",
         size="small",
         color="deep-purple",
         style="font-family:monospace;min-width:240px;",

@@ -43,7 +43,8 @@ class GalaxyLayer:
         self._visible = visible
         self._actors: list = []
         self._snapshot: GalaxySnapshot | None = None
-        self._mask: np.ndarray | None = None
+        self._focus_mask: np.ndarray | None = None
+        self._filter_mask: np.ndarray | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -95,10 +96,27 @@ class GalaxyLayer:
         self._redraw()
 
     def set_mask(self, mask: "np.ndarray | None") -> None:
-        """Boolean mask selecting which points to render. None = show all."""
-        self._mask = mask
+        """Backwards-compatible: sets the focus mask."""
+        self.set_focus_mask(mask)
+
+    def set_focus_mask(self, mask: "np.ndarray | None") -> None:
+        """Spatial focus mask (from sphere/box zoom). None = no focus."""
+        self._focus_mask = mask
         if self._snapshot is not None:
             self._redraw()
+
+    def set_filter_mask(self, mask: "np.ndarray | None") -> None:
+        """Property filter mask (from Filters tab). None = no filtering."""
+        self._filter_mask = mask
+        if self._snapshot is not None:
+            self._redraw()
+
+    def _combined_mask(self) -> "np.ndarray | None":
+        if self._focus_mask is None:
+            return self._filter_mask
+        if self._filter_mask is None:
+            return self._focus_mask
+        return self._focus_mask & self._filter_mask
 
     # ------------------------------------------------------------------
     # Internal
@@ -115,18 +133,24 @@ class GalaxyLayer:
         if snap is None or snap.count == 0:
             return
 
-        # Apply spatial focus mask if set
-        if self._mask is not None and len(self._mask) == snap.count:
+        # Combined focus + filter mask
+        mask = self._combined_mask()
+        if mask is not None and len(mask) == snap.count:
             from sage_viewer.io.galaxy_reader import GalaxySnapshot as _GS
             snap = _GS(
-                positions=snap.positions[self._mask],
-                stellar_mass=snap.stellar_mass[self._mask],
-                mvir=snap.mvir[self._mask],
-                sfr=snap.sfr[self._mask],
-                ssfr=snap.ssfr[self._mask],
-                cold_gas=snap.cold_gas[self._mask],
-                bulge_mass=snap.bulge_mass[self._mask],
-                gal_type=snap.gal_type[self._mask],
+                positions=snap.positions[mask],
+                stellar_mass=snap.stellar_mass[mask],
+                mvir=snap.mvir[mask],
+                sfr=snap.sfr[mask],
+                ssfr=snap.ssfr[mask],
+                cold_gas=snap.cold_gas[mask],
+                bulge_mass=snap.bulge_mass[mask],
+                gal_type=snap.gal_type[mask],
+                bh_mass=snap.bh_mass[mask],
+                ics_mass=snap.ics_mass[mask],
+                ffb_regime=snap.ffb_regime[mask],
+                cgm_regime=snap.cgm_regime[mask],
+                central_mvir=snap.central_mvir[mask],
                 snap_num=snap.snap_num,
             )
             if snap.count == 0:

@@ -9,14 +9,19 @@ import numpy as np
 
 @dataclass
 class GalaxySnapshot:
-    positions: np.ndarray     # (N, 3) float32, Mpc/h
-    stellar_mass: np.ndarray  # (N,)   float32, Msun
-    mvir: np.ndarray          # (N,)   float32, 10^10 Msun/h (raw)
-    sfr: np.ndarray           # (N,)   float32, Msun/yr
-    ssfr: np.ndarray          # (N,)   float32, yr^-1
-    cold_gas: np.ndarray      # (N,)   float32, Msun
-    bulge_mass: np.ndarray    # (N,)   float32, Msun
-    gal_type: np.ndarray      # (N,)   int32, 0=central 1+=satellite
+    positions: np.ndarray       # (N, 3) float32, Mpc/h
+    stellar_mass: np.ndarray    # (N,)   float32, Msun
+    mvir: np.ndarray            # (N,)   float32, 10^10 Msun/h (raw)
+    sfr: np.ndarray             # (N,)   float32, Msun/yr
+    ssfr: np.ndarray            # (N,)   float32, yr^-1
+    cold_gas: np.ndarray        # (N,)   float32, Msun
+    bulge_mass: np.ndarray      # (N,)   float32, Msun
+    gal_type: np.ndarray        # (N,)   int32, 0=central 1+=satellite
+    bh_mass: np.ndarray         # (N,)   float32, Msun
+    ics_mass: np.ndarray        # (N,)   float32, Msun (intra-cluster stars)
+    ffb_regime: np.ndarray      # (N,)   int32, FFB regime flag
+    cgm_regime: np.ndarray      # (N,)   int32, 0=cold 1=hot (Regime field)
+    central_mvir: np.ndarray    # (N,)   float32, Msun (host FOF Mvir)
     snap_num: int
 
     @property
@@ -26,11 +31,14 @@ class GalaxySnapshot:
     @classmethod
     def empty(cls, snap_num: int) -> "GalaxySnapshot":
         z = np.empty(0, dtype=np.float32)
+        zi = np.empty(0, dtype=np.int32)
         return cls(
             positions=np.empty((0, 3), dtype=np.float32),
             stellar_mass=z, mvir=z, sfr=z, ssfr=z,
             cold_gas=z, bulge_mass=z,
-            gal_type=np.empty(0, dtype=np.int32),
+            gal_type=zi,
+            bh_mass=z, ics_mass=z, central_mvir=z,
+            ffb_regime=zi, cgm_regime=zi,
             snap_num=snap_num,
         )
 
@@ -82,13 +90,28 @@ def load_galaxy_snapshot(
                 f"Missing field {e} in {hdf5_path}:{group_key}"
             ) from e
 
+        # Optional fields — present in current SAGE outputs but tolerate absence
+        def _opt(field: str, default_dtype) -> np.ndarray:
+            if field in grp:
+                return np.array(grp[field])
+            return np.zeros(len(posx), dtype=default_dtype)
+
+        bh_raw         = _opt("BlackHoleMass", np.float32)
+        ics_raw        = _opt("IntraClusterStars", np.float32)
+        ffb_regime_raw = _opt("FFBRegime", np.int32).astype(np.int32)
+        cgm_regime_raw = _opt("Regime", np.int32).astype(np.int32)
+        cmvir_raw      = _opt("CentralMvir", np.float32)
+
     # All mass fields stored as 10^10 Msun/h → convert to Msun
     f = 1.0e10 / hubble_h
-    stellar_mass = stellar_raw.astype(np.float32) * f
-    bulge_mass   = bulge_raw.astype(np.float32) * f
-    cold_gas     = cold_gas_raw.astype(np.float32) * f
-    sfr          = (sfr_disk + sfr_bulge).astype(np.float32)
-    ssfr         = sfr / np.where(stellar_mass > 0, stellar_mass, np.inf)
+    stellar_mass  = stellar_raw.astype(np.float32) * f
+    bulge_mass    = bulge_raw.astype(np.float32) * f
+    cold_gas      = cold_gas_raw.astype(np.float32) * f
+    bh_mass       = bh_raw.astype(np.float32) * f
+    ics_mass      = ics_raw.astype(np.float32) * f
+    central_mvir  = cmvir_raw.astype(np.float32) * f
+    sfr           = (sfr_disk + sfr_bulge).astype(np.float32)
+    ssfr          = sfr / np.where(stellar_mass > 0, stellar_mass, np.inf)
 
     mask    = (stellar_mass > min_stellar_mass) & (mvir_raw > 0)
     indices = np.where(mask)[0]
@@ -111,5 +134,10 @@ def load_galaxy_snapshot(
         cold_gas=cold_gas[indices],
         bulge_mass=bulge_mass[indices],
         gal_type=gal_type[indices],
+        bh_mass=bh_mass[indices],
+        ics_mass=ics_mass[indices],
+        ffb_regime=ffb_regime_raw[indices],
+        cgm_regime=cgm_regime_raw[indices],
+        central_mvir=central_mvir[indices],
         snap_num=snap_num,
     )
