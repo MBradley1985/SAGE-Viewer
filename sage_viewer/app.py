@@ -63,6 +63,8 @@ def create_app(
         ("Environment", "environment"),
         ("Coords",      "coords"),
         ("Box",         "box"),
+        ("Console",     "console"),
+        ("Library",     "library"),
     ]
 
     # ---- Model discovery ------------------------------------------------
@@ -397,6 +399,57 @@ def create_app(
                                     "{{ row.value }}",
                                     style="font-family:monospace;text-align:right;color:#e2e8f0;",
                                 )
+
+                    # Library media viewer — same right-side slot as the
+                    # Galaxy / Group info cards; mutually exclusive.
+                    with v3.VCard(
+                        v_show=("library_show",),
+                        style=(
+                            "position:absolute;top:32px;right:24px;"
+                            "min-width:280px;max-width:520px;"
+                            "background:rgba(17,24,39,0.92);"
+                            "backdrop-filter:blur(6px);"
+                            "border:1px solid #374151;"
+                            "color:#e2e8f0;"
+                            "z-index:5;"
+                        ),
+                        elevation=8,
+                    ):
+                        with v3.VCardTitle(
+                            style=(
+                                "display:flex;align-items:center;"
+                                "font-size:0.85rem;letter-spacing:0.06em;"
+                                "padding:10px 12px 6px;"
+                            ),
+                        ):
+                            v3.VIcon("mdi-folder-multimedia-outline",
+                                     size="small", color="cyan",
+                                     style="margin-right:6px;")
+                            html.Span("{{ library_name }}")
+                            v3.VSpacer()
+                            v3.VBtn(
+                                icon="mdi-close",
+                                size="x-small",
+                                variant="text",
+                                click=server.controller.library_close,
+                            )
+                        v3.VDivider()
+                        with v3.VCardText(
+                            style="padding:8px 12px;",
+                        ):
+                            html.Img(
+                                src=("library_data_url",),
+                                v_show=("library_kind === 'image'",),
+                                style="max-width:100%;max-height:60vh;display:block;",
+                            )
+                            html.Video(
+                                src=("library_data_url",),
+                                v_show=("library_kind === 'video'",),
+                                controls=True,
+                                autoplay=True,
+                                loop=True,
+                                style="max-width:100%;max-height:60vh;display:block;",
+                            )
 
                     # Loading overlay shown while a model loads
                     with v3.VOverlay(

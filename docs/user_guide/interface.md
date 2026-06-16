@@ -1,45 +1,70 @@
 # Interface
 
-SAGE-Viewer's browser UI has four regions:
+SAGE-Viewer's browser UI has three main regions and a number of overlays that appear when needed:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Toolbar: ▶ ⏸ ⏹  ──snapshot slider──  Snap 63 | z=0.00 │
-├──────────┬──────────────────────────────┬───────────────┤
-│  Layer   │                              │  Navigation   │
-│  Panel   │     PyVista render window    │  Panel        │
-│  (left)  │                              │  (right)      │
-├──────────┴──────────────────────────────┴───────────────┤
-│  Info bar: click-to-inspect output                      │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│ ☰  SAGE-Viewer  ◀◀ ▶ ⏸ ⏹ 🔁  ──slider──  Snap N│z│a   1×  Off ⤴  │
+├──────────────────────────────────────────────────────────────┬───┤
+│                                                              │ T │
+│                                                              │ a │
+│                  PyVista render window                       │ b │
+│                                                              │ p │
+│                  (overlays appear here:                      │ a │
+│                   loading spinner,                           │ n │
+│                   warning snackbar,                          │ e │
+│                   Galaxy / Group Info card)                  │ l │
+├──────────────────────────────────────────────────────────────┴───┤
+│ Info bar: position + nearest halo / galaxy on double-click       │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-## Toolbar
+## Toolbar (top)
 
 | Control | Action |
 |---|---|
-| ▶ Play | Begin animating through snapshots at selected speed |
-| ⏸ Pause | Freeze on current snapshot |
-| ⏹ Stop | Stop and jump back to z=0 (last snapshot) |
+| ☰ (hamburger) | Open the dropdown: switch tabs, switch primary model, toggle overlay models |
+| Reverse | Play backwards in time |
+| Play / Pause / Stop | Snapshot transport. Stop returns to z = 0 |
+| Loop | Continue playback past the endpoints |
 | Snapshot slider | Jump directly to any snapshot |
-| Snapshot chip | Shows `Snap N | z = X.XX | a = X.XXXX` |
-| Speed selector | 1× / 2× / 5× playback speed |
+| Snapshot chip | `Snap N  \|  z = X.XX  \|  a = X.XXXX` |
+| Speed selector | 0.1× / 0.25× / 0.5× / 0.75× / 1× / 2× / 5× |
+| Rotate selector | Off / CW / CCW × 15 / 30 / 60 ° s⁻¹ — continuous camera orbit |
 
-## Layer panel (left)
+## Right tabs panel
 
-| Control | Action |
+Seven tabs across a 3-column wrap layout:
+
+| Tab | Purpose |
 |---|---|
-| Haloes toggle | Show or hide the DM halo point cloud |
-| Haloes opacity | Adjust halo transparency (0–0.3 range) |
-| Haloes colour by | Switch between mass / sSFR / density / type modes |
-| Galaxies toggle | Show or hide the galaxy point cloud |
-| Galaxies opacity | Adjust galaxy transparency (0–1 range) |
-| Galaxies colour by | Switch between mass / sSFR / density / type modes |
+| Structure   | Layer visibility, opacity, colour-by mode, colormap (inline colorbar beneath each) |
+| Filters     | Range sliders for halo (Mvir / Rvir / Vvir) and galaxy (stellar mass, sSFR, B/T, age, BH mass, ICS mass, type, FFB regime, CGM regime) |
+| Record      | Screenshots (PNG / JPG / TIFF) and movies (GIF / MOV / PNG sequence) |
+| Target      | Fly to halo / galaxy by index, focus-zoom presets, Galaxy Info, Highlight Galaxy |
+| Environment | Halo selector, env-class checkboxes, Group Info, Highlight Members |
+| Coords      | Fly to arbitrary (x, y, z) |
+| Box         | Zoom to axis-aligned sub-box |
 
-## Navigation panel (right)
+Above the tabs sit two row-spanning controls — **Reset Camera**, **Focus toggle**, and **Centre** — that work regardless of which tab is active.
 
-See [Navigation](navigation.md) for full details.
+## Render-window overlays
+
+| Overlay | When |
+|---|---|
+| Loading spinner   | Dimmed cover while a new model loads from disk |
+| Warning snackbar  | Top of the render view; appears when an overlay attempt is rejected (e.g. incompatible box size) |
+| Galaxy Info card  | Top-right of the render view, semi-transparent; closed by × or by switching tabs |
+| Group Info card   | Same top-right slot as Galaxy Info; mutually exclusive (opening one closes the other) |
 
 ## Info bar (bottom)
 
-Displays position, nearest halo Mvir, and nearest galaxy stellar mass / sSFR / type when you click a point in the render window.
+Double-click any point in the render window to select the nearest galaxy. The info bar then shows:
+
+* The world-space (x, y, z) you clicked
+* Nearest halo Mvir and index
+* Nearest galaxy stellar mass / sSFR / central-or-satellite / index
+
+The galaxy index field in the Target and Environment tabs updates automatically so you can immediately follow up with **Galaxy Info**, **Highlight Galaxy**, or **Group Info** without typing.
+
+Single clicks (no double) are treated as pure camera interactions — they don't move selection and don't trigger any overlays.

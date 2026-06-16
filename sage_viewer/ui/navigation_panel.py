@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from trame.widgets import html
 from trame.widgets import vuetify3 as v3
 
 from sage_viewer.scene.scene import Scene
@@ -20,25 +21,46 @@ _GALAXY_MODES = [
     {"title": "SFR",          "value": "sfr"},
     {"title": "Cold Gas",     "value": "cold_gas"},
     {"title": "Bulge Mass",   "value": "bulge_mass"},
+    {"title": "B / T",        "value": "bt"},
+    {"title": "BH Mass",      "value": "bh_mass"},
+    {"title": "ICS Mass",     "value": "ics_mass"},
+    {"title": "Age",          "value": "age"},
     {"title": "Density",      "value": "density"},
     {"title": "Type",         "value": "type"},
+    {"title": "Structure",    "value": "structure"},
 ]
 
 _CMAPS = [
-    {"title": "Blues",    "value": "Blues"},
-    {"title": "Purples",  "value": "Purples"},
-    {"title": "Greens",   "value": "Greens"},
-    {"title": "Oranges",  "value": "Oranges"},
-    {"title": "Reds",     "value": "Reds"},
+    # Sequential
     {"title": "Viridis",  "value": "viridis"},
     {"title": "Plasma",   "value": "plasma"},
     {"title": "Inferno",  "value": "inferno"},
     {"title": "Magma",    "value": "magma"},
     {"title": "Cividis",  "value": "cividis"},
+    {"title": "Turbo",    "value": "turbo"},
+    {"title": "Blues",    "value": "Blues"},
+    {"title": "Purples",  "value": "Purples"},
+    {"title": "Greens",   "value": "Greens"},
+    {"title": "Oranges",  "value": "Oranges"},
+    {"title": "Reds",     "value": "Reds"},
+    {"title": "Greys",    "value": "Greys"},
+    {"title": "YlOrRd",   "value": "YlOrRd"},
+    {"title": "YlGnBu",   "value": "YlGnBu"},
+    {"title": "BuPu",     "value": "BuPu"},
+    {"title": "Hot",      "value": "hot"},
+    {"title": "Cool",     "value": "cool"},
+    {"title": "Bone",     "value": "bone"},
+    {"title": "Copper",   "value": "copper"},
+    # Diverging
     {"title": "Coolwarm", "value": "coolwarm"},
     {"title": "RdBu",     "value": "RdBu"},
-    {"title": "YlOrRd",   "value": "YlOrRd"},
+    {"title": "Seismic",  "value": "seismic"},
     {"title": "Spectral", "value": "Spectral"},
+    {"title": "BrBG",     "value": "BrBG"},
+    # Cyclic / qualitative
+    {"title": "Twilight", "value": "twilight"},
+    {"title": "Jet",      "value": "jet"},
+    {"title": "Rainbow",  "value": "rainbow"},
 ]
 
 
@@ -53,6 +75,10 @@ _GAL_CB = {
     "ssfr":         ("sSFR",    "10⁻¹⁴", "10⁻⁸ yr⁻¹"),
     "sfr":          ("SFR",     "10⁻³",  "10² M☉/yr"),
     "cold_gas":     ("Mgas",    "10⁷",   "10¹¹·⁵ M☉"),
+    "bt":           ("B/T",     "0",     "1"),
+    "bh_mass":      ("Mbh",     "10⁴",   "10¹⁰ M☉"),
+    "ics_mass":     ("Mics",    "10⁶",   "10¹² M☉"),
+    "age":          ("Age",     "0",     "14 Gyr"),
     "bulge_mass":   ("Mbulge",  "10⁷",   "10¹² M☉"),
     "density":      ("Density", "Low",   "High"),
     "type":         ("Type",    "Central","Satellite"),
@@ -85,7 +111,19 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.nav_box_zmin         = 0.0
     state.nav_box_zmax         = round(scene._cfg.box_size / 2, 2)
     state.focus_active         = False
+    state.free_roam            = False
     state.nav_active_tab       = "layers"
+
+    # Console
+    state.console_input   = ""
+    state.console_history = []   # list of {"id": int, "cmd": str, "out": str}
+
+    # Library
+    state.library_show     = False
+    state.library_files    = []        # list of {"name", "path", "kind", "size_kb"}
+    state.library_data_url = ""
+    state.library_kind     = ""        # "image" | "video"
+    state.library_name     = ""
 
     # Group info panel state (mirrors galinfo_*)
     state.groupinfo_show  = False
@@ -131,7 +169,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # Colorbar state — full style strings to avoid Vue concatenation issues
     from sage_viewer.utils.colormap import cmap_css_gradient
     _h_label, _h_min, _h_max = _HALO_CB[scene.halo_layer.color_mode]
-    _g_label, _g_min, _g_max = _GAL_CB[scene.galaxy_layer.color_mode]
+    _g_label, _g_min, _g_max = _GAL_CB.get(
+        scene.galaxy_layer.color_mode, ("—", "—", "—")
+    )
     state.halo_cbar_style = _cbar_style(cmap_css_gradient(scene.halo_layer.colormap))
     state.halo_cbar_min   = _h_min
     state.halo_cbar_max   = _h_max
@@ -350,7 +390,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @state.change("galaxy_color_mode")
     def on_galaxy_mode(galaxy_color_mode, **_):
         scene.galaxy_layer.color_mode = galaxy_color_mode
-        _, lo, hi = _GAL_CB[galaxy_color_mode]
+        # Categorical / multi-layer modes (density, type, structure) don't have
+        # a single colormap range — fall back to a generic label.
+        if galaxy_color_mode in _GAL_CB:
+            _, lo, hi = _GAL_CB[galaxy_color_mode]
+        else:
+            lo, hi = "—", "—"
         state.gal_cbar_min = lo
         state.gal_cbar_max = hi
         _push()
@@ -379,11 +424,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
             idx = int(state.nav_halo_idx)
             d   = float(state.nav_distance)
             scene.camera.go_to_halo(idx, d)
-            if _focused():
-                pos = scene.camera._halo_index.position_of(idx)
-                scene.set_focus_sphere(
-                    (float(pos[0]), float(pos[1]), float(pos[2])), d
-                )
+            # Always engage focus on Go (user can toggle it off afterwards)
+            pos = scene.camera._halo_index.position_of(idx)
+            scene.set_focus_sphere(
+                (float(pos[0]), float(pos[1]), float(pos[2])), d
+            )
+            state.focus_active = True
         except Exception:
             pass
         _push()
@@ -447,10 +493,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
         if galaxies.count > 0:
             d2 = np.sum((galaxies.positions - np.array(halo_pos)) ** 2, axis=1)
             state.nav_gal_idx = int(np.argmin(d2))
-        if _focused():
-            scene.set_focus_sphere(
-                (float(halo_pos[0]), float(halo_pos[1]), float(halo_pos[2])), d
-            )
+        # Always engage focus on Go in the Environment tab
+        scene.set_focus_sphere(
+            (float(halo_pos[0]), float(halo_pos[1]), float(halo_pos[2])), d
+        )
+        state.focus_active = True
         state.flush()
         _push()
 
@@ -485,8 +532,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
         )
         state.galinfo_items = [{"label": k, "value": v} for k, v in info.items()]
         state.galinfo_show  = True
-        # Close any open group-info card so they don't overlap
+        # Close any other right-side overlay
         state.groupinfo_show = False
+        state.library_show   = False
         state.flush()
         _push()
 
@@ -535,8 +583,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
         )
         state.groupinfo_items = [{"label": k, "value": v} for k, v in info.items()]
         state.groupinfo_show  = True
-        # Mutually exclusive with the galaxy info panel
+        # Mutually exclusive with the other right-side overlays
         state.galinfo_show    = False
+        state.library_show    = False
 
         # Place the standard small red circle on the FOF central — same
         # indicator style used by the Galaxy info action.
@@ -873,8 +922,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
             float(state.nav_z), float(state.nav_distance),
         )
         scene.camera.go_to_coords(x, y, z, d)
-        if _focused():
-            scene.set_focus_sphere((x, y, z), d)
+        # Always engage focus on Go
+        scene.set_focus_sphere((x, y, z), d)
+        state.focus_active = True
         _push()
 
     @ctrl.set("zoom_to_box")
@@ -894,6 +944,179 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.focus_active = False
         _push()
 
+    @ctrl.set("center_camera")
+    def on_center_camera():
+        scene.camera.go_to_box_center()
+        _push()
+
+    @ctrl.set("toggle_free_roam")
+    def on_toggle_free_roam():
+        state.free_roam = not bool(state.free_roam)
+        scene.camera.set_free_roam(bool(state.free_roam))
+        _push()
+
+    # ------------------------------------------------------------------
+    # Console — natural-language command interpreter
+    # ------------------------------------------------------------------
+
+    from sage_viewer.utils.command_parser import (
+        CommandContext, execute_command,
+    )
+    _console_counter = [0]
+    _cmd_ctx = CommandContext(scene=scene, state=state, ctrl=ctrl)
+
+    def _truncate(text: str, n: int = 4000) -> str:
+        if len(text) <= n:
+            return text
+        return text[:n] + f"\n… [{len(text) - n} chars truncated]"
+
+    @ctrl.set("console_submit")
+    def on_console_submit():
+        cmd = str(state.console_input or "").rstrip()
+        if not cmd:
+            return
+        try:
+            out_text = execute_command(cmd, _cmd_ctx) or "(ok)"
+        except Exception as e:
+            out_text = f"Error: {e}"
+
+        _console_counter[0] += 1
+        history = list(state.console_history)
+        history.append({
+            "id":  _console_counter[0],
+            "cmd": cmd,
+            "out": _truncate(out_text),
+        })
+        if len(history) > 100:
+            history = history[-100:]
+        state.console_history = history
+        state.console_input   = ""
+        state.flush()
+        _push()
+
+    @ctrl.set("console_clear")
+    def on_console_clear():
+        state.console_history = []
+        state.flush()
+
+    # ------------------------------------------------------------------
+    # Library — browse and replay stored screenshots / movies
+    # ------------------------------------------------------------------
+
+    import pathlib as _pathlib
+    _repo_root = _pathlib.Path(__file__).resolve().parents[2]
+    _LIBRARY_DIR = _repo_root / "sage_library"
+    _LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
+
+    _MEDIA_EXTS = {
+        ".png":  ("image", "image/png"),
+        ".jpg":  ("image", "image/jpeg"),
+        ".jpeg": ("image", "image/jpeg"),
+        ".tif":  ("image", "image/tiff"),
+        ".tiff": ("image", "image/tiff"),
+        ".gif":  ("image", "image/gif"),
+        ".mov":  ("video", "video/mp4"),    # MOV with H.264 ≈ MP4
+        ".mp4":  ("video", "video/mp4"),
+    }
+
+    def _scan_library() -> list[dict]:
+        out: list[dict] = []
+        roots = [_LIBRARY_DIR, _repo_root / "sage_outputs"]
+        for root in roots:
+            if not root.exists():
+                continue
+            for p in sorted(root.rglob("*")):
+                if not p.is_file():
+                    continue
+                ext = p.suffix.lower()
+                if ext not in _MEDIA_EXTS:
+                    continue
+                kind, _mime = _MEDIA_EXTS[ext]
+                try:
+                    size_kb = max(1, p.stat().st_size // 1024)
+                except OSError:
+                    continue
+                # Friendly display path (relative to repo root)
+                try:
+                    rel = p.relative_to(_repo_root)
+                except ValueError:
+                    rel = p
+                out.append({
+                    "name":     p.name,
+                    "rel":      str(rel),
+                    "path":     str(p),
+                    "kind":     kind,
+                    "ext":      ext.lstrip("."),
+                    "size_kb":  int(size_kb),
+                })
+        return out
+
+    @ctrl.set("library_refresh")
+    def on_library_refresh():
+        state.library_files = _scan_library()
+        state.flush()
+
+    @ctrl.set("library_open")
+    def on_library_open(path: str):
+        import base64
+        p = _pathlib.Path(path)
+        if not p.is_file():
+            return
+        ext = p.suffix.lower()
+        if ext not in _MEDIA_EXTS:
+            return
+        kind, mime = _MEDIA_EXTS[ext]
+        try:
+            data = p.read_bytes()
+        except OSError as e:
+            state.library_data_url = ""
+            state.library_name     = f"ERROR reading {p.name}: {e}"
+            state.library_show     = True
+            state.flush()
+            return
+        b64 = base64.b64encode(data).decode("ascii")
+        state.library_data_url = f"data:{mime};base64,{b64}"
+        state.library_kind     = kind
+        state.library_name     = p.name
+        state.library_show     = True
+        # Mutually exclusive with other right-side overlays
+        state.galinfo_show     = False
+        state.groupinfo_show   = False
+        state.flush()
+        _push()
+
+    @ctrl.set("library_close")
+    def on_library_close():
+        state.library_show     = False
+        state.library_data_url = ""
+        state.flush()
+
+    # Populate the file list at startup
+    state.library_files = _scan_library()
+
+    # Allow Enter inside the console text field to submit
+    server.trigger("console_submit_trigger")(on_console_submit)
+
+    @ctrl.set("highlight_galaxy")
+    def on_highlight_galaxy():
+        """Toggle a cyan splat on the currently-selected galaxy."""
+        cam = scene.camera
+        if cam.has_member_indicators:
+            cam._clear_member_indicators()
+            _push()
+            return
+        try:
+            gidx = int(state.nav_gal_idx)
+        except (TypeError, ValueError):
+            return
+        _, galaxies = scene._loader.get(scene.current_snap)
+        if gidx < 0 or gidx >= galaxies.count:
+            return
+        import numpy as np
+        pos = np.array([galaxies.positions[gidx]], dtype=np.float64)
+        cam._add_member_indicators(pos)
+        _push()
+
     @ctrl.set("toggle_focus")
     def on_toggle_focus():
         currently_on = bool(state.focus_active)
@@ -909,13 +1132,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # UI helper
     # ------------------------------------------------------------------
 
-    def _tf(v_model, label):
-        v3.VTextField(
+    def _tf(v_model, label, on_enter=None):
+        kwargs = dict(
             v_model=(v_model,), label=label,
             type="number", hide_details=True,
             variant="outlined", bg_color="#1a1a2e",
             density="compact",
         )
+        if on_enter is not None:
+            kwargs["keydown_enter"] = on_enter
+        v3.VTextField(**kwargs)
 
     # ------------------------------------------------------------------
     # Layout
@@ -928,7 +1154,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             "color:#e2e8f0;overflow:hidden;"
         ),
     ):
-        # ── Reset + Focus ──────────────────────────────────────────
+        # ── Reset + Focus + Centre ─────────────────────────────────
         with v3.VSheet(color="transparent", style="padding:8px;flex-shrink:0;"):
             with v3.VRow(no_gutters=True, style="gap:6px;"):
                 with v3.VCol(style="padding:0;"):
@@ -944,6 +1170,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         color=("focus_active ? 'cyan' : '#6b7280'",),
                         title="Focus",
                     )
+                with v3.VCol(cols="auto", style="padding:0;"):
+                    v3.VBtn(
+                        icon="mdi-image-filter-center-focus",
+                        variant="outlined",
+                        density="compact", click=ctrl.center_camera,
+                        color="#6b7280",
+                        title="Place camera at box centre",
+                    )
+                with v3.VCol(cols="auto", style="padding:0;"):
+                    v3.VBtn(
+                        icon="mdi-airplane",
+                        variant="outlined",
+                        density="compact", click=ctrl.toggle_free_roam,
+                        color=("free_roam ? 'cyan' : '#6b7280'",),
+                        title=(
+                            "Free-roam mode (terrain-style fly-through) — "
+                            "off: orbit, on: free traverse anywhere"
+                        ),
+                    )
 
         v3.VDivider(style="flex-shrink:0;")
 
@@ -957,7 +1202,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             style=(
                 "width:100%;flex-shrink:0;background:#111827;"
                 "border-radius:0;display:flex;flex-wrap:wrap;"
-                "height:auto;min-height:108px;padding-bottom:6px;"
+                "height:auto;min-height:118px;padding-bottom:6px;"
             ),
         ):
             for label, value in [
@@ -968,6 +1213,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 ("Environment", "environment"),
                 ("Coords",      "coords"),
                 ("Box",         "box"),
+                ("Console",     "console"),
+                ("Library",     "library"),
             ]:
                 v3.VBtn(
                     label, value=value,
@@ -1072,6 +1319,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         v_model=("galaxy_colormap",), items=(_CMAPS,),
                         label="Colormap", hide_details=True,
                         variant="outlined", color="deep-purple", density="compact",
+                        # Structure mode is the bare composition (no outer
+                        # property halo) — the colormap doesn't apply.
+                        # For every other mode the colormap drives the
+                        # outermost layer that sits around the envelope.
+                        disabled=("galaxy_color_mode === 'structure'",),
                     )
                 with v3.VSheet(color="transparent", style="padding:4px 0 8px;"):
                     with v3.VSheet(
@@ -1111,9 +1363,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_halo_idx", "Halo index")
+                    _tf("nav_halo_idx",  "Halo index",        on_enter=ctrl.go_to_halo)
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_distance", "Standoff (Mpc/h)")
+                    _tf("nav_distance",  "Standoff (Mpc/h)",  on_enter=ctrl.go_to_halo)
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
                         "Go", block=True, color="cyan",
@@ -1167,6 +1419,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
 
                 v3.VBtn(
+                    "Highlight Galaxy",
+                    block=True, color="cyan", variant="outlined",
+                    density="compact",
+                    prepend_icon="mdi-bullseye-arrow",
+                    click=ctrl.highlight_galaxy,
+                    style="margin-bottom:6px;",
+                )
+
+                v3.VBtn(
                     "Clear Indicator",
                     block=True, variant="outlined",
                     color="red", density="compact",
@@ -1187,9 +1448,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_halo_idx", "Halo index")
+                    _tf("nav_halo_idx", "Halo index",       on_enter=ctrl.go_to_env_halo)
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_distance", "Standoff (Mpc/h)")
+                    _tf("nav_distance", "Standoff (Mpc/h)", on_enter=ctrl.go_to_env_halo)
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
                         "Go", block=True, color="cyan",
@@ -1284,7 +1545,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ("Standoff",  "nav_distance"),
                 ]:
                     with v3.VSheet(color="transparent", style=_FIELD):
-                        _tf(key, label)
+                        _tf(key, label, on_enter=ctrl.go_to_coords)
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
                         "Go", block=True, color="cyan",
@@ -1302,12 +1563,152 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ("Z min", "nav_box_zmin"), ("Z max", "nav_box_zmax"),
                 ]:
                     with v3.VSheet(color="transparent", style=_FIELD):
-                        _tf(key, label)
+                        _tf(key, label, on_enter=ctrl.zoom_to_box)
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
                         "Zoom", block=True, color="cyan",
                         density="compact", click=ctrl.zoom_to_box,
                     )
+
+            # ── CONSOLE tab — Python REPL against the live scene ──
+            with v3.VSheet(
+                color="transparent",
+                v_show=("nav_active_tab === 'console'",),
+            ):
+                v3.VLabel(
+                    "COMMAND CONSOLE",
+                    style=(
+                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
+                        "color:#7c3aed;padding:4px 0 4px;display:block;"
+                    ),
+                )
+                v3.VLabel(
+                    "Type natural commands: 'show only clusters', 'go to halo 42', "
+                    "'snap 30', 'galaxy info', 'rotate cw 30', 'screenshot'. "
+                    "Type 'help' for the full list.",
+                    style=(
+                        "font-size:0.6rem;color:#9ca3af;line-height:1.35;"
+                        "display:block;padding:0 0 6px;"
+                    ),
+                )
+                # History
+                with v3.VSheet(
+                    color="#0a0a0f",
+                    style=(
+                        "max-height:240px;min-height:120px;overflow-y:auto;"
+                        "padding:6px 8px;border:1px solid #1f2937;border-radius:4px;"
+                        "font-family:monospace;font-size:0.66rem;line-height:1.35;"
+                    ),
+                ):
+                    with html.Div(
+                        v_for=("entry in console_history",),
+                        key=("entry.id",),
+                        style="padding:2px 0 4px;border-bottom:1px solid #1f2937;",
+                    ):
+                        html.Div(
+                            "> {{ entry.cmd }}",
+                            style="color:cyan;white-space:pre-wrap;",
+                        )
+                        html.Div(
+                            "{{ entry.out }}",
+                            style="color:#9ca3af;white-space:pre-wrap;",
+                        )
+                # Input
+                v3.VTextField(
+                    v_model=("console_input",),
+                    label="Type a command  (Enter to run)",
+                    hide_details=True, variant="outlined",
+                    bg_color="#1a1a2e", density="compact",
+                    style="padding-top:8px;",
+                    keydown_enter=(
+                        "$event.preventDefault(); "
+                        "trigger('console_submit_trigger')"
+                    ),
+                )
+                with v3.VRow(no_gutters=True, style="gap:6px;padding-top:6px;"):
+                    with v3.VCol(style="padding:0;"):
+                        v3.VBtn(
+                            "Run", block=True, color="cyan",
+                            density="compact",
+                            prepend_icon="mdi-play",
+                            click=ctrl.console_submit,
+                        )
+                    with v3.VCol(style="padding:0;"):
+                        v3.VBtn(
+                            "Clear", block=True, variant="outlined",
+                            color="red", density="compact",
+                            prepend_icon="mdi-delete-sweep-outline",
+                            click=ctrl.console_clear,
+                        )
+
+            # ── LIBRARY tab — browse stored media ──────────────
+            with v3.VSheet(
+                color="transparent",
+                v_show=("nav_active_tab === 'library'",),
+            ):
+                v3.VLabel(
+                    "MEDIA LIBRARY",
+                    style=(
+                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
+                        "color:#7c3aed;padding:4px 0 4px;display:block;"
+                    ),
+                )
+                v3.VLabel(
+                    "Screenshots and movies from <SAGE-Viewer>/sage_library/ and "
+                    "<SAGE-Viewer>/sage_outputs/.  Click a row to display.",
+                    style=(
+                        "font-size:0.6rem;color:#9ca3af;line-height:1.35;"
+                        "display:block;padding:0 0 4px;"
+                    ),
+                )
+                with v3.VRow(no_gutters=True, style="gap:6px;padding:4px 0;"):
+                    with v3.VCol(style="padding:0;"):
+                        v3.VBtn(
+                            "Refresh", block=True, color="cyan",
+                            density="compact", size="small",
+                            prepend_icon="mdi-refresh",
+                            click=ctrl.library_refresh,
+                        )
+                    with v3.VCol(style="padding:0;"):
+                        v3.VBtn(
+                            "Close viewer", block=True, variant="outlined",
+                            color="red", density="compact", size="small",
+                            prepend_icon="mdi-close-circle-outline",
+                            click=ctrl.library_close,
+                        )
+                # File list
+                with v3.VSheet(
+                    color="#0a0a0f",
+                    style=(
+                        "max-height:340px;min-height:120px;overflow-y:auto;"
+                        "border:1px solid #1f2937;border-radius:4px;"
+                        "margin-top:6px;"
+                    ),
+                ):
+                    with v3.VList(density="compact", bg_color="transparent"):
+                        v3.VListItem(
+                            v_for=("entry in library_files",),
+                            key=("entry.path",),
+                            click=(
+                                server.controller.library_open,
+                                "[entry.path]",
+                            ),
+                            title=("entry.name",),
+                            subtitle=(
+                                "entry.ext.toUpperCase() + ' · ' + "
+                                "entry.size_kb + ' KB · ' + entry.rel",
+                            ),
+                            prepend_icon=(
+                                "entry.kind === 'video' "
+                                "? 'mdi-movie-open-outline' : 'mdi-image-outline'",
+                            ),
+                            color="cyan",
+                        )
+                v3.VLabel(
+                    "{{ library_files.length }} file"
+                    "{{ library_files.length === 1 ? '' : 's' }}",
+                    style="font-size:0.6rem;color:#6b7280;padding:6px 0;display:block;",
+                )
 
             # ── FILTERS tab ────────────────────────────────────
             with v3.VSheet(

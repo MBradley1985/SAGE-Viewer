@@ -212,6 +212,50 @@ class CameraController:
             (0.0, 1.0, 0.0),
         ]
 
+    def go_to_box_center(self) -> None:
+        """Place the camera AT the box centre, looking along +z."""
+        self._clear_indicator()
+        half = self._box_size / 2.0
+        self._pl.camera.focal_point = (half, half, half + 1.0)
+        self._pl.camera.position    = (half, half, half)
+        self._pl.camera.up          = (0.0, 1.0, 0.0)
+
+    # ------------------------------------------------------------------
+    # Interaction-style toggle (trackball ↔ free-roam / terrain)
+    # ------------------------------------------------------------------
+
+    def set_free_roam(self, enabled: bool) -> None:
+        """Switch the interactor between trackball (default) and free-roam.
+
+        Free-roam uses VTK's terrain style so the camera can freely traverse
+        anywhere inside the box; the standard trackball orbits the focal
+        point and effectively stops at the box centre.  Also enables a
+        per-frame fly-through trick: the focal point is pushed ahead in the
+        view direction so zoom never collides with it.
+        """
+        if enabled:
+            # Terrain-style controls: drag = look, scroll = walk forward
+            self._pl.enable_terrain_style(mouse_wheel_zooms=True)
+            # Pre-emptively push the focal point far ahead so mouse-wheel
+            # zoom always has somewhere to dolly towards.
+            self._push_focal_ahead(distance=self._box_size * 0.5)
+        else:
+            self._pl.enable_trackball_style()
+
+    def _push_focal_ahead(self, distance: float = 10.0) -> None:
+        """Move the focal point `distance` Mpc/h ahead of the camera in
+        the current view direction.  Keeps zoom dolly room available."""
+        cam   = self._pl.camera
+        pos   = np.array(cam.position,    dtype=np.float64)
+        focal = np.array(cam.focal_point, dtype=np.float64)
+        direction = focal - pos
+        n = float(np.linalg.norm(direction))
+        if n < 1e-10:
+            direction = np.array([0.0, 0.0, 1.0])
+        else:
+            direction = direction / n
+        cam.focal_point = tuple(pos + direction * float(distance))
+
     def go_to_coords(
         self,
         x: float,

@@ -6,14 +6,46 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 
 ## Features
 
-- Simultaneous halo (lhalo_binary trees) and galaxy (SAGE HDF5) point cloud rendering
-- Toggle halo/galaxy layers independently with live opacity and colormap controls
-- Snapshot timeline with play/pause/stop and adjustable speed
-- Free camera navigation plus fly-to by halo ID, galaxy index, or coordinates
-- Zoom to arbitrary radius or sub-box
-- Point-pick info panel showing halo mass and galaxy stellar mass/sSFR/type
-- Multi-CPU snapshot prefetching for smooth playback
-- Mass cuts for interactive performance at any resolution
+### Rendering
+- World-space gaussian splat rendering of haloes and galaxies — splats scale with camera distance and stay physically meaningful at any zoom
+- New **Structure** render mode: each galaxy drawn as a multi-layer composition (black BH core, blue cold-gas envelope, coolwarm stellar particles, green CGM / red Hot-atmosphere outer halo) sized by the underlying SAGE properties
+- 27 selectable matplotlib colormaps, identical lists for halo and galaxy layers
+- Live colormap, colour-by mode, opacity and visibility controls per layer
+
+### Playback & camera
+- Play / Pause / Stop / Reverse / Repeat transport at 0.1× – 5× speeds
+- Continuous camera rotation (CW / CCW at 15° / 30° / 60° per second)
+- Reset / Centre / Focus buttons
+- Fly to halo, galaxy, coordinates, or sub-box (with focus mode that masks everything outside)
+- Camera bookmarks (save, restore, delete)
+
+### Selection & inspection
+- **Galaxy Info** panel (Target tab) — GalaxyID, type, halo Mvir, stellar mass, sSFR, cold gas, B/T, BH mass, H₂ mass, gas regime, FFB regime, environment classification, mass-weighted stellar age
+- **Group Info** panel (Environment tab) — FOF-aggregate stats: classification, member breakdown (centrals vs satellites), host Mvir, Σ stellar / cold gas / SFR, mean B/T, spatial extent, target role, BCG stellar mass
+- **Highlight Galaxy** / **Highlight Members** buttons add cyan splat overlays
+- Double-click any point in the viewport to select the nearest galaxy
+
+### Filtering
+- Halo filters: Mvir (log₁₀), Rvir (Mpc/h), Vvir (km/s)
+- Galaxy filters: stellar mass, sSFR, B/T, age, BH mass, ICS mass, type (centrals / satellites), FFB regime, CGM / Hot regime, environment class (Field / Isolated / Group / Cluster, via checkboxes in the Environment tab)
+- Filters auto-disable when the loaded model doesn't contain the underlying field
+- Reset Filters button restores defaults
+
+### Multi-model
+- Auto-scans `<sage_root>/output/` for SAGE model subfolders
+- Switch the primary model from the hamburger menu (any box size)
+- Overlay a second compatible model on top (same box size + snap count)
+- Loading spinner during model swaps; warning snackbar for incompatible overlays
+
+### Output
+- Screenshots in PNG / JPG / TIFF
+- Movie recording in GIF / MOV (H.264, via ffmpeg) / PNG sequence
+- Configurable FPS (1 – 60) and resolution (Native / 2× / 4× supersampled)
+- Optional user-typed label per capture; everything goes into a single session folder per app launch
+
+### Self-contained metadata
+- Cosmology (h, Ω_m, Ω_Λ), box size, and snapshot redshifts are read directly from `model_0.hdf5`'s `Header/Simulation`
+- The `.par` file is now only needed for tree-file paths
 
 ## Supported simulations
 
@@ -21,6 +53,8 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 |---|---|---|---|
 | miniMillennium | 62.5 Mpc/h | 64 | lhalo_binary |
 | microUchuu | 96 Mpc/h | 50 | lhalo_binary |
+
+Both supported automatically — point at the `.par` file and SAGE-Viewer figures out the rest from the HDF5.
 
 ## Quick start
 
@@ -40,6 +74,40 @@ ssh -L 8080:localhost:8080 user@cluster
 # Then open http://localhost:8080 in your browser
 ```
 
+## Command-line options
+
+```text
+--par FILE              Path to a SAGE .par file (required)
+--par-dir DIR           Directory to scan for additional .par files
+                        (defaults to the parent of --par; used for the
+                        multi-model dropdown)
+--snap N                Initial snapshot number (default: last = z=0)
+--port N                Trame server port (default: 8080)
+--n-jobs N              Worker threads for parallel halo file reads
+--max-halos N           Downsample ceiling per snapshot
+--max-galaxies N        Downsample ceiling per snapshot
+--min-halo-mass MSUN    Minimum halo mass to load
+--min-stellar-mass MSUN Minimum stellar mass to load
+```
+
+## Multi-model workflow
+
+If your SAGE root looks like:
+
+```
+SAGE26/
+├── input/
+│   ├── millennium.par
+│   ├── millennium_vanilla.par
+│   └── microuchuu.par
+└── output/
+    ├── millennium/model_0.hdf5
+    ├── millennium_vanilla/model_0.hdf5
+    └── microuchuu/model_0.hdf5
+```
+
+then `sage-viewer --par input/millennium.par` discovers all three models automatically. Click the hamburger icon (top-left) → Models section to switch, or click "+ overlay" next to a compatible model to render both at once.
+
 ## Installation
 
 ```bash
@@ -52,29 +120,23 @@ cd SAGE-Viewer
 pip install -e ".[dev]"
 ```
 
-Requires Python >= 3.10.
+Requires Python ≥ 3.10. Movie recording in MOV format requires `ffmpeg` in your `PATH`.
 
 ## Documentation
 
 Full documentation at [mbradley1985.github.io/SAGE-Viewer](https://mbradley1985.github.io/SAGE-Viewer).
 
-## Integration with SAGE26
+## Tabs at a glance
 
-SAGE-Viewer reads SAGE output directories and `.par` files directly. No conversion step needed:
-
-```bash
-# From your SAGE26 root
-sage-viewer --par input/millennium.par --snap 63
-```
-
-## Colormap modes
-
-| Mode | Haloes | Galaxies |
-|---|---|---|
-| `mass` | Halo Mvir | Stellar mass |
-| `ssfr` | Halo mass | Specific SFR |
-| `density` | Local density | Local density |
-| `type` | Halo mass | Central (Blues) / Satellite (Reds) |
+| Tab | Purpose |
+|---|---|
+| Structure  | Layer visibility, opacity, colour-by mode, colormap (with inline colorbar) |
+| Filters    | Range sliders for halo and galaxy properties |
+| Record     | Screenshots and movie recording |
+| Target     | Halo / galaxy navigation, focus zoom, Galaxy Info, Highlight Galaxy |
+| Environment| Halo selector, environment-class checkboxes, Group Info, Highlight Members |
+| Coords     | Fly to arbitrary (x, y, z) |
+| Box        | Zoom to axis-aligned sub-box |
 
 ## License
 

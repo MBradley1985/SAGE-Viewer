@@ -8,35 +8,56 @@ PyVista's standard trackball controls apply inside the render window:
 |---|---|
 | Left drag | Rotate |
 | Right drag / scroll | Zoom |
-| Middle drag | Pan |
-| `r` | Reset camera to full box |
-| `f` | Focus on the picked point |
-| Left click | Pick point → update info bar |
+| Middle drag (or Shift + left drag) | Pan |
+| **Double-click** | Select the nearest galaxy (only registers on the Target / Environment tabs to avoid wasted work) |
+| Single click | Nothing — pure camera interaction (no selection state change) |
 
-## Navigation panel controls
+## Persistent header controls
 
-### Reset Camera
+Three buttons sit above the tab panel and work no matter which tab is active:
 
-Returns to a full-box view centred on (box/2, box/2, box/2).
+| Button | Action |
+|---|---|
+| Reset Camera | Returns to a full-box view from outside the box |
+| Focus toggle (◎ target icon) | Masks haloes and galaxies outside the current zoom region. Galaxy zooms auto-enable focus |
+| Centre (✛ crosshair icon) | Places the camera AT the box centre, looking out |
 
-### Fly to Halo
+## Target tab
 
-Enter a **halo index** (0-based, within the current snapshot) and a **standoff distance** in Mpc/h. Press **Go** to move the camera there.
+| Control | Action |
+|---|---|
+| Halo index + Standoff + Go | Fly to a halo by index at the given standoff |
+| Galaxy index + Go (Enter) | Fly to a galaxy by index |
+| Zoom preset buttons (3 / 5 / 10) | Galaxy zoom radii in Mpc/h. Engages a focus sphere |
+| Galaxy Info | Open the per-galaxy properties card; flies to 30 Mpc/h standoff and locks a 10 Mpc/h focus sphere |
+| Highlight Galaxy | Add a cyan splat on the picked galaxy (toggle) |
+| Clear Indicator | Clear all overlays and close Galaxy / Group Info cards |
 
-!!! tip
-    Use the info bar (click a halo point) to find the index of a specific halo you've spotted visually.
+## Environment tab
 
-### Fly to Galaxy
+| Control | Action |
+|---|---|
+| Halo index + Standoff + Go | Same flight as Target's halo Go, but also snaps the selected galaxy to the FOF central at that halo |
+| Field / Isolated / Group / Cluster checkboxes | Show galaxies in the selected environment classes (Field < 10¹¹ M☉; Isolated 10¹¹⁻¹²·⁵; Group 10¹²·⁵⁻¹⁴; Cluster > 10¹⁴) |
+| Group Info | Open the FOF-aggregate properties card |
+| Highlight Members | Cyan splats on every FOF group member (toggle) |
+| Clear | Clear all overlays and close the panel |
 
-Enter a **galaxy index** (0-based, within the current snapshot). Press **Go**.
+## Coords tab
 
-### Fly to Coordinates
+Enter **X, Y, Z** in Mpc/h and a standoff distance, press **Go** to point the camera at that location.
 
-Enter **X, Y, Z** in Mpc/h and a standoff distance. Press **Go** to point the camera at that location.
+## Box tab
 
-### Zoom to Sub-box
+Enter an axis-aligned bounding box (Xmin, Xmax, Ymin, Ymax, Zmin, Zmax) in Mpc/h. Press **Zoom** to frame that region. With Focus active, the box also defines the masked region.
 
-Enter an axis-aligned bounding box (Xmin, Xmax, Ymin, Ymax, Zmin, Zmax) in Mpc/h. Press **Zoom** to frame that region.
+## Cam (camera bookmarks)
+
+| Control | Action |
+|---|---|
+| Label + Save | Save the current camera position with a name |
+| Bookmarks dropdown + Go | Restore a saved camera position |
+| 🗑 | Delete the selected bookmark |
 
 ## Programmatic navigation (Python API)
 
@@ -49,4 +70,5 @@ scene.camera.go_to_halo(42)
 scene.camera.zoom_to_box(0, 30, 0, 30, 0, 30)
 scene.camera.zoom_to_radius(center=(31.25, 31.25, 31.25), radius=10.0)
 scene.camera.reset()
+scene.camera.go_to_box_center()
 ```

@@ -53,6 +53,7 @@ movies/
 sage_screenshots/
 sage_recordings/
 sage_outputs/
+sage_library/
 *.mp4
 *.mov
 *.gif
