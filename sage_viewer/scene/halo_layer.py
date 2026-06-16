@@ -34,8 +34,6 @@ class HaloLayer:
         self._opacity = opacity
         self._visible = visible
         self._actors: list = []
-        self._cloud:  pv.PolyData | None = None   # persistent geometry
-        self._render_params: tuple = ()           # tracks need-to-rebuild
         self._snapshot: HaloSnapshot | None = None
         self._focus_mask: np.ndarray | None = None
         self._filter_mask: np.ndarray | None = None
@@ -122,7 +120,6 @@ class HaloLayer:
         snap = self._snapshot
         if snap is None or snap.count == 0:
             self._clear_actors()
-            self._cloud = None
             return
 
         # Combined focus + filter mask
@@ -139,30 +136,31 @@ class HaloLayer:
             )
             if snap.count == 0:
                 self._clear_actors()
-                self._cloud = None
                 return
 
         colors = self._compute_colors(snap)
         radii  = halo_world_radii(snap.masses)
 
-        # Use in-place update when only the data has changed AND the point
-        # count is identical — otherwise we'd leave VTK pointing at freed
-        # memory (the mapper / shader caches array pointers).
-        target_params = (self._colormap, self._opacity)
-        can_reuse = (
-            self._cloud is not None
-            and self._actors
-            and self._render_params == target_params
-            and self._cloud.n_points == len(snap.positions)
-        )
-        if can_reuse:
-            self._update_in_place(snap.positions, colors, radii)
-        else:
-            self._clear_actors()
-            self._render_gaussian(snap.positions, colors, radii)
-            self._render_params = target_params
+        # Full rebuild every redraw — the layered NFW-style stack has
+        # three actors per halo population so the in-place fast-path
+        # doesn't apply (the same trade-off galaxies make for Structure).
+        self._clear_actors()
+        self._render_layered(snap.positions, colors, radii)
 
-    def _render_gaussian(
+    # ------------------------------------------------------------------
+    # Layered NFW-style halo rendering — 3 stacked gaussian splats per
+    # halo at decreasing radius and increasing opacity, giving a soft
+    # density-profile look (bright core → faint Rvir boundary).
+    # ------------------------------------------------------------------
+
+    _LAYERS = (
+        # (radius_scale, opacity_floor, opacity_multiplier)
+        (1.00, 0.03, 0.35),   # outer envelope ~ Rvir boundary
+        (0.45, 0.05, 0.60),   # inner halo
+        (0.18, 0.08, 0.95),   # dense core
+    )
+
+    def _render_layered(
         self,
         positions: np.ndarray,
         colors: np.ndarray,
@@ -170,45 +168,28 @@ class HaloLayer:
     ) -> None:
         if len(positions) == 0:
             return
-        cloud = pv.PolyData(positions)
-        cloud["scalar"] = colors
-        cloud["radius"] = radii
-        actor = self._pl.add_mesh(
-            cloud,
-            scalars="scalar",
-            cmap=self._colormap,
-            clim=[0.0, 1.0],
-            style="points_gaussian",
-            emissive=False,
-            opacity=self._opacity,
-            show_scalar_bar=False,
-            render=False,
-            reset_camera=False,
-        )
-        mapper = actor.mapper
-        mapper.SetScaleArray("radius")
-        mapper.SetScaleFactor(1.0)
-        if not self._visible:
-            actor.SetVisibility(False)
-        self._cloud = cloud
-        self._actors.append(actor)
-
-    def _update_in_place(
-        self,
-        positions: np.ndarray,
-        colors: np.ndarray,
-        radii: np.ndarray,
-    ) -> None:
-        """Update the persistent PolyData's points/scalars without rebuilding
-        the actor/mapper/shader pipeline. Avoids the ~50–100 ms VTK setup cost
-        per snapshot transition."""
-        cloud = self._cloud
-        if cloud is None:
-            return
-        cloud.points         = positions
-        cloud["scalar"]      = colors
-        cloud["radius"]      = radii
-        cloud.Modified()
+        for r_scale, opa_floor, opa_mul in self._LAYERS:
+            cloud = pv.PolyData(positions)
+            cloud["scalar"] = colors
+            cloud["radius"] = (radii * float(r_scale)).astype(np.float32)
+            actor = self._pl.add_mesh(
+                cloud,
+                scalars="scalar",
+                cmap=self._colormap,
+                clim=[0.0, 1.0],
+                style="points_gaussian",
+                emissive=False,
+                opacity=max(opa_floor, self._opacity * opa_mul),
+                show_scalar_bar=False,
+                render=False,
+                reset_camera=False,
+            )
+            mapper = actor.mapper
+            mapper.SetScaleArray("radius")
+            mapper.SetScaleFactor(1.0)
+            if not self._visible:
+                actor.SetVisibility(False)
+            self._actors.append(actor)
 
     def _compute_colors(self, snap: HaloSnapshot) -> np.ndarray:
         vmin, vmax = _RANGES[self._color_mode]
