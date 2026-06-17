@@ -502,6 +502,7 @@ def create_app(
                         # Mirrored history
                         with v3.VSheet(
                             color="#0a0a0f",
+                            classes="sage-console-scroll",
                             style=(
                                 "flex:1 1 0;min-height:0;overflow-y:auto;"
                                 "padding:6px 10px;font-family:monospace;"
@@ -537,7 +538,9 @@ def create_app(
                             style="padding:6px 8px;flex-shrink:0;",
                         ):
                             with html.Div(
-                                **{"data-enter-click": "btn-console-run"}
+                                raw_attrs=[
+                                    'data-enter-click="btn-console-run"'
+                                ],
                             ):
                                 v3.VTextField(
                                     v_model=("console_input",),

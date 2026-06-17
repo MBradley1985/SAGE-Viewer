@@ -89,6 +89,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Implemented via a global JS handler (`data-enter-click="<btn-id>"`)
   served from `sage_viewer/static/sage_viewer.js` — bypasses Vuetify's
   internal keydown handling for reliability
+- The wrapper `<div>` carries the marker via trame's `raw_attrs=`,
+  not a plain `data-enter-click=` kwarg: trame only renders attribute
+  keys in its allowed-keys set and silently drops unknown ones, so the
+  kwarg form never reached the DOM and Enter did nothing
 
 ### Galaxy rendering simplified
 - Per-galaxy **star scatter removed entirely** — the 15–25 M splat

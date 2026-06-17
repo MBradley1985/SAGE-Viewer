@@ -57,4 +57,42 @@
       el = el.parentElement;
     }
   }, true);  // capture phase so we beat Vuetify's listeners
+
+  // ─── Console auto-scroll (follow output) ──────────────────────────
+  // The console history (in-panel + pop-out) appends entries via Vue.
+  // Keep each `.sage-console-scroll` container pinned to the bottom so
+  // new output stays visible — unless the user has scrolled up to read
+  // back, in which case we leave their position alone.
+  var NEAR_BOTTOM_PX = 48;
+  function stickToBottom(el) {
+    el.scrollTop = el.scrollHeight;
+  }
+  function isNearBottom(el) {
+    return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX;
+  }
+  // One observer per container, attached lazily as they appear/change.
+  var obs = new MutationObserver(function (mutations) {
+    var seen = new Set();
+    mutations.forEach(function (m) {
+      var el = m.target;
+      while (el && el !== document.body) {
+        if (el.classList && el.classList.contains('sage-console-scroll')) break;
+        el = el.parentElement;
+      }
+      if (!el || el === document.body || seen.has(el)) return;
+      seen.add(el);
+      // Only follow if the user was already at/near the bottom.
+      if (el.__sageStick !== false) stickToBottom(el);
+    });
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+
+  // Track whether the user has scrolled away from the bottom so we can
+  // pause auto-follow, and resume once they return to the bottom.
+  document.addEventListener('scroll', function (e) {
+    var el = e.target;
+    if (!el || !el.classList || !el.classList.contains('sage-console-scroll'))
+      return;
+    el.__sageStick = isNearBottom(el);
+  }, true);
 })();

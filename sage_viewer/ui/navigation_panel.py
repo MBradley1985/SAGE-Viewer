@@ -1565,8 +1565,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
         if on_enter is not None:
             kwargs["keydown_enter"] = on_enter
         if target_id is not None:
-            with html.Div(**{"data-enter-click": target_id},
-                          style="display:contents;"):
+            with html.Div(
+                raw_attrs=[f'data-enter-click="{target_id}"'],
+                style="display:contents;",
+            ):
                 v3.VTextField(**kwargs)
         else:
             v3.VTextField(**kwargs)
@@ -2052,8 +2054,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 with html.Div(
                     style=(
                         "display:flex;align-items:center;gap:6px;"
-                        "padding:8px 0 10px;flex-shrink:0;flex-wrap:wrap;"
-                        "min-height:48px;line-height:1;"
+                        "padding:2px 0 6px;flex-shrink:0;flex-wrap:wrap;"
                     ),
                 ):
                     html.Span(
@@ -2087,7 +2088,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                                    "[c.id])"),
                             style=(
                                 "text-transform:none;font-size:0.62rem;"
-                                "min-width:0;padding:0 8px;"
+                                "min-width:0;padding:0 8px;height:22px;"
                             ),
                         )
                         v3.VBtn(
@@ -2099,7 +2100,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             v_show=("consoles_list.length > 1",),
                             click=("trigger('console_close_trigger', "
                                    "[c.id])"),
-                            style="min-width:18px;padding:0;",
+                            style="min-width:18px;padding:0;height:22px;",
                         )
                     v3.VBtn(
                         icon="mdi-plus",
@@ -2109,7 +2110,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         color="cyan",
                         click=ctrl.console_new,
                         title="New console",
-                        style="min-width:24px;padding:0;",
+                        style="min-width:24px;padding:0;height:22px;",
                     )
 
                 # History — flex-fills the available vertical space.
@@ -2117,6 +2118,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 # bottom block is always visible.
                 with v3.VSheet(
                     color="#0a0a0f",
+                    classes="sage-console-scroll",
                     style=(
                         "flex:1 1 0;min-height:0;overflow-y:auto;"
                         "padding:6px 8px;border:1px solid #1f2937;"
@@ -2151,7 +2153,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         "display:flex;flex-direction:column;gap:6px;"
                     ),
                 ):
-                    with html.Div(**{"data-enter-click": "btn-console-run"}):
+                    with html.Div(
+                        raw_attrs=['data-enter-click="btn-console-run"'],
+                    ):
                         v3.VTextField(
                             v_model=("console_input",),
                             label=(
@@ -2167,7 +2171,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             keydown_enter=ctrl.console_submit,
                         )
                     with html.Div(
-                        **{"data-enter-click": "btn-console-load"}
+                        raw_attrs=['data-enter-click="btn-console-load"'],
                     ):
                         v3.VTextField(
                             v_model=("console_script_path",),
@@ -2452,7 +2456,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 with html.Div(
-                    **{"data-enter-click": "btn-take-screenshot"}
+                    raw_attrs=['data-enter-click="btn-take-screenshot"'],
                 ):
                     v3.VTextField(
                         v_model=("screenshot_label",),
@@ -2508,7 +2512,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 with html.Div(
-                    **{"data-enter-click": "btn-start-recording"}
+                    raw_attrs=['data-enter-click="btn-start-recording"'],
                 ):
                     v3.VTextField(
                         v_model=("movie_label",),

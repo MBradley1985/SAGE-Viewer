@@ -5,7 +5,12 @@
       "Bash(xargs kill -9)",
       "Bash(awk NR>=1610 && NR<=1640 *)",
       "Bash(awk NR>=345 && NR<=400 *)",
-      "Bash(awk NR>=400 && NR<=430 *)"
+      "Bash(awk NR>=400 && NR<=430 *)",
+      "Read(//private/tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8099/sage_static/sage_viewer.js)",
+      "Bash(curl -s http://localhost:8099/sage_static/sage_viewer.js)",
+      "Bash(curl -s http://localhost:8099/)",
+      "Bash(curl -s http://localhost:8099/index.html)"
     ]
   }
 }
