@@ -21,6 +21,8 @@ _OPTIONAL_FIELDS: dict[str, str] = {
     "cgm_regime":   "Regime",
     "central_mvir": "CentralMvir",
     "h2_mass":      "H2gas",
+    "cgm_gas":      "CGMgas",
+    "hot_gas":      "HotGas",
     "galaxy_id":    "GalaxyIndex",
     "central_id":   "CentralGalaxyIndex",
     "time_of_infall": "TimeOfInfall",

@@ -10,13 +10,21 @@ SAGE-Viewer renders dark matter haloes and SAGE galaxies together in a browser-b
 
 | Feature | Description |
 |---|---|
-| Dual layers | Haloes and galaxies rendered simultaneously as point clouds |
-| Timeline | Scrub, play, pause, and step through all 64 Millennium snapshots |
-| Layer controls | Toggle visibility, adjust opacity, and change colourmap mode live |
-| Navigation | Fly to any halo index, galaxy index, or coordinate; zoom to sub-box |
-| Point picking | Click any point to inspect its halo mass or galaxy properties |
+| Dual layers | Haloes and galaxies rendered simultaneously as world-space gaussian splats |
+| Timeline | Scrub, play, pause, and step through every snapshot at 0.1×–5× speeds |
+| Layer controls | Toggle visibility, adjust opacity, choose colour-by mode, pick from 27 colormaps |
+| Structure mode | Layered galaxies: cold-gas envelope + outer CGM/Hot envelope, sized by SAGE fields |
+| Navigation | Fly to halo index, galaxy index, coordinates, or sub-box — focus mode masks everything outside |
+| Tab-aware Focus | One button that does the right thing on whatever tab you're in |
+| Double-click any point | Populates Target halo + galaxy IDs and (if Focus is active) carries the camera to the selection |
+| Point picking | Double-click anywhere in the viewport — works on every tab |
+| Multi-model | Switch between SAGE flavours of the same sim; overlay two compatible models simultaneously |
+| Embedded console | Real shell terminal + Python REPL + natural-language SAGE commands in one tab, with multi-session tabs, script loading, and a pop-out window |
+| Output | Screenshots (PNG/JPG/TIFF), movies (GIF/MOV/PNG-sequence) at 1–60 fps, 1×/2×/4× supersampling |
+| Camera bookmarks | Save / restore / delete arbitrary viewpoints |
 | Multi-CPU loading | Snapshot prefetch pool keeps playback smooth |
 | Remote use | Trame web server — run on a cluster, view in any browser |
+| Enter to run | Every input submits on Enter, equivalent to clicking its action button |
 
 ---
 

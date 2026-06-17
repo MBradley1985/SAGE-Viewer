@@ -25,7 +25,7 @@ class HaloLayer:
         plotter: pv.Plotter,
         color_mode: ColorMode = "mvir",
         colormap: str = "viridis",
-        opacity: float = 0.10,
+        opacity: float = 0.15,
         visible: bool = True,
     ) -> None:
         self._pl = plotter

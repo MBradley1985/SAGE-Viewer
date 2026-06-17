@@ -4,7 +4,147 @@ All notable changes to SAGE-Viewer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — 0.2.0
+## [Unreleased] — 0.3.0
+
+### Major additions
+
+#### Embedded shell console (terminal in a tab)
+- The Console tab is now a real terminal — every command runs through
+  the user's `$SHELL` via `subprocess` with the per-session `cwd` and
+  `env`, so globs, pipes, redirects, `&` backgrounding, and `$VAR`
+  expansion all work
+- `cd <path>`, `pwd`, and `export FOO=bar` handled as in-process
+  built-ins so they survive between commands
+- macOS-style prompt: `host:basename user$` (e.g. `G2YYHL4LCN:SAGE-Viewer mbradley$`)
+- 300 s timeout per command (background long jobs with `&`)
+- Type `python` / `python3` / `py` to drop into an embedded Python REPL
+  whose locals expose `scene`, `state`, `ctrl`, `server`, `plotter`,
+  `np`. Type `exit` / `quit` / `shell` to return.
+- Type `sage` / `nl` / `natural` to enter natural-language mode for the
+  existing SAGE command parser (`show only clusters`, `go to halo 42`,
+  `snap 30`, `screenshot`, etc.)
+- **Multiple sessions**: tab strip with one button per console + a `+`
+  to spawn new ones; each session has its own history, mode, cwd, env,
+  and Python interpreter
+- **Load Script** button reads a `.py` path from the script field and
+  `exec`s it in the session's Python locals — useful for plotting and
+  test scripts on HPC
+- **Pop-out** button floats the console over the viewport in a movable
+  card (drag by the title bar) so you can keep typing while watching
+  the render
+- Console fills most of the right panel; type-command + script-path
+  inputs and the four action buttons (Run, Clear, Load Script, Pop-out)
+  are anchored at the bottom
+
+#### Tab-aware Focus button
+- Focus icon now does the right thing based on the active tab:
+  - **Target** → focus on the current galaxy at `nav_gal_last_radius`
+  - **Environment** → focus on the current halo at `nav_distance`
+  - **Coords** → focus sphere at `(nav_x, nav_y, nav_z)` of `nav_distance`
+  - **Box** → focus on the current axis-aligned sub-box
+  - Other tabs → re-apply the last established focus region
+- Turning Focus OFF always just clears, regardless of tab
+
+#### Double-click everywhere
+- Picker is now globally on, not just in Target / Environment
+- A double-click anywhere populates `nav_halo_idx` + `nav_gal_idx`,
+  switches to the Target tab, and draws the red marker on the picked
+  galaxy
+- If Focus is already active when you double-click, the camera carries
+  to the new selection at the last-used radius
+
+#### Switching-models overlay
+- A cyan-bordered "SWITCHING MODELS, PLEASE HOLD..." card now covers
+  the viewport whenever a model is being loaded or swapped
+- A rotating italic quip refreshes every 2.5 s so the user knows the
+  server is still alive
+
+### UI polish
+
+- **Toolbar re-arranged**: hamburger + SAGE-Viewer title clustered on
+  the LEFT; transport + slider + snap chip + speed + rotation all
+  clustered on the RIGHT, with a single big spacer between
+- **Right panel locked at 300 px width**, never scrolls — the panel's
+  internal flex layout fits all content per tab
+- **Indicators persist across tab switches** — the box wireframe,
+  sphere wireframe, member dots, and red galaxy marker no longer get
+  cleared when you change tabs; they only clear on explicit user
+  action (Reset Camera, Go/Zoom, Clear, Focus toggle)
+- **Coords-mode wireframe sphere** (5 great-circle rings, pure lines
+  with no vertex markers) drawn when you Go to coords, matching the
+  Box mode's wireframe-box convention
+- **"Use Current Position" button** in the Coords tab populates X/Y/Z
+  + Standoff from the camera's focal point and standoff distance
+- **"Use Current View" button** in the Box tab populates the six min/max
+  bounds from the camera's current frustum at the focal plane
+- **Box-mode Zoom always engages focus** (was conditional on already
+  being focused), matching Target / Environment / Coords behaviour
+- **Default halo opacity** raised from 0.10 → 0.15
+
+### Enter to run (everywhere)
+- Every text field that has a paired action button now also fires
+  that button on Enter. Wired across Target (halo Go, galaxy Go),
+  Environment (Go), Coords (Go), Box (Zoom), Console (Run, Load
+  Script), pop-out console, Record (Take Screenshot, Start Recording).
+- Implemented via a global JS handler (`data-enter-click="<btn-id>"`)
+  served from `sage_viewer/static/sage_viewer.js` — bypasses Vuetify's
+  internal keydown handling for reliability
+
+### Galaxy rendering simplified
+- Per-galaxy **star scatter removed entirely** — the 15–25 M splat
+  draws per frame were the main perf killer at high galaxy counts
+  with no spatial-perception payoff
+- **BH accretion-disk core layer removed** — visually invisible
+  against the surrounding warm-toned splats at typical zoom levels
+- Structure mode now renders just three lightweight layers per galaxy:
+  outer envelope (CGM/Hot), cold-gas envelope, and the optional
+  property-coloured outer shell
+- **CGMgas + HotGas as a sized field**: the outer envelope is now
+  sized and coloured by `CGMgas` (CGM-regime galaxies) and `HotGas`
+  (Hot-regime galaxies). `h2_mass` is no longer consumed by the
+  rendering layers (still loaded + shown in the Galaxy Info card).
+
+### Data model
+- `GalaxySnapshot` gains `cgm_gas` and `hot_gas` fields (both Msun,
+  read as optional HDF5 columns `CGMgas` / `HotGas`)
+- Par-file parser now strips `;`, `#`, and `%` as inline-comment
+  markers — fixes a parse error on microUchuu's `.par`
+  (`BoxSize 100.0 ; ...`)
+
+### Static asset system
+- Trame module registered to serve `sage_viewer/static/` at
+  `/sage_static/` — needed because Vue 3 silently drops `<script>`
+  tags from templates, so all client JS now comes in via real files
+- Currently hosts `sage_viewer.js` (pop-out drag handler + Enter-to-
+  click handler); new client helpers can drop into the same folder
+
+### Text rendering consistency
+- All Unicode super/subscripts replaced with ASCII across user-visible
+  strings (`M☉ → Msun`, `yr⁻¹ → yr^-1`, `10¹²·⁵ → 10^12.5`,
+  `log₁₀ → log10`, `H₂ → H2`, `Σ → Total`). Avoids font-substitution
+  inconsistencies that mixed super- and normal-size glyphs.
+
+### Performance
+- All "lower quality during drag" hacks reverted; full still-quality
+  rendering is now in effect at all times
+  (`interactive_ratio=1.0, interactive_quality=100, still_quality=100`,
+  no `SetDesiredUpdateRate(15.0)` toggling during play / rotate /
+  mouse drag)
+
+### Bug fixes
+- Switching to microUchuu used to crash on `BoxSize 100.0 ; Size of the
+  simulation box` — par parser now handles `;` comments
+- Tab switches no longer destroy in-progress indicators (box / sphere /
+  member dots)
+- Sphere indicator no longer renders vertex point-markers along its
+  great-circle polylines (explicit `verts` cell clear on the PolyData)
+- Pop-out console window is now actually draggable (was broken because
+  Vue 3 stripped the inline `<script>` block; now served as a real
+  static asset)
+
+---
+
+## [0.2.0]
 
 ### Major additions
 

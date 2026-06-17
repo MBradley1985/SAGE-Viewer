@@ -111,9 +111,6 @@ def build_toolbar(server, scene: Scene) -> None:
         stop_evt.clear()
         state.is_playing = True
         state.flush()
-        # Tell VTK "we want fast frames" so it picks low-cost rendering paths
-        rw = scene.plotter.ren_win
-        rw.SetDesiredUpdateRate(15.0)
         try:
             while not stop_evt.is_set():
                 fps      = _FPS.get(float(state.play_speed), 3)
@@ -138,7 +135,6 @@ def build_toolbar(server, scene: Scene) -> None:
                 except asyncio.TimeoutError:
                     pass
         finally:
-            rw.SetDesiredUpdateRate(0.0001)   # back to high-quality rendering
             state.is_playing = False
             state.flush()
 
@@ -182,28 +178,23 @@ def build_toolbar(server, scene: Scene) -> None:
 
     async def _rotate_loop():
         interval = 1.0 / _ROT_RATE_FPS
-        rw = scene.plotter.ren_win
-        rw.SetDesiredUpdateRate(_ROT_RATE_FPS)
-        try:
-            while _ctl["rotate_mode"] != "off":
-                mode = _ctl["rotate_mode"]
-                sign, deg_per_sec = _parse_rotate(mode)
-                if sign == 0:
-                    break
-                delta  = sign * deg_per_sec * interval
-                cam    = scene.plotter.camera
-                focal  = np.array(cam.focal_point, dtype=np.float64)
-                pos    = np.array(cam.position,    dtype=np.float64)
-                r      = pos - focal
-                angle  = np.deg2rad(delta)
-                c, s   = np.cos(angle), np.sin(angle)
-                rm     = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
-                cam.position = tuple(focal + rm @ r)
-                cam.up       = (0.0, 1.0, 0.0)
-                _push()
-                await asyncio.sleep(interval)
-        finally:
-            rw.SetDesiredUpdateRate(0.0001)   # back to high-quality rendering
+        while _ctl["rotate_mode"] != "off":
+            mode = _ctl["rotate_mode"]
+            sign, deg_per_sec = _parse_rotate(mode)
+            if sign == 0:
+                break
+            delta  = sign * deg_per_sec * interval
+            cam    = scene.plotter.camera
+            focal  = np.array(cam.focal_point, dtype=np.float64)
+            pos    = np.array(cam.position,    dtype=np.float64)
+            r      = pos - focal
+            angle  = np.deg2rad(delta)
+            c, s   = np.cos(angle), np.sin(angle)
+            rm     = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+            cam.position = tuple(focal + rm @ r)
+            cam.up       = (0.0, 1.0, 0.0)
+            _push()
+            await asyncio.sleep(interval)
 
     @state.change("rotate_mode")
     def on_rotate_mode(rotate_mode, **_):
@@ -219,11 +210,12 @@ def build_toolbar(server, scene: Scene) -> None:
     # Widgets
     # ------------------------------------------------------------------
 
-    v3.VToolbarTitle("SAGE-Viewer", style="font-size:1rem;min-width:120px;")
-
+    # Single big spacer pushes the entire playback cluster to the right
+    # of the toolbar, immediately adjacent to the title / hamburger on
+    # the left.
     v3.VSpacer()
 
-    # Transport controls
+    # Transport controls — leftmost of the right-hand cluster.
     with v3.VBtnGroup(variant="outlined", density="compact"):
         v3.VBtn(
             icon="mdi-swap-horizontal",
@@ -242,10 +234,8 @@ def build_toolbar(server, scene: Scene) -> None:
             title="Loop",
         )
 
-    v3.VSpacer()
-
     # Snapshot slider
-    with v3.VCol(style="max-width:340px;padding:0 12px;"):
+    with v3.VCol(style="max-width:280px;padding:0 12px;"):
         v3.VSlider(
             v_model=("snap_num",),
             min=0, max=snap_count - 1, step=1,
@@ -257,11 +247,9 @@ def build_toolbar(server, scene: Scene) -> None:
     v3.VChip(
         "{{ snap_label }}",
         size="small",
-        color="deep-purple",
-        style="font-family:monospace;min-width:240px;",
+        color="cyan",
+        style="font-family:monospace;min-width:220px;margin-right:8px;",
     )
-
-    v3.VSpacer()
 
     # Speed selector
     v3.VSelect(
@@ -280,3 +268,5 @@ def build_toolbar(server, scene: Scene) -> None:
         hide_details=True,
         style="max-width:120px;",
     )
+
+    # (theme selector removed — DOS Blue is the only palette)

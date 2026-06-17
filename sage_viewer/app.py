@@ -4,12 +4,81 @@ from pathlib import Path
 
 from trame.app import get_server
 from trame.ui.vuetify3 import SinglePageLayout
+from textwrap import dedent
+
 from trame.widgets import html, vuetify3 as v3
 from trame_vtk.modules.vtk import has_capabilities
 from trame_vtk.widgets.vtk import VtkRemoteView
 
 from sage_viewer.scene.scene import Scene
 from sage_viewer.utils.discover import find_models
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# UI palettes
+# ──────────────────────────────────────────────────────────────────────────
+_THEME_CSS = dedent("""
+/* ============================================================
+   MODERN (default) — colours come from the Vuetify theme.  No
+   structural overrides; Vuetify defaults apply.
+   ============================================================ */
+
+/* ============================================================
+   DOS BLUE — Norton-Commander-style high-contrast IBM blue.
+   Vuetify adds `.v-theme--dos_blue` to the application root when
+   the theme is active; everything below is scoped to that class.
+   ============================================================ */
+/* Border-radius zero on everything (including icons — no harm) */
+.v-theme--dos_blue,
+.v-theme--dos_blue *,
+.v-theme--dos_blue *::before,
+.v-theme--dos_blue *::after { border-radius: 0 !important; }
+
+/* VT323 font on text-bearing elements, but explicitly NOT on any icon
+   wrapper / glyph so MDI keeps its own font and continues to render. */
+.v-theme--dos_blue,
+.v-theme--dos_blue *:not(.v-icon):not(.v-icon *):not(i.mdi):not(.mdi):not([class*="mdi-"]):not(.material-icons):not(.material-icons *) {
+    font-family: 'VT323','Perfect DOS VGA 437','Courier New',monospace !important;
+    letter-spacing: 0.03em;
+}
+/* VT323 renders smaller than equivalent-pt sans-serif fonts; bump every
+   text-bearing element in DOS Blue mode so it reads at a comfortable size. */
+.v-theme--dos_blue .v-label,
+.v-theme--dos_blue .v-list-item-title,
+.v-theme--dos_blue .v-list-subheader { font-size: 1.1rem !important; }
+.v-theme--dos_blue .v-list-item-subtitle { font-size: 0.92rem !important; }
+.v-theme--dos_blue .v-btn { font-size: 1.0rem !important; }
+.v-theme--dos_blue .v-card-title { font-size: 1.2rem !important; }
+.v-theme--dos_blue .v-card-text { font-size: 0.95rem !important; }
+.v-theme--dos_blue .v-field__input,
+.v-theme--dos_blue .v-field input,
+.v-theme--dos_blue input { font-size: 1.05rem !important; }
+.v-theme--dos_blue .v-chip { font-size: 1.0rem !important; }
+.v-theme--dos_blue .v-select__selection-text { font-size: 1.0rem !important; }
+.v-theme--dos_blue .v-select__selection { font-size: 1.0rem !important; }
+.v-theme--dos_blue span { font-size: 1em; }       /* keep inheritance */
+.v-theme--dos_blue .v-toolbar-title { font-size: 1.25rem !important; }
+.v-theme--dos_blue .v-card {
+    border: 2px solid #ffffff !important;
+    box-shadow: 4px 4px 0 #000 !important;
+    backdrop-filter: none !important;
+}
+.v-theme--dos_blue .v-card-title {
+    background: #aaaaaa !important;
+    color: #000 !important;
+    letter-spacing: 0.12em;
+}
+.v-theme--dos_blue .v-btn {
+    border: 1px solid #ffffff !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.1em !important;
+    box-shadow: 2px 2px 0 #000 !important;
+    font-weight: 700;
+}
+.v-theme--dos_blue .v-text-field .v-field,
+.v-theme--dos_blue .v-select .v-field { border-radius: 0 !important; }
+.v-theme--dos_blue .v-chip { border-radius: 0 !important; }
+""")
 from sage_viewer.ui.info_panel import build_info_panel
 from sage_viewer.ui.navigation_panel import build_navigation_panel
 from sage_viewer.ui.toolbar import build_toolbar
@@ -39,22 +108,37 @@ def create_app(
     server = get_server(client_type="vue3")
     server.enable_module(has_capabilities)
 
+    # Serve SAGE-Viewer's client-side helpers (pop-out drag, Enter-to-
+    # click). Vue 3 silently drops <script> tags from templates so we
+    # have to inject these via the module/static-asset system.
+    import os as _os_static
+    _sage_static_dir = _os_static.path.join(
+        _os_static.path.dirname(__file__), "static"
+    )
+    server.enable_module({
+        "serve":   {"sage_static": _sage_static_dir},
+        "scripts": ["sage_static/sage_viewer.js"],
+    })
+
+    # Single-theme config — DOS Blue is now the only palette.
     _vuetify_config = {
         "theme": {
-            "defaultTheme": "dark",
+            "defaultTheme": "dos_blue",
             "themes": {
-                "dark": {
+                "dos_blue": {
+                    "dark": True,
                     "colors": {
-                        "primary": "#7c3aed",
-                        "secondary": "#06b6d4",
-                        "background": "#0a0a0f",
-                        "surface": "#111827",
-                    }
-                }
+                        "primary":    "#ffff55",   # DOS yellow
+                        "secondary":  "#ffffff",
+                        "background": "#0000aa",   # IBM blue
+                        "surface":    "#0000aa",
+                        "on-surface": "#ffffff",
+                        "on-background": "#ffffff",
+                    },
+                },
             },
         }
     }
-
     _NAV_TABS = [
         ("Structure",   "layers"),
         ("Filters",     "filters"),
@@ -110,6 +194,56 @@ def create_app(
 
     server.state.models_list      = _build_models_list()
     server.state.model_loading    = False
+    # Rotating quip shown on the "switching models" overlay. Updated by
+    # an asyncio task that runs while model_loading is True.
+    server.state.model_quip       = "Switching models, please hold..."
+    _MODEL_QUIPS: list[str] = [
+        "Reticulating splines...",
+        "Herding electrons into formation...",
+        "Asking the universe nicely for the haloes...",
+        "Spinning up galaxies — please don't shake the box.",
+        "Negotiating with dark matter (it drives a hard bargain).",
+        "Counting black holes... lost count.",
+        "Convincing photons to travel faster. No luck.",
+        "Reading SAGE bedtime stories to the trees...",
+        "Stirring the cold gas. Gently.",
+        "Polishing the CGM. Won't be long.",
+        "Aligning angular momenta — close your eyes.",
+        "Subhalo abundance matching the vibes...",
+        "Hubble tension intensifies...",
+        "Letting the H2 form on dust grains. Patience.",
+        "Renormalizing the friend-of-friend friendships.",
+        "Tracing merger trees — they're surprisingly deep.",
+        "Reminding satellites who's central.",
+        "Quenching star formation (sorry).",
+        "Calibrating feedback — too much, less, more, less...",
+        "Recomputing 1/H(z). Again.",
+        "Reading the par file out loud, slowly.",
+    ]
+
+    async def _quip_loop():
+        import asyncio as _asyncio
+        import random as _random
+        try:
+            while bool(server.state.model_loading):
+                server.state.model_quip = _random.choice(_MODEL_QUIPS)
+                server.state.flush()
+                await _asyncio.sleep(2.5)
+        finally:
+            server.state.model_quip = "Switching models, please hold..."
+            server.state.flush()
+
+    _quip_task: list = [None]
+
+    @server.state.change("model_loading")
+    def on_model_loading_change(model_loading, **_):
+        import asyncio as _asyncio
+        if model_loading:
+            if _quip_task[0] is None or _quip_task[0].done():
+                _quip_task[0] = _asyncio.ensure_future(_quip_loop())
+        else:
+            if _quip_task[0] is not None and not _quip_task[0].done():
+                _quip_task[0].cancel()
     server.state.model_fields     = scene.primary.fields_available
     server.state.primary_model    = scene.primary.name
     # Snackbar for overlay-compatibility errors etc.
@@ -176,8 +310,19 @@ def create_app(
             server.state.model_loading = False
             _refresh_models_state()
 
-    with SinglePageLayout(server, full_height=True, vuetify_config=_vuetify_config) as layout:
-        layout.title.set_text("SAGE-Viewer")
+    # `theme=("ui_theme",)` reactively binds the active Vuetify theme to
+    # our state variable — Vuetify swaps the entire palette plus the root
+    # `v-theme--<name>` class instantly when ui_theme changes.
+    server.state.ui_theme = "dos_blue"
+    with SinglePageLayout(
+        server, full_height=True,
+        vuetify_config=_vuetify_config,
+        theme=("ui_theme",),
+    ) as layout:
+        # Hide the SinglePageLayout's auto-built title — we render our own
+        # later inside the toolbar so we can control its position relative
+        # to the hamburger menu.
+        layout.title.style = "display:none;"
         # Hide the default VAppBarNavIcon — replaced by our custom menu button below
         layout.icon.style = "display:none;"
 
@@ -249,10 +394,37 @@ def create_app(
                                 style="padding-left:24px;font-size:0.7rem;",
                             )
 
+            # Title sits directly to the right of the hamburger menu —
+            # both kept close together on the LEFT side of the toolbar.
+            v3.VToolbarTitle(
+                "SAGE-Viewer",
+                style="padding-left:4px;",
+            )
+
             build_toolbar(server, scene)
 
 
         with layout.content:
+            # Pixel-style monospace for the retro palettes — loaded via a
+            # real <link> tag so the browser treats it as a normal external
+            # stylesheet (works even when injected inside a Vue template).
+            html.Link(
+                rel="stylesheet",
+                href=(
+                    "https://fonts.googleapis.com/css2?"
+                    "family=VT323&display=swap"
+                ),
+            )
+            # Theme overrides — encoded as a data: URL so it loads via a real
+            # stylesheet link rather than an inline <style> element (Vue's
+            # template compiler doesn't reliably emit inline <style>).
+            import base64 as _b64
+            _css_data_url = (
+                "data:text/css;charset=utf-8;base64,"
+                + _b64.b64encode(_THEME_CSS.encode("utf-8")).decode("ascii")
+            )
+            html.Link(rel="stylesheet", href=_css_data_url)
+
             with v3.VSheet(
                 style=(
                     "display:flex;flex-direction:row;"
@@ -273,11 +445,114 @@ def create_app(
                         # Closer to original quality settings — less dramatic
                         # interactive→still cycling on each click reduces
                         # visible "flash" re-renders.
-                        interactive_ratio=0.75,
-                        interactive_quality=65,
+                        # Full quality at all times — no resolution drop
+                        # during camera drag.
+                        interactive_ratio=1.0,
+                        interactive_quality=100,
                         still_quality=100,
                     )
                     server.controller.view_update = view.update
+
+                    # Pop-out console — floats over the viewport, mirrors
+                    # the active session's history. Toggle from the
+                    # Console tab's "Pop-out" button. Drag-free for now;
+                    # pinned to the bottom-left corner of the viewport.
+                    with v3.VCard(
+                        v_show=("console_popout_show",),
+                        classes="sage-popout",
+                        style=(
+                            "position:absolute;left:24px;bottom:24px;"
+                            "width:560px;max-width:60%;"
+                            "height:360px;max-height:55%;"
+                            "background:rgba(13,13,26,0.92);"
+                            "border:1px solid #06b6d4;"
+                            "box-shadow:0 0 18px rgba(6,182,212,0.30);"
+                            "display:flex;flex-direction:column;"
+                            "z-index:10;color:#e2e8f0;"
+                            "resize:both;overflow:hidden;"
+                        ),
+                        elevation=0, rounded=False,
+                    ):
+                        # Title bar — also the drag handle (cursor:move +
+                        # ".sage-popout-handle" picked up by the global
+                        # drag script).
+                        with html.Div(
+                            classes="sage-popout-handle",
+                            style=(
+                                "display:flex;align-items:center;"
+                                "padding:4px 8px;gap:8px;"
+                                "border-bottom:1px solid #1f2937;"
+                                "flex-shrink:0;cursor:move;"
+                                "user-select:none;"
+                            ),
+                        ):
+                            html.Span(
+                                "CONSOLE  (Console {{ console_active_id }})",
+                                style=(
+                                    "font-size:0.75rem;font-weight:700;"
+                                    "letter-spacing:0.08em;color:#06b6d4;"
+                                ),
+                            )
+                            v3.VSpacer()
+                            v3.VBtn(
+                                icon="mdi-close", size="x-small",
+                                variant="text", color="#9ca3af",
+                                click=server.controller.console_toggle_popout,
+                            )
+                        # Mirrored history
+                        with v3.VSheet(
+                            color="#0a0a0f",
+                            style=(
+                                "flex:1 1 0;min-height:0;overflow-y:auto;"
+                                "padding:6px 10px;font-family:monospace;"
+                                "font-size:0.72rem;line-height:1.4;"
+                            ),
+                        ):
+                            with html.Div(
+                                v_for=("entry in console_history",),
+                                key=("'po-' + entry.id",),
+                                style=(
+                                    "padding:2px 0 4px;"
+                                    "border-bottom:1px solid #1f2937;"
+                                ),
+                            ):
+                                html.Div(
+                                    "{{ entry.cmd }}",
+                                    style=(
+                                        "color:cyan;white-space:pre-wrap;"
+                                        "font-family:monospace;"
+                                    ),
+                                )
+                                html.Div(
+                                    "{{ entry.out }}",
+                                    style=(
+                                        "color:#9ca3af;"
+                                        "white-space:pre-wrap;"
+                                    ),
+                                )
+                        # Input — submits via the same trigger as the
+                        # in-panel input, so the pop-out is just a second
+                        # surface onto the active console.
+                        with html.Div(
+                            style="padding:6px 8px;flex-shrink:0;",
+                        ):
+                            with html.Div(
+                                **{"data-enter-click": "btn-console-run"}
+                            ):
+                                v3.VTextField(
+                                    v_model=("console_input",),
+                                    label=(
+                                        "console_mode === 'python' "
+                                        "? 'Python REPL  (Enter to run)' "
+                                        ": (console_mode === 'sage' "
+                                        "    ? 'SAGE command  (Enter to run)' "
+                                        "    : 'Shell  (Enter to run)')",
+                                    ),
+                                    hide_details=True, variant="outlined",
+                                    bg_color="#1a1a2e", density="compact",
+                                    style="font-family:monospace;",
+                                    keydown_enter=server.controller.console_submit,
+                                )
 
                     # Snackbar for compatibility / status messages
                     v3.VSnackbar(
@@ -457,31 +732,51 @@ def create_app(
                         contained=True,
                         persistent=True,
                         classes="d-flex align-center justify-center",
-                        scrim="rgba(0,0,0,0.65)",
+                        scrim="rgba(0,0,0,0.78)",
                     ):
                         with v3.VSheet(
                             color="#1a1a2e",
                             style=(
-                                "padding:24px 32px;border-radius:8px;"
+                                "padding:40px 56px;border-radius:6px;"
+                                "border:1px solid #06b6d4;"
                                 "display:flex;flex-direction:column;align-items:center;"
-                                "gap:14px;"
+                                "gap:18px;min-width:480px;max-width:640px;"
+                                "box-shadow:0 0 24px rgba(6,182,212,0.35);"
                             ),
                         ):
-                            v3.VProgressCircular(
-                                indeterminate=True, color="cyan", size=48, width=4,
+                            v3.VLabel(
+                                "SWITCHING MODELS, PLEASE HOLD…",
+                                style=(
+                                    "font-size:1.35rem;font-weight:700;"
+                                    "letter-spacing:0.12em;color:#06b6d4;"
+                                    "text-align:center;"
+                                ),
+                            )
+                            v3.VProgressLinear(
+                                indeterminate=True, color="cyan", height=4,
+                                style="width:100%;",
                             )
                             v3.VLabel(
-                                "Loading model…",
-                                style="font-size:0.9rem;color:#e2e8f0;",
-                            )
-                            v3.VLabel(
-                                "Reading snapshots and building scene",
-                                style="font-size:0.7rem;color:#9ca3af;",
+                                "{{ model_quip }}",
+                                style=(
+                                    "font-size:0.95rem;color:#e2e8f0;"
+                                    "text-align:center;font-style:italic;"
+                                    "min-height:1.4em;"
+                                ),
                             )
 
-                # Right panel — layers + navigation tabs
+                # Right panel — layers + navigation tabs.
+                # Locked to a fixed 300px width so layouts stay consistent
+                # across screen sizes; flex-shrink/grow disabled so the
+                # main viewport area absorbs all the slack. Internal scroll
+                # handles overflow on short windows.
                 with v3.VSheet(
-                    style="width:300px;flex-shrink:0;height:100%;overflow:hidden;",
+                    style=(
+                        "width:300px;min-width:300px;max-width:300px;"
+                        "flex:0 0 300px;"
+                        "height:100%;box-sizing:border-box;"
+                        "overflow:hidden;"
+                    ),
                     color="#0d0d1a",
                     rounded=False,
                     elevation=0,

@@ -16,6 +16,7 @@ _HALO_MODES = [
 ]
 
 _GALAXY_MODES = [
+    {"title": "Structure",    "value": "structure"},
     {"title": "Stellar Mass", "value": "stellar_mass"},
     {"title": "sSFR",         "value": "ssfr"},
     {"title": "SFR",          "value": "sfr"},
@@ -27,7 +28,6 @@ _GALAXY_MODES = [
     {"title": "Age",          "value": "age"},
     {"title": "Density",      "value": "density"},
     {"title": "Type",         "value": "type"},
-    {"title": "Structure",    "value": "structure"},
 ]
 
 _CMAPS = [
@@ -65,23 +65,23 @@ _CMAPS = [
 
 
 _HALO_CB = {
-    "mvir": ("Mvir",    "10¹⁰",  "10¹⁵ M☉"),
-    "rvir": ("Rvir",    "0.03",  "3 Mpc/h"),
-    "vvir": ("Vvir",    "30",    "1000 km/s"),
+    "mvir": ("Mvir",    "10^10",  "10^15 Msun"),
+    "rvir": ("Rvir",    "0.03",   "3 Mpc/h"),
+    "vvir": ("Vvir",    "30",     "1000 km/s"),
 }
 
 _GAL_CB = {
-    "stellar_mass": ("M★",      "10⁸",    "10¹²·⁵ M☉"),
-    "ssfr":         ("sSFR",    "10⁻¹⁴", "10⁻⁸ yr⁻¹"),
-    "sfr":          ("SFR",     "10⁻³",  "10² M☉/yr"),
-    "cold_gas":     ("Mgas",    "10⁷",   "10¹¹·⁵ M☉"),
-    "bt":           ("B/T",     "0",     "1"),
-    "bh_mass":      ("Mbh",     "10⁴",   "10¹⁰ M☉"),
-    "ics_mass":     ("Mics",    "10⁶",   "10¹² M☉"),
-    "age":          ("Age",     "0",     "14 Gyr"),
-    "bulge_mass":   ("Mbulge",  "10⁷",   "10¹² M☉"),
-    "density":      ("Density", "Low",   "High"),
-    "type":         ("Type",    "Central","Satellite"),
+    "stellar_mass": ("M*",      "10^8",    "10^12.5 Msun"),
+    "ssfr":         ("sSFR",    "10^-14",  "10^-8 yr^-1"),
+    "sfr":          ("SFR",     "10^-3",   "10^2 Msun/yr"),
+    "cold_gas":     ("Mgas",    "10^7",    "10^11.5 Msun"),
+    "bt":           ("B/T",     "0",       "1"),
+    "bh_mass":      ("Mbh",     "10^4",    "10^10 Msun"),
+    "ics_mass":     ("Mics",    "10^6",    "10^12 Msun"),
+    "age":          ("Age",     "0",       "14 Gyr"),
+    "bulge_mass":   ("Mbulge",  "10^7",    "10^12 Msun"),
+    "density":      ("Density", "Low",     "High"),
+    "type":         ("Type",    "Central", "Satellite"),
 }
 
 _CBAR_BASE = (
@@ -99,11 +99,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # Navigation state
     state.nav_halo_idx         = 0
     state.nav_gal_idx          = 0
-    state.nav_gal_last_radius  = 5.0   # 5 Mpc/h
+    state.nav_gal_last_radius  = 10.0  # 10 Mpc/h — Target Go default
     state.nav_x                = round(scene._cfg.box_size / 2, 2)
     state.nav_y                = round(scene._cfg.box_size / 2, 2)
     state.nav_z                = round(scene._cfg.box_size / 2, 2)
-    state.nav_distance         = 5.0   # 5 Mpc/h
+    state.nav_distance         = 10.0  # 10 Mpc/h — Target/Environment standoff
     state.nav_box_xmin         = 0.0
     state.nav_box_xmax         = round(scene._cfg.box_size / 2, 2)
     state.nav_box_ymin         = 0.0
@@ -114,9 +114,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.free_roam            = False
     state.nav_active_tab       = "layers"
 
-    # Console
-    state.console_input   = ""
-    state.console_history = []   # list of {"id": int, "cmd": str, "out": str}
+    # Console — supports multiple parallel sessions. The state vars
+    # below always reflect the *active* console; switching consoles
+    # syncs them in/out of the per-session Python-side storage dict
+    # (`_consoles_data`).
+    state.console_input        = ""
+    state.console_history      = []   # active console's history
+    state.consoles_list        = [{"id": 1, "title": "Console 1"}]
+    state.console_active_id    = 1
+    state.console_script_path  = ""   # path used by Load Script
+    state.console_popout_show  = False
 
     # Library
     state.library_show     = False
@@ -331,7 +338,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     @ctrl.set("reset_opacities")
     def on_reset_opacities():
-        state.halo_opacity   = 0.10
+        state.halo_opacity   = 0.15
         state.galaxy_opacity = 1.0
         state.flush()
 
@@ -501,9 +508,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.flush()
         _push()
 
-    _GALINFO_STANDOFF_MPC = 30.0   # camera distance from the galaxy
-    _GALINFO_FOCUS_MPC    = 10.0   # focus sphere radius (mask region)
-
     @ctrl.set("show_galaxy_info")
     def on_show_galaxy_info():
         from sage_viewer.utils.galaxy_info import build_galaxy_info
@@ -515,14 +519,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         if gidx < 0 or gidx >= galaxies.count:
             return
 
-        # Zoom out to 30 Mpc/h standoff but focus-mask to a tighter 10 Mpc/h
-        # sphere around the target — gives a clean local neighbourhood view.
-        center = scene.camera.go_to_galaxy(gidx, _GALINFO_STANDOFF_MPC)
-        if center != (0.0, 0.0, 0.0):
-            scene.set_focus_sphere(center, _GALINFO_FOCUS_MPC)
-            state.focus_active = True
-            state.nav_gal_last_radius = _GALINFO_FOCUS_MPC
-
+        # Show the info panel only — do NOT move the camera or change focus.
         info = build_galaxy_info(
             galaxies=galaxies,
             fields_available=scene.primary.fields_available,
@@ -603,6 +600,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.groupinfo_show = False
         state.flush()
         _push()
+
+    # Auto-refresh whichever info card is open when the selection changes.
+    @state.change("nav_gal_idx")
+    def _refresh_info_on_selection(**_):
+        if bool(state.galinfo_show):
+            ctrl.show_galaxy_info()
+        elif bool(state.groupinfo_show):
+            ctrl.show_group_info()
 
     # Cache the last-highlighted set so re-toggling re-shows the SAME
     # positions even if the snapshot or nav_gal_idx have drifted in between.
@@ -927,14 +932,51 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.focus_active = True
         _push()
 
+    @ctrl.set("populate_coords_from_camera")
+    def on_populate_coords_from_camera():
+        """Fill the Coords fields with the current camera focal point + standoff."""
+        import numpy as _np
+        cam = scene.plotter.camera
+        fp  = _np.array(cam.focal_point, dtype=_np.float64)
+        pos = _np.array(cam.position,    dtype=_np.float64)
+        d   = float(_np.linalg.norm(pos - fp))
+        state.nav_x = round(float(fp[0]), 3)
+        state.nav_y = round(float(fp[1]), 3)
+        state.nav_z = round(float(fp[2]), 3)
+        # Standoff matches the current camera distance from the focal point.
+        state.nav_distance = round(d, 3) if d > 0 else float(state.nav_distance)
+        state.flush()
+
+    @ctrl.set("populate_box_from_camera")
+    def on_populate_box_from_camera():
+        """Fill the Box fields with the axis-aligned bounding region currently in view."""
+        import numpy as _np
+        cam = scene.plotter.camera
+        fp  = _np.array(cam.focal_point, dtype=_np.float64)
+        pos = _np.array(cam.position,    dtype=_np.float64)
+        d   = float(_np.linalg.norm(pos - fp))
+        # Half-extent at the focal plane = d * tan(FOV/2). Use that as the
+        # cube half-width so the box roughly matches what's on screen.
+        fov_rad = _np.deg2rad(cam.view_angle)
+        half = max(d * _np.tan(fov_rad / 2.0), 0.1)
+        state.nav_box_xmin = round(float(fp[0] - half), 3)
+        state.nav_box_xmax = round(float(fp[0] + half), 3)
+        state.nav_box_ymin = round(float(fp[1] - half), 3)
+        state.nav_box_ymax = round(float(fp[1] + half), 3)
+        state.nav_box_zmin = round(float(fp[2] - half), 3)
+        state.nav_box_zmax = round(float(fp[2] + half), 3)
+        state.flush()
+
     @ctrl.set("zoom_to_box")
     def on_zoom_to_box():
         xmin, xmax = float(state.nav_box_xmin), float(state.nav_box_xmax)
         ymin, ymax = float(state.nav_box_ymin), float(state.nav_box_ymax)
         zmin, zmax = float(state.nav_box_zmin), float(state.nav_box_zmax)
         scene.camera.zoom_to_box(xmin, xmax, ymin, ymax, zmin, zmax)
-        if _focused():
-            scene.set_focus_box(xmin, xmax, ymin, ymax, zmin, zmax)
+        # Always engage focus on Zoom — matches Target / Environment /
+        # Coords behaviour. User can toggle it off via the focus button.
+        scene.set_focus_box(xmin, xmax, ymin, ymax, zmin, zmax)
+        state.focus_active = True
         _push()
 
     @ctrl.set("reset_camera")
@@ -962,41 +1004,359 @@ def build_navigation_panel(server, scene: Scene) -> None:
     from sage_viewer.utils.command_parser import (
         CommandContext, execute_command,
     )
-    _console_counter = [0]
+    import sys as _sys
+    import io as _io
+    import code as _code
+    import contextlib as _contextlib
+    import traceback as _traceback
+    import subprocess as _subprocess
+    import shlex as _shlex
+    import os as _os
+    import socket as _socket
+    import getpass as _getpass
+    import numpy as _np
+
+    _hostname_short = _socket.gethostname().split(".")[0]
+    _username       = _getpass.getuser()
     _cmd_ctx = CommandContext(scene=scene, state=state, ctrl=ctrl)
+
+    def _make_console_data() -> dict:
+        """Per-session state for one console: a real shell terminal by
+        default, with Python REPL and natural-language SAGE modes
+        reachable via the `python` / `sage` commands.
+        """
+        locals_dict = {
+            "__name__": "__console__",
+            "__doc__":  None,
+            "scene":    scene,
+            "state":    state,
+            "ctrl":     ctrl,
+            "server":   server,
+            "plotter":  scene.plotter,
+            "np":       _np,
+        }
+        # cwd persists per-session so `cd somewhere` is sticky between
+        # commands.  Env is the parent process env at startup; users can
+        # mutate via `export FOO=bar` (handled below).
+        return {
+            "history":   [],
+            "input":     "",
+            "mode":      "shell",   # "shell" | "python" | "sage"
+            "prompt":    "$",
+            "cwd":       _os.getcwd(),
+            "env":       dict(_os.environ),
+            "py_buffer": [],
+            "py_interp": _code.InteractiveInterpreter(locals_dict),
+            "py_locals": locals_dict,
+            "counter":   0,
+        }
+
+    _consoles_data: dict[int, dict] = {1: _make_console_data()}
+    _active_console = [1]
+    _console_id_counter = [1]
 
     def _truncate(text: str, n: int = 4000) -> str:
         if len(text) <= n:
             return text
         return text[:n] + f"\n… [{len(text) - n} chars truncated]"
 
-    @ctrl.set("console_submit")
-    def on_console_submit():
-        cmd = str(state.console_input or "").rstrip()
-        if not cmd:
+    def _save_active() -> None:
+        """Snapshot the state vars into the active console's storage."""
+        cid = _active_console[0]
+        d = _consoles_data.get(cid)
+        if d is None:
             return
-        try:
-            out_text = execute_command(cmd, _cmd_ctx) or "(ok)"
-        except Exception as e:
-            out_text = f"Error: {e}"
+        d["history"] = list(state.console_history)
+        d["input"]   = state.console_input
 
-        _console_counter[0] += 1
+    def _load_console(cid: int) -> None:
+        """Push storage[cid] into the state vars and mark active."""
+        d = _consoles_data.get(cid)
+        if d is None:
+            return
+        state.console_history   = list(d["history"])
+        state.console_input     = d["input"]
+        state.console_mode      = d["mode"]
+        state.console_prompt    = d["prompt"]
+        state.console_active_id = cid
+        _active_console[0]      = cid
+        state.flush()
+
+    # Mode + prompt initialised from the default console.
+    state.console_mode   = _consoles_data[1]["mode"]
+    state.console_prompt = _consoles_data[1]["prompt"]
+
+    def _py_eval(d: dict, source: str) -> str | None:
+        """Compile + run source in this console's interpreter; return
+        captured stdout+stderr, or None if the input is incomplete."""
+        out_buf, err_buf = _io.StringIO(), _io.StringIO()
+        try:
+            compiled = _code.compile_command(source, "<console>", "single")
+        except (SyntaxError, OverflowError, ValueError):
+            with _contextlib.redirect_stderr(err_buf):
+                d["py_interp"].showsyntaxerror("<console>")
+            return err_buf.getvalue()
+        if compiled is None:
+            return None
+        with _contextlib.redirect_stdout(out_buf), \
+             _contextlib.redirect_stderr(err_buf):
+            d["py_interp"].runcode(compiled)
+        return out_buf.getvalue() + err_buf.getvalue()
+
+    def _push_history(prompt: str, cmd: str, out: str) -> None:
+        d = _consoles_data[_active_console[0]]
+        d["counter"] += 1
         history = list(state.console_history)
         history.append({
-            "id":  _console_counter[0],
-            "cmd": cmd,
-            "out": _truncate(out_text),
+            "id":  d["counter"],
+            "cmd": f"{prompt} {cmd}" if cmd else prompt,
+            "out": _truncate(out) if out else "",
         })
-        if len(history) > 100:
-            history = history[-100:]
+        if len(history) > 200:
+            history = history[-200:]
         state.console_history = history
-        state.console_input   = ""
+        d["history"] = list(history)
+
+    def _shell_prompt(d: dict) -> str:
+        """macOS / Bash style: `host:basename user$`. Matches a real
+        Terminal.app prompt for visual consistency."""
+        try:
+            cwd  = d["cwd"]
+            home = _os.path.expanduser("~")
+            if cwd == home:
+                base = "~"
+            else:
+                base = _os.path.basename(cwd) or "/"
+            return f"{_hostname_short}:{base} {_username}$"
+        except Exception:
+            return "$"
+
+    def _run_shell(d: dict, cmd: str) -> str:
+        """Execute one shell command in `d`'s cwd. Handles `cd`, `pwd`,
+        `export` as builtins; everything else hits the user's $SHELL."""
+        stripped = cmd.strip()
+        if not stripped:
+            return ""
+
+        # `cd` / `cd <path>` — must be handled in-process because
+        # subprocess.run can't change our cwd.
+        if stripped == "cd" or stripped.startswith("cd ") \
+                or stripped.startswith("cd\t"):
+            arg = stripped[2:].strip() or "~"
+            target = _os.path.expanduser(_os.path.expandvars(arg))
+            if not _os.path.isabs(target):
+                target = _os.path.join(d["cwd"], target)
+            target = _os.path.normpath(target)
+            if not _os.path.isdir(target):
+                return f"cd: {arg}: No such directory"
+            d["cwd"] = target
+            return ""
+
+        if stripped == "pwd":
+            return d["cwd"]
+
+        # `export FOO=bar` — basic env mutation.
+        if stripped.startswith("export "):
+            try:
+                assignments = _shlex.split(stripped[7:])
+            except ValueError as e:
+                return f"export: {e}"
+            for a in assignments:
+                if "=" in a:
+                    k, v = a.split("=", 1)
+                    d["env"][k] = v
+                else:
+                    d["env"].pop(a, None)
+            return ""
+
+        # Anything else: pass through the user's interactive shell so
+        # globs, pipes, redirects, $vars, aliases (from .bashrc/.zshrc
+        # — though non-interactive shells skip those by default) work.
+        shell = d["env"].get("SHELL", "/bin/bash")
+        try:
+            res = _subprocess.run(
+                cmd, shell=True, executable=shell,
+                cwd=d["cwd"], env=d["env"],
+                stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
+                text=True, timeout=300,
+            )
+            out = (res.stdout or "").rstrip()
+            if res.returncode != 0 and not out:
+                out = f"(exit {res.returncode})"
+            elif res.returncode != 0:
+                out += f"\n(exit {res.returncode})"
+            return out
+        except _subprocess.TimeoutExpired:
+            return "(timed out after 300s — try backgrounding with &)"
+        except Exception as e:
+            return f"Error: {e}"
+
+    @ctrl.set("console_submit")
+    def on_console_submit():
+        cid = _active_console[0]
+        d   = _consoles_data[cid]
+        cmd_raw = str(state.console_input or "")
+
+        # In SHELL/SAGE modes an empty line is a no-op. In Python mode
+        # empty lines terminate multi-line blocks, so we keep them.
+        if d["mode"] in ("shell", "sage") and not cmd_raw.strip():
+            return
+
+        if d["mode"] == "shell":
+            cmd = cmd_raw.rstrip()
+            low = cmd.strip().lower()
+            if low in ("python", "python3", "py"):
+                d["mode"]   = "python"
+                d["prompt"] = ">>>"
+                state.console_mode   = "python"
+                state.console_prompt = ">>>"
+                _push_history(_shell_prompt(d), cmd,
+                    f"Python {_sys.version.split()[0]} (embedded)\n"
+                    "Locals: scene, state, ctrl, server, plotter, np.\n"
+                    "Type 'exit' or 'quit' to leave the REPL.")
+            elif low in ("sage", "nl", "natural"):
+                d["mode"]   = "sage"
+                d["prompt"] = "sage>"
+                state.console_mode   = "sage"
+                state.console_prompt = "sage>"
+                _push_history(_shell_prompt(d), cmd,
+                    "Natural-language SAGE command mode. "
+                    "Examples: 'show only clusters', 'go to halo 42', "
+                    "'snap 30', 'screenshot'. Type 'help' for the full "
+                    "list, 'exit' to return to shell.")
+            else:
+                out = _run_shell(d, cmd)
+                _push_history(_shell_prompt(d), cmd, out)
+
+        elif d["mode"] == "sage":
+            cmd = cmd_raw.rstrip()
+            low = cmd.strip().lower()
+            if low in ("exit", "quit", "shell"):
+                d["mode"]   = "shell"
+                d["prompt"] = "$"
+                state.console_mode   = "shell"
+                state.console_prompt = _shell_prompt(d)
+                _push_history("sage>", cmd, "(back to shell)")
+            else:
+                try:
+                    out_text = execute_command(cmd, _cmd_ctx) or "(ok)"
+                except Exception as e:
+                    out_text = f"Error: {e}"
+                _push_history("sage>", cmd, out_text)
+
+        else:  # python mode
+            line = cmd_raw.rstrip()
+            low  = line.strip().lower()
+            if low in ("exit", "quit", "exit()", "quit()", "shell"):
+                d["py_buffer"].clear()
+                d["mode"]   = "shell"
+                d["prompt"] = "$"
+                state.console_mode   = "shell"
+                state.console_prompt = _shell_prompt(d)
+                _push_history(">>>", line, "(back to shell)")
+            else:
+                d["py_buffer"].append(line)
+                source = "\n".join(d["py_buffer"])
+                force = (line == "" and len(d["py_buffer"]) > 1)
+                if force:
+                    result = _py_eval(d, source)
+                    if result is None:
+                        result = "SyntaxError: unexpected EOF while parsing"
+                    d["py_buffer"].clear()
+                    _push_history("...", line, result.rstrip())
+                    d["prompt"] = ">>>"
+                    state.console_prompt = ">>>"
+                else:
+                    result = _py_eval(d, source)
+                    if result is None:
+                        prompt = ">>>" if len(d["py_buffer"]) == 1 else "..."
+                        _push_history(prompt, line, "")
+                        d["prompt"] = "..."
+                        state.console_prompt = "..."
+                        state.console_input = ""
+                        d["input"] = ""
+                        state.flush()
+                        _push()
+                        return
+                    d["py_buffer"].clear()
+                    _push_history(">>>", line, (result or "").rstrip())
+                    d["prompt"] = ">>>"
+                    state.console_prompt = ">>>"
+
+        state.console_input = ""
+        d["input"] = ""
         state.flush()
         _push()
 
     @ctrl.set("console_clear")
     def on_console_clear():
         state.console_history = []
+        _consoles_data[_active_console[0]]["history"] = []
+        state.flush()
+
+    @ctrl.set("console_new")
+    def on_console_new():
+        _save_active()
+        _console_id_counter[0] += 1
+        new_id = _console_id_counter[0]
+        _consoles_data[new_id] = _make_console_data()
+        state.consoles_list = state.consoles_list + [
+            {"id": new_id, "title": f"Console {new_id}"}
+        ]
+        _load_console(new_id)
+
+    @ctrl.set("console_switch")
+    def on_console_switch(cid):
+        cid = int(cid)
+        if cid == _active_console[0]:
+            return
+        _save_active()
+        _load_console(cid)
+
+    @ctrl.set("console_close")
+    def on_console_close(cid):
+        cid = int(cid)
+        if len(_consoles_data) <= 1:
+            return    # always keep at least one
+        _save_active()
+        _consoles_data.pop(cid, None)
+        state.consoles_list = [c for c in state.consoles_list if c["id"] != cid]
+        if _active_console[0] == cid:
+            new_active = state.consoles_list[0]["id"]
+            _load_console(new_active)
+        else:
+            state.flush()
+
+    @ctrl.set("console_load_script")
+    def on_console_load_script():
+        path = str(state.console_script_path or "").strip()
+        if not path:
+            return
+        cid = _active_console[0]
+        d = _consoles_data[cid]
+        try:
+            with open(path) as f:
+                source = f.read()
+        except Exception as e:
+            _push_history("$", f"load {path}", f"Error reading {path}: {e}")
+            state.flush(); _push()
+            return
+        out_buf, err_buf = _io.StringIO(), _io.StringIO()
+        try:
+            with _contextlib.redirect_stdout(out_buf), \
+                 _contextlib.redirect_stderr(err_buf):
+                exec(compile(source, path, "exec"), d["py_locals"])
+            out = (out_buf.getvalue() + err_buf.getvalue()).rstrip() \
+                  or "(script ran)"
+        except Exception:
+            out = (out_buf.getvalue() + err_buf.getvalue()
+                   + _traceback.format_exc()).rstrip()
+        _push_history("$", f"load {path}", out)
+        state.flush(); _push()
+
+    @ctrl.set("console_toggle_popout")
+    def on_console_toggle_popout():
+        state.console_popout_show = not bool(state.console_popout_show)
         state.flush()
 
     # ------------------------------------------------------------------
@@ -1094,8 +1454,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # Populate the file list at startup
     state.library_files = _scan_library()
 
-    # Allow Enter inside the console text field to submit
+    # Triggers — Enter / per-row buttons fire these from Vue templates.
     server.trigger("console_submit_trigger")(on_console_submit)
+    server.trigger("console_load_script_trigger")(on_console_load_script)
+    server.trigger("console_switch_trigger")(on_console_switch)
+    server.trigger("console_close_trigger")(on_console_close)
 
     @ctrl.set("highlight_galaxy")
     def on_highlight_galaxy():
@@ -1120,19 +1483,79 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @ctrl.set("toggle_focus")
     def on_toggle_focus():
         currently_on = bool(state.focus_active)
-        state.focus_active = not currently_on
         if currently_on:
+            # Turning OFF — always just clears focus, regardless of tab.
+            state.focus_active = False
             scene.clear_focus()
-        elif scene._focus_region is not None:
-            halos, galaxies = scene._loader.get(scene._current_snap)
-            scene._apply_focus_masks(halos.positions, galaxies.positions)
+            _push()
+            return
+
+        # Turning ON — engage focus appropriate to the active tab so the
+        # button behaves naturally wherever the user is in the UI.
+        tab = state.nav_active_tab
+        halos, galaxies = scene._loader.get(scene.current_snap)
+
+        if tab == "target":
+            try:
+                idx = int(state.nav_gal_idx)
+                radius = float(state.nav_gal_last_radius)
+                if 0 <= idx < galaxies.count:
+                    g = galaxies.positions[idx]
+                    scene.set_focus_sphere(
+                        (float(g[0]), float(g[1]), float(g[2])), radius
+                    )
+                    state.focus_active = True
+            except Exception:
+                pass
+        elif tab == "environment":
+            try:
+                hidx = int(state.nav_halo_idx)
+                d    = float(state.nav_distance)
+                if 0 <= hidx < halos.count:
+                    pos = scene.camera._halo_index.position_of(hidx)
+                    scene.set_focus_sphere(
+                        (float(pos[0]), float(pos[1]), float(pos[2])), d
+                    )
+                    state.focus_active = True
+            except Exception:
+                pass
+        elif tab == "box":
+            try:
+                xmin, xmax = float(state.nav_box_xmin), float(state.nav_box_xmax)
+                ymin, ymax = float(state.nav_box_ymin), float(state.nav_box_ymax)
+                zmin, zmax = float(state.nav_box_zmin), float(state.nav_box_zmax)
+                scene.set_focus_box(xmin, xmax, ymin, ymax, zmin, zmax)
+                state.focus_active = True
+            except Exception:
+                pass
+        elif tab == "coords":
+            try:
+                x = float(state.nav_x)
+                y = float(state.nav_y)
+                z = float(state.nav_z)
+                d = float(state.nav_distance)
+                scene.set_focus_sphere((x, y, z), d)
+                state.focus_active = True
+            except Exception:
+                pass
+        else:
+            # Other tabs (Structure, Filters, Record, Console, Library) —
+            # re-apply whatever focus region was last set, if any.
+            if scene._focus_region is not None:
+                scene._apply_focus_masks(halos.positions, galaxies.positions)
+                state.focus_active = True
+
         _push()
 
     # ------------------------------------------------------------------
     # UI helper
     # ------------------------------------------------------------------
 
-    def _tf(v_model, label, on_enter=None):
+    def _tf(v_model, label, on_enter=None, target_id=None):
+        """Number-input helper. Enter binds via `target_id` (the id of
+        an action button to simulate-click via the global JS handler);
+        legacy callers can still pass `on_enter` and we'll keep that
+        wired as a defensive backup."""
         kwargs = dict(
             v_model=(v_model,), label=label,
             type="number", hide_details=True,
@@ -1141,7 +1564,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
         )
         if on_enter is not None:
             kwargs["keydown_enter"] = on_enter
-        v3.VTextField(**kwargs)
+        if target_id is not None:
+            with html.Div(**{"data-enter-click": target_id},
+                          style="display:contents;"):
+                v3.VTextField(**kwargs)
+        else:
+            v3.VTextField(**kwargs)
 
     # ------------------------------------------------------------------
     # Layout
@@ -1232,11 +1660,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         v3.VDivider(style="flex-shrink:0;")
 
-        # ── Tab content (overflow-y:scroll keeps scrollbar space stable
-        #    across tab switches so the render view never resizes)
+        # ── Tab content — fills the remaining panel height and clips
+        # overflow rather than scrolling (panel size is fixed; each tab
+        # is responsible for fitting its content).
         with v3.VSheet(
             color="transparent",
-            style="flex:1;overflow-y:scroll;padding:10px 12px;",
+            style=(
+                "flex:1;min-height:0;overflow:hidden;padding:10px 12px;"
+                "display:flex;flex-direction:column;"
+            ),
         ):
             # Layers
             with v3.VSheet(
@@ -1246,8 +1678,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VLabel(
                     "DARK MATTER HALOES",
                     style=(
-                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
-                        "color:#7c3aed;padding:6px 0 8px;display:block;"
+                        "font-size:0.95rem;font-weight:700;letter-spacing:0.08em;"
+                        "color:#06b6d4;padding:6px 0 8px;display:block;"
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
@@ -1293,32 +1725,32 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VLabel(
                     "GALAXIES",
                     style=(
-                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
-                        "color:#7c3aed;padding:6px 0 8px;display:block;"
+                        "font-size:0.95rem;font-weight:700;letter-spacing:0.08em;"
+                        "color:#06b6d4;padding:6px 0 8px;display:block;"
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSwitch(
                         v_model=("galaxies_visible",), label="Visible",
-                        color="deep-purple", hide_details=True, density="compact",
+                        color="green", hide_details=True, density="compact",
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSlider(
                         v_model=("galaxy_opacity",), label="Opacity",
                         min=0.0, max=1.0, step=0.01,
-                        thumb_label=True, color="deep-purple", hide_details=True,
+                        thumb_label=True, color="green", hide_details=True,
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
                         v_model=("galaxy_color_mode",), items=(_GALAXY_MODES,),
                         label="Colour by", hide_details=True,
-                        variant="outlined", color="deep-purple", density="compact",
+                        variant="outlined", color="green", density="compact",
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
                         v_model=("galaxy_colormap",), items=(_CMAPS,),
                         label="Colormap", hide_details=True,
-                        variant="outlined", color="deep-purple", density="compact",
+                        variant="outlined", color="green", density="compact",
                         # Structure mode is the bare composition (no outer
                         # property halo) — the colormap doesn't apply.
                         # For every other mode the colormap drives the
@@ -1358,18 +1790,23 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VLabel(
                     "HALO",
                     style=(
-                        "font-size:0.68rem;font-weight:700;letter-spacing:0.06em;"
-                        "color:#7c3aed;display:block;padding:4px 0 6px;"
+                        "font-size:0.85rem;font-weight:700;letter-spacing:0.06em;"
+                        "color:#06b6d4;display:block;padding:4px 0 6px;"
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_halo_idx",  "Halo index",        on_enter=ctrl.go_to_halo)
+                    _tf("nav_halo_idx",  "Halo index",
+                        on_enter=ctrl.go_to_halo,
+                        target_id="btn-target-halo-go")
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_distance",  "Standoff (Mpc/h)",  on_enter=ctrl.go_to_halo)
+                    _tf("nav_distance",  "Standoff (Mpc/h)",
+                        on_enter=ctrl.go_to_halo,
+                        target_id="btn-target-halo-go")
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
                         "Go", block=True, color="cyan",
                         density="compact", click=ctrl.go_to_halo,
+                        id="btn-target-halo-go",
                     )
 
                 v3.VDivider(style="margin:12px 0;")
@@ -1377,17 +1814,19 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VLabel(
                     "GALAXY",
                     style=(
-                        "font-size:0.68rem;font-weight:700;letter-spacing:0.06em;"
-                        "color:#7c3aed;display:block;padding:4px 0 6px;"
+                        "font-size:0.85rem;font-weight:700;letter-spacing:0.06em;"
+                        "color:#06b6d4;display:block;padding:4px 0 6px;"
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    with v3.VForm(submit=ctrl.go_to_galaxy_enter):
-                        _tf("nav_gal_idx", "Galaxy index  (Enter to go)")
+                    _tf("nav_gal_idx", "Galaxy index  (Enter to go)",
+                        on_enter=ctrl.go_to_galaxy_enter,
+                        target_id="btn-target-galaxy-go")
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
-                        "Go", block=True, color="deep-purple",
+                        "Go", block=True, color="green",
                         density="compact", click=ctrl.go_to_galaxy_enter,
+                        id="btn-target-galaxy-go",
                     )
                 v3.VLabel(
                     "Zoom radius (Mpc/h)",
@@ -1400,18 +1839,18 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     variant="outlined", density="compact",
                     style="width:100%;",
                 ):
-                    v3.VBtn("3",  style="flex:1;", color="deep-purple",
+                    v3.VBtn("3",  style="flex:1;", color="green",
                             click=ctrl.go_to_galaxy_1)
-                    v3.VBtn("5",  style="flex:1;", color="deep-purple",
+                    v3.VBtn("5",  style="flex:1;", color="green",
                             click=ctrl.go_to_galaxy_3)
-                    v3.VBtn("10", style="flex:1;", color="deep-purple",
+                    v3.VBtn("10", style="flex:1;", color="green",
                             click=ctrl.go_to_galaxy_5)
 
                 v3.VDivider(style="margin:14px 0 10px;")
 
                 v3.VBtn(
                     "Galaxy Info",
-                    block=True, color="deep-purple",
+                    block=True, color="green",
                     density="compact",
                     prepend_icon="mdi-information-outline",
                     click=ctrl.show_galaxy_info,
@@ -1443,18 +1882,23 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VLabel(
                     "HALO  (pick a FOF group)",
                     style=(
-                        "font-size:0.68rem;font-weight:700;letter-spacing:0.06em;"
-                        "color:#7c3aed;display:block;padding:4px 0 6px;"
+                        "font-size:0.85rem;font-weight:700;letter-spacing:0.06em;"
+                        "color:#06b6d4;display:block;padding:4px 0 6px;"
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_halo_idx", "Halo index",       on_enter=ctrl.go_to_env_halo)
+                    _tf("nav_halo_idx", "Halo index",
+                        on_enter=ctrl.go_to_env_halo,
+                        target_id="btn-env-go")
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_distance", "Standoff (Mpc/h)", on_enter=ctrl.go_to_env_halo)
+                    _tf("nav_distance", "Standoff (Mpc/h)",
+                        on_enter=ctrl.go_to_env_halo,
+                        target_id="btn-env-go")
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
                         "Go", block=True, color="cyan",
                         density="compact", click=ctrl.go_to_env_halo,
+                        id="btn-env-go",
                     )
 
                 v3.VDivider(style="margin:12px 0;")
@@ -1462,8 +1906,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VLabel(
                     "ENVIRONMENT FILTER",
                     style=(
-                        "font-size:0.68rem;font-weight:700;letter-spacing:0.06em;"
-                        "color:#7c3aed;display:block;padding:4px 0 6px;"
+                        "font-size:0.85rem;font-weight:700;letter-spacing:0.06em;"
+                        "color:#06b6d4;display:block;padding:4px 0 6px;"
                     ),
                 )
                 v3.VLabel(
@@ -1476,33 +1920,33 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VCheckbox(
                     v_model=("env_show_field",),
-                    label="Field        (< 10¹¹ M☉)",
+                    label="Field        (< 10^11 Msun)",
                     hide_details=True, density="compact",
-                    color="deep-purple",
+                    color="green",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
                 v3.VCheckbox(
                     v_model=("env_show_isolated",),
-                    label="Isolated   (10¹¹–10¹²·⁵ M☉)",
+                    label="Isolated   (10^11 - 10^12.5 Msun)",
                     hide_details=True, density="compact",
-                    color="deep-purple",
+                    color="green",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
                 v3.VCheckbox(
                     v_model=("env_show_group",),
-                    label="Group      (10¹²·⁵–10¹⁴ M☉)",
+                    label="Group      (10^12.5 - 10^14 Msun)",
                     hide_details=True, density="compact",
-                    color="deep-purple",
+                    color="green",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
                 v3.VCheckbox(
                     v_model=("env_show_cluster",),
-                    label="Cluster    (> 10¹⁴ M☉)",
+                    label="Cluster    (> 10^14 Msun)",
                     hide_details=True, density="compact",
-                    color="deep-purple",
+                    color="green",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
@@ -1511,7 +1955,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 v3.VBtn(
                     "Group Info",
-                    block=True, color="deep-purple",
+                    block=True, color="green",
                     density="compact",
                     prepend_icon="mdi-account-group-outline",
                     click=ctrl.show_group_info,
@@ -1545,11 +1989,20 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ("Standoff",  "nav_distance"),
                 ]:
                     with v3.VSheet(color="transparent", style=_FIELD):
-                        _tf(key, label, on_enter=ctrl.go_to_coords)
+                        _tf(key, label, on_enter=ctrl.go_to_coords,
+                            target_id="btn-coords-go")
                 with v3.VSheet(color="transparent", style=_BTN):
+                    v3.VBtn(
+                        "Use Current Position", block=True, variant="outlined",
+                        color="cyan", density="compact",
+                        prepend_icon="mdi-crosshairs-gps",
+                        click=ctrl.populate_coords_from_camera,
+                        style="margin-bottom:6px;",
+                    )
                     v3.VBtn(
                         "Go", block=True, color="cyan",
                         density="compact", click=ctrl.go_to_coords,
+                        id="btn-coords-go",
                     )
 
             # Box
@@ -1563,83 +2016,201 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ("Z min", "nav_box_zmin"), ("Z max", "nav_box_zmax"),
                 ]:
                     with v3.VSheet(color="transparent", style=_FIELD):
-                        _tf(key, label, on_enter=ctrl.zoom_to_box)
+                        _tf(key, label, on_enter=ctrl.zoom_to_box,
+                            target_id="btn-box-zoom")
                 with v3.VSheet(color="transparent", style=_BTN):
+                    v3.VBtn(
+                        "Use Current View", block=True, variant="outlined",
+                        color="cyan", density="compact",
+                        prepend_icon="mdi-crosshairs-gps",
+                        click=ctrl.populate_box_from_camera,
+                        style="margin-bottom:6px;",
+                    )
                     v3.VBtn(
                         "Zoom", block=True, color="cyan",
                         density="compact", click=ctrl.zoom_to_box,
+                        id="btn-box-zoom",
                     )
 
-            # ── CONSOLE tab — Python REPL against the live scene ──
-            with v3.VSheet(
-                color="transparent",
+            # ── CONSOLE tab — multi-session REPL ────────────────────
+            # Layout: heading + tab strip pinned to the top, history
+            # absorbs all remaining vertical space, and a bottom-anchored
+            # block carries the two text fields plus the 4 action
+            # buttons. `margin-top:auto` on the bottom block guarantees
+            # it sits flush against the panel's bottom edge.
+            with html.Div(
                 v_show=("nav_active_tab === 'console'",),
+                style=(
+                    "display:flex;flex-direction:column;"
+                    "height:100%;min-height:0;width:100%;"
+                ),
             ):
-                v3.VLabel(
-                    "COMMAND CONSOLE",
+                # Heading + session tab strip on one line — saves a row
+                # of vertical space and keeps the buttons clearly visible.
+                # `min-height` and `padding` are generous so the small
+                # buttons don't visually clip inside the flex column.
+                with html.Div(
                     style=(
-                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
-                        "color:#7c3aed;padding:4px 0 4px;display:block;"
+                        "display:flex;align-items:center;gap:6px;"
+                        "padding:8px 0 10px;flex-shrink:0;flex-wrap:wrap;"
+                        "min-height:48px;line-height:1;"
                     ),
-                )
-                v3.VLabel(
-                    "Type natural commands: 'show only clusters', 'go to halo 42', "
-                    "'snap 30', 'galaxy info', 'rotate cw 30', 'screenshot'. "
-                    "Type 'help' for the full list.",
-                    style=(
-                        "font-size:0.6rem;color:#9ca3af;line-height:1.35;"
-                        "display:block;padding:0 0 6px;"
-                    ),
-                )
-                # History
+                ):
+                    html.Span(
+                        "CONSOLE",
+                        style=(
+                            "font-size:0.85rem;font-weight:700;"
+                            "letter-spacing:0.08em;color:#06b6d4;"
+                            "margin-right:4px;"
+                        ),
+                    )
+                    # Per-session buttons — render the title + close X
+                    # as a single contiguous span so flex-wrap keeps
+                    # them together instead of breaking mid-session.
+                    with html.Span(
+                        v_for=("c in consoles_list",),
+                        key=("c.id",),
+                        style=(
+                            "display:inline-flex;align-items:center;"
+                            "gap:2px;"
+                        ),
+                    ):
+                        v3.VBtn(
+                            "{{ c.title }}",
+                            size="x-small",
+                            density="compact",
+                            variant=("console_active_id === c.id ? 'flat' "
+                                     ": 'outlined'",),
+                            color=("console_active_id === c.id ? 'cyan' "
+                                   ": '#6b7280'",),
+                            click=("trigger('console_switch_trigger', "
+                                   "[c.id])"),
+                            style=(
+                                "text-transform:none;font-size:0.62rem;"
+                                "min-width:0;padding:0 8px;"
+                            ),
+                        )
+                        v3.VBtn(
+                            icon="mdi-close",
+                            size="x-small",
+                            density="compact",
+                            variant="text",
+                            color="#6b7280",
+                            v_show=("consoles_list.length > 1",),
+                            click=("trigger('console_close_trigger', "
+                                   "[c.id])"),
+                            style="min-width:18px;padding:0;",
+                        )
+                    v3.VBtn(
+                        icon="mdi-plus",
+                        size="x-small",
+                        density="compact",
+                        variant="outlined",
+                        color="cyan",
+                        click=ctrl.console_new,
+                        title="New console",
+                        style="min-width:24px;padding:0;",
+                    )
+
+                # History — flex-fills the available vertical space.
+                # min-height:0 lets it shrink when needed so the
+                # bottom block is always visible.
                 with v3.VSheet(
                     color="#0a0a0f",
                     style=(
-                        "max-height:240px;min-height:120px;overflow-y:auto;"
-                        "padding:6px 8px;border:1px solid #1f2937;border-radius:4px;"
-                        "font-family:monospace;font-size:0.66rem;line-height:1.35;"
+                        "flex:1 1 0;min-height:0;overflow-y:auto;"
+                        "padding:6px 8px;border:1px solid #1f2937;"
+                        "border-radius:4px;font-family:monospace;"
+                        "font-size:0.7rem;line-height:1.4;"
                     ),
                 ):
                     with html.Div(
                         v_for=("entry in console_history",),
                         key=("entry.id",),
-                        style="padding:2px 0 4px;border-bottom:1px solid #1f2937;",
+                        style=(
+                            "padding:2px 0 4px;"
+                            "border-bottom:1px solid #1f2937;"
+                        ),
                     ):
                         html.Div(
-                            "> {{ entry.cmd }}",
-                            style="color:cyan;white-space:pre-wrap;",
+                            "{{ entry.cmd }}",
+                            style=("color:cyan;white-space:pre-wrap;"
+                                   "font-family:monospace;"),
                         )
                         html.Div(
                             "{{ entry.out }}",
                             style="color:#9ca3af;white-space:pre-wrap;",
                         )
-                # Input
-                v3.VTextField(
-                    v_model=("console_input",),
-                    label="Type a command  (Enter to run)",
-                    hide_details=True, variant="outlined",
-                    bg_color="#1a1a2e", density="compact",
-                    style="padding-top:8px;",
-                    keydown_enter=(
-                        "$event.preventDefault(); "
-                        "trigger('console_submit_trigger')"
+
+                # Bottom block — anchored to the panel's bottom edge via
+                # `margin-top:auto`. Holds the input field, script path,
+                # and the four action buttons.
+                with html.Div(
+                    style=(
+                        "margin-top:6px;flex-shrink:0;"
+                        "display:flex;flex-direction:column;gap:6px;"
                     ),
-                )
-                with v3.VRow(no_gutters=True, style="gap:6px;padding-top:6px;"):
-                    with v3.VCol(style="padding:0;"):
-                        v3.VBtn(
-                            "Run", block=True, color="cyan",
-                            density="compact",
-                            prepend_icon="mdi-play",
-                            click=ctrl.console_submit,
+                ):
+                    with html.Div(**{"data-enter-click": "btn-console-run"}):
+                        v3.VTextField(
+                            v_model=("console_input",),
+                            label=(
+                                "console_mode === 'python' "
+                                "? 'Python REPL  (Enter to run)' "
+                                ": (console_mode === 'sage' "
+                                "    ? 'SAGE command  (Enter to run)' "
+                                "    : 'Shell  (Enter to run, type python "
+                                "or sage to switch modes)')",
+                            ),
+                            hide_details=True, variant="outlined",
+                            bg_color="#1a1a2e", density="compact",
+                            keydown_enter=ctrl.console_submit,
                         )
-                    with v3.VCol(style="padding:0;"):
-                        v3.VBtn(
-                            "Clear", block=True, variant="outlined",
-                            color="red", density="compact",
-                            prepend_icon="mdi-delete-sweep-outline",
-                            click=ctrl.console_clear,
+                    with html.Div(
+                        **{"data-enter-click": "btn-console-load"}
+                    ):
+                        v3.VTextField(
+                            v_model=("console_script_path",),
+                            label="Script path  (Enter to load + execute)",
+                            hide_details=True, variant="outlined",
+                            bg_color="#1a1a2e", density="compact",
+                            keydown_enter=ctrl.console_load_script,
                         )
+                    with v3.VRow(no_gutters=True, style="gap:6px;"):
+                        with v3.VCol(style="padding:0;"):
+                            v3.VBtn(
+                                "Run", block=True, color="cyan",
+                                density="compact",
+                                prepend_icon="mdi-play",
+                                click=ctrl.console_submit,
+                                id="btn-console-run",
+                            )
+                        with v3.VCol(style="padding:0;"):
+                            v3.VBtn(
+                                "Clear", block=True, variant="outlined",
+                                color="red", density="compact",
+                                prepend_icon="mdi-delete-sweep-outline",
+                                click=ctrl.console_clear,
+                            )
+                    with v3.VRow(no_gutters=True, style="gap:6px;"):
+                        with v3.VCol(style="padding:0;"):
+                            v3.VBtn(
+                                "Load Script", block=True,
+                                variant="outlined",
+                                color="cyan", density="compact",
+                                prepend_icon="mdi-file-code-outline",
+                                click=ctrl.console_load_script,
+                                id="btn-console-load",
+                            )
+                        with v3.VCol(style="padding:0;"):
+                            v3.VBtn(
+                                "Pop-out", block=True, variant="outlined",
+                                color=("console_popout_show ? 'cyan' "
+                                       ": '#6b7280'",),
+                                density="compact",
+                                prepend_icon="mdi-dock-window",
+                                click=ctrl.console_toggle_popout,
+                            )
 
             # ── LIBRARY tab — browse stored media ──────────────
             with v3.VSheet(
@@ -1649,8 +2220,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VLabel(
                     "MEDIA LIBRARY",
                     style=(
-                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
-                        "color:#7c3aed;padding:4px 0 4px;display:block;"
+                        "font-size:0.95rem;font-weight:700;letter-spacing:0.08em;"
+                        "color:#06b6d4;padding:4px 0 4px;display:block;"
                     ),
                 )
                 v3.VLabel(
@@ -1716,21 +2287,27 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v_show=("nav_active_tab === 'filters'",),
             ):
                 _FSEC = (
-                    "font-size:0.62rem;font-weight:700;letter-spacing:0.08em;"
-                    "color:#7c3aed;padding:2px 0 2px;display:block;"
+                    "font-size:0.78rem;font-weight:700;letter-spacing:0.08em;"
+                    "color:#06b6d4;padding:2px 0 2px;display:block;"
                 )
                 _FLBL = (
                     "font-size:0.6rem;color:#9ca3af;display:block;"
                     "padding:2px 0 0;"
                 )
-                _FSLD = "padding:0;margin-top:-4px;margin-bottom:-2px;"
+                # Compact filter sliders — narrower AND shorter than the
+                # default Vuetify range slider so they don't dominate.
+                _FSLD = (
+                    "padding:0;margin-top:-12px;margin-bottom:-12px;"
+                    "transform:scale(0.7);transform-origin:left center;"
+                    "width:125%;"
+                )
                 _FSEL = (
                     "--v-input-control-height:30px;"
                     "font-size:0.7rem;margin-top:1px;"
                 )
 
                 v3.VLabel("DARK MATTER HALOES", style=_FSEC)
-                v3.VLabel("Mvir  (log₁₀ M☉)", style=_FLBL)
+                v3.VLabel("Mvir  (log10 Msun)", style=_FLBL)
                 v3.VRangeSlider(
                     v_model=("filter_halo_mvir",),
                     min=10.0, max=15.0, step=0.1,
@@ -1758,19 +2335,19 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VDivider(style="margin:4px 0 2px;")
 
                 v3.VLabel("GALAXIES", style=_FSEC)
-                v3.VLabel("Stellar mass  (log₁₀ M☉)", style=_FLBL)
+                v3.VLabel("Stellar mass  (log10 Msun)", style=_FLBL)
                 v3.VRangeSlider(
                     v_model=("filter_gal_smass",),
                     min=8.0, max=12.5, step=0.1,
-                    thumb_label=True, color="deep-purple",
+                    thumb_label=True, color="green",
                     density="compact", hide_details=True,
                     style=_FSLD,
                 )
-                v3.VLabel("sSFR  (log₁₀ yr⁻¹)", style=_FLBL)
+                v3.VLabel("sSFR  (log10 yr^-1)", style=_FLBL)
                 v3.VRangeSlider(
                     v_model=("filter_gal_ssfr",),
                     min=-14.0, max=-8.0, step=0.1,
-                    thumb_label=True, color="deep-purple",
+                    thumb_label=True, color="green",
                     density="compact", hide_details=True,
                     style=_FSLD,
                 )
@@ -1778,7 +2355,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VRangeSlider(
                     v_model=("filter_gal_bt",),
                     min=0.0, max=1.0, step=0.02,
-                    thumb_label=True, color="deep-purple",
+                    thumb_label=True, color="green",
                     density="compact", hide_details=True,
                     style=_FSLD,
                 )
@@ -1786,25 +2363,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VRangeSlider(
                     v_model=("filter_gal_age",),
                     min=0.0, max=14.0, step=0.1,
-                    thumb_label=True, color="deep-purple",
+                    thumb_label=True, color="green",
                     density="compact", hide_details=True,
                     disabled=("!model_fields.mean_age",),
                     style=_FSLD,
                 )
-                v3.VLabel("BH mass  (log₁₀ M☉)", style=_FLBL)
+                v3.VLabel("BH mass  (log10 Msun)", style=_FLBL)
                 v3.VRangeSlider(
                     v_model=("filter_gal_bhmass",),
                     min=0.0, max=10.0, step=0.1,
-                    thumb_label=True, color="deep-purple",
+                    thumb_label=True, color="green",
                     density="compact", hide_details=True,
                     disabled=("!model_fields.bh_mass",),
                     style=_FSLD,
                 )
-                v3.VLabel("ICS mass  (log₁₀ M☉)", style=_FLBL)
+                v3.VLabel("ICS mass  (log10 Msun)", style=_FLBL)
                 v3.VRangeSlider(
                     v_model=("filter_gal_ics",),
                     min=0.0, max=12.0, step=0.1,
-                    thumb_label=True, color="deep-purple",
+                    thumb_label=True, color="green",
                     density="compact", hide_details=True,
                     disabled=("!model_fields.ics_mass",),
                     style=_FSLD,
@@ -1819,7 +2396,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         {"title": "Satellites",  "value": "satellite"},
                     ],),
                     hide_details=True, variant="outlined",
-                    color="deep-purple", density="compact",
+                    color="green", density="compact",
                     style=_FSEL,
                 )
 
@@ -1832,7 +2409,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         {"title": "Non-FFB only", "value": "no"},
                     ],),
                     hide_details=True, variant="outlined",
-                    color="deep-purple", density="compact",
+                    color="green", density="compact",
                     disabled=("!model_fields.ffb_regime",),
                     style=_FSEL,
                 )
@@ -1846,7 +2423,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         {"title": "Hot atmosphere galaxies", "value": "hot"},
                     ],),
                     hide_details=True, variant="outlined",
-                    color="deep-purple", density="compact",
+                    color="green", density="compact",
                     disabled=("!model_fields.cgm_regime",),
                     style=_FSEL,
                 )
@@ -1870,23 +2447,28 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VLabel(
                     "SCREENSHOT",
                     style=(
-                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
-                        "color:#7c3aed;padding:6px 0 8px;display:block;"
+                        "font-size:0.95rem;font-weight:700;letter-spacing:0.08em;"
+                        "color:#06b6d4;padding:6px 0 8px;display:block;"
                     ),
                 )
-                v3.VTextField(
-                    v_model=("screenshot_label",),
-                    label="Label (optional)",
-                    hide_details=True, variant="outlined",
-                    bg_color="#1a1a2e", density="compact",
-                    style="padding-bottom:8px;",
-                )
+                with html.Div(
+                    **{"data-enter-click": "btn-take-screenshot"}
+                ):
+                    v3.VTextField(
+                        v_model=("screenshot_label",),
+                        label="Label (optional)  (Enter to take screenshot)",
+                        hide_details=True, variant="outlined",
+                        bg_color="#1a1a2e", density="compact",
+                        style="padding-bottom:8px;",
+                        keydown_enter=ctrl.take_screenshot,
+                    )
                 v3.VBtn(
                     "Take Screenshot",
                     block=True, color="cyan",
                     density="compact",
                     prepend_icon="mdi-camera",
                     click=ctrl.take_screenshot,
+                    id="btn-take-screenshot",
                 )
                 with v3.VRow(no_gutters=True, style="gap:6px;padding-top:6px;"):
                     with v3.VCol(style="padding:0;"):
@@ -1921,17 +2503,21 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VLabel(
                     "RECORD MOVIE",
                     style=(
-                        "font-size:0.7rem;font-weight:700;letter-spacing:0.08em;"
-                        "color:#7c3aed;padding:6px 0 8px;display:block;"
+                        "font-size:0.95rem;font-weight:700;letter-spacing:0.08em;"
+                        "color:#06b6d4;padding:6px 0 8px;display:block;"
                     ),
                 )
-                v3.VTextField(
-                    v_model=("movie_label",),
-                    label="Label (optional)",
-                    hide_details=True, variant="outlined",
-                    bg_color="#1a1a2e", density="compact",
-                    style="padding-bottom:8px;",
-                )
+                with html.Div(
+                    **{"data-enter-click": "btn-start-recording"}
+                ):
+                    v3.VTextField(
+                        v_model=("movie_label",),
+                        label="Label (optional)  (Enter to start recording)",
+                        hide_details=True, variant="outlined",
+                        bg_color="#1a1a2e", density="compact",
+                        style="padding-bottom:8px;",
+                        keydown_enter=ctrl.start_recording,
+                    )
                 v3.VLabel(
                     "FPS (output)  {{ '— ' + movie_fps }}",
                     style="font-size:0.68rem;color:#9ca3af;display:block;padding:4px 0 2px;",
@@ -1992,6 +2578,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             prepend_icon="mdi-record-circle-outline",
                             click=ctrl.start_recording,
                             disabled=("recording_active",),
+                            id="btn-start-recording",
                         )
                     with v3.VCol(style="padding:0;"):
                         v3.VBtn(

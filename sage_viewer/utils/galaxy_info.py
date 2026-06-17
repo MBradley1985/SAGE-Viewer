@@ -103,7 +103,7 @@ def build_galaxy_info(
 
     is_central = bool(galaxies.gal_type[idx] == 0)
     gal_type_str = "Central" if is_central else "Satellite"
-    # `mvir` in the snapshot is raw 10¹⁰ M☉/h; everything else is already Msun.
+    # `mvir` in the snapshot is raw 10¹⁰ Msun/h; everything else is already Msun.
     mvir = float(galaxies.mvir[idx]) * 1.0e10 / max(hubble_h, 1e-6)
     sm   = float(galaxies.stellar_mass[idx])
     ssfr = float(galaxies.ssfr[idx])
@@ -120,10 +120,10 @@ def build_galaxy_info(
     info: dict = {
         "GalaxyID":    "—",
         "Type":        gal_type_str,
-        "Halo Mvir":   f"{mvir:.2e} M☉",
-        "Stellar Mass": f"{sm:.2e} M☉",
-        "sSFR":        f"{ssfr:.2e} yr⁻¹",
-        "Cold Gas":    f"{cg:.2e} M☉",
+        "Halo Mvir":   f"{mvir:.2e} Msun",
+        "Stellar Mass": f"{sm:.2e} Msun",
+        "sSFR":        f"{ssfr:.2e} yr^-1",
+        "Cold Gas":    f"{cg:.2e} Msun",
         "Bulge / Total": bt_label,
     }
 
@@ -132,12 +132,12 @@ def build_galaxy_info(
 
     if fields_available.get("bh_mass", False):
         bh = float(galaxies.bh_mass[idx])
-        info["BH Mass"] = f"{bh:.2e} M☉" if bh > 0 else "0  (no central BH)"
+        info["BH Mass"] = f"{bh:.2e} Msun" if bh > 0 else "0  (no central BH)"
 
     if fields_available.get("h2_mass", False):
         # `h2_mass` in the snapshot is already Msun (converted by the reader).
         h2 = float(galaxies.h2_mass[idx])
-        info["H₂ Mass"] = f"{h2:.2e} M☉" if h2 > 0 else "0  (no H₂)"
+        info["H2 Mass"] = f"{h2:.2e} Msun" if h2 > 0 else "0  (no H2)"
 
     if fields_available.get("cgm_regime", False):
         info["Gas Regime"] = _cgm_label(int(galaxies.cgm_regime[idx]))

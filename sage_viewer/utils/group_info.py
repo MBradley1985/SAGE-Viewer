@@ -75,10 +75,10 @@ def build_group_info(
     info: dict = {
         "Classification": classification,
         "Members":        f"{n_members}  ({n_central} central, {n_sat} sat.)",
-        "Host Mvir":      f"{host_mvir:.2e} M☉",
-        "Σ Stellar Mass": f"{total_sm:.2e} M☉",
-        "Σ Cold Gas":     f"{total_cgm:.2e} M☉",
-        "Σ SFR":          f"{total_sfr:.2e} M☉/yr",
+        "Host Mvir":      f"{host_mvir:.2e} Msun",
+        "Total Stellar Mass": f"{total_sm:.2e} Msun",
+        "Total Cold Gas":     f"{total_cgm:.2e} Msun",
+        "Total SFR":          f"{total_sfr:.2e} Msun/yr",
         "Mean B/T":       f"{mean_bt:.2f}",
         "Extent":         f"{extent:.2f} Mpc/h",
         "Target role":    "Central" if is_central else "Satellite",
@@ -87,6 +87,6 @@ def build_group_info(
     # Optional: brightest / most massive member (the central, by definition)
     cidx_local = int(np.argmin(gt))   # smallest type → most likely central (0)
     bcg_sm = float(sm[cidx_local])
-    info["BCG Stellar Mass"] = f"{bcg_sm:.2e} M☉"
+    info["BCG Stellar Mass"] = f"{bcg_sm:.2e} Msun"
 
     return info

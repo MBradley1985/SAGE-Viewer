@@ -30,31 +30,6 @@ _CENTRAL_CMAP    = "Blues"
 _SATELLITE_CMAP  = "Reds"
 
 
-def _scatter_particles(
-    positions: np.ndarray,
-    sigma: np.ndarray,
-    n_per: np.ndarray,
-    rng: np.random.Generator,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Per-galaxy gaussian particle scatter around each `positions[i]`.
-
-    Returns (out_positions, out_scalars) where scalars are random [0,1]
-    values to drive the coolwarm colormap.  `sigma[i]` is the std-dev of
-    the scatter for galaxy i; `n_per[i]` is the particle count.
-    """
-    n_total = int(n_per.sum()) if len(n_per) else 0
-    if n_total <= 0:
-        return np.empty((0, 3), dtype=np.float32), np.empty(0, dtype=np.float32)
-    # Repeat each centre and sigma per particle
-    centres = np.repeat(positions, n_per, axis=0)
-    sigmas  = np.repeat(sigma.astype(np.float32), n_per)
-    # Random gaussian offsets
-    offsets = rng.standard_normal((n_total, 3)).astype(np.float32) * sigmas[:, None]
-    out_pos = (centres + offsets).astype(np.float32)
-    out_sca = rng.uniform(0.0, 1.0, size=n_total).astype(np.float32)
-    return out_pos, out_sca
-
-
 class GalaxyLayer:
     """Manages the galaxy point-cloud actor(s) inside a PyVista Plotter."""
 
@@ -185,6 +160,8 @@ class GalaxyLayer:
                 cgm_regime=snap.cgm_regime[mask],
                 central_mvir=snap.central_mvir[mask],
                 h2_mass=snap.h2_mass[mask],
+                cgm_gas=snap.cgm_gas[mask],
+                hot_gas=snap.hot_gas[mask],
                 galaxy_id=snap.galaxy_id[mask],
                 central_id=snap.central_id[mask],
                 time_of_infall=snap.time_of_infall[mask],
@@ -279,23 +256,21 @@ class GalaxyLayer:
         # ---- Per-galaxy radii (Mpc/h) keyed off the default scaling -----
         r_outer = np.maximum(radii, 1e-4)         # default 0.025–0.25 Mpc/h
         r_cold  = 0.45 * r_outer
-        r_bh    = 0.10 * r_outer                  # tiny black core
-        r_stars = 0.05 * r_outer                  # particle scatter sigma
 
         # Convenience clamped log10
         def _logn(x, vmin, vmax):
             log = np.log10(np.maximum(x, 1.0))
             return np.clip((log - vmin) / (vmax - vmin + 1e-10), 0.0, 1.0)
 
-        bh_scalar   = _logn(snap.bh_mass,   4.0, 10.0)
         cold_scalar = _logn(snap.cold_gas,  7.0, 11.5)
         # CGM vs Hot: split galaxies by regime
         cgm_mask = (snap.cgm_regime == 0) if snap.cgm_regime.size else np.zeros(snap.count, bool)
         hot_mask = ~cgm_mask
-        cgm_scalar = _logn(snap.h2_mass,    7.0, 11.0)  # use H2 as CGM proxy
-        # Outer envelope mass for sizing
-        outer_mass = np.where(cgm_mask, snap.h2_mass, snap.cold_gas)
-        outer_scalar = _logn(outer_mass,    7.0, 11.5)
+        # Outer envelope: CGM galaxies sized/coloured by CGMgas;
+        # Hot-atmosphere galaxies by HotGas. (cold_gas is reserved for
+        # the inner cold-gas envelope; H2 currently unused at this layer.)
+        outer_mass = np.where(cgm_mask, snap.cgm_gas, snap.hot_gas)
+        outer_scalar = _logn(outer_mass, 7.0, 11.5)
 
         # ---- (1) Outer envelope ---------------------------------------
         # CGM galaxies → green, Hot atmosphere → red.
@@ -334,75 +309,9 @@ class GalaxyLayer:
             actor.SetVisibility(False)
         self._actors.append(actor)
 
-        # ---- (3) Stellar coolwarm scatter (inner shell) ---------------
-        n_per_gal = np.clip(
-            np.power(10.0, _logn(snap.stellar_mass, 8.0, 12.5) * 1.7) * 3.0,
-            2, 60,
-        ).astype(np.int32)
-        rng = np.random.default_rng(snap.snap_num + 7919)
-        # Build particle clouds for inner (denser) and outer (sparser) layers
-        positions_inner, scalars_inner = _scatter_particles(
-            pos, r_stars, n_per_gal, rng,
-        )
-        if len(positions_inner) > 0:
-            cloud = pv.PolyData(positions_inner)
-            cloud["scalar"] = scalars_inner
-            cloud["radius"] = np.full(len(positions_inner),
-                                      0.04 * float(r_stars.mean()),
-                                      dtype=np.float32)
-            actor = self._pl.add_mesh(
-                cloud, scalars="scalar", cmap="coolwarm", clim=[0.0, 1.0],
-                style="points_gaussian", emissive=False,
-                opacity=max(0.4, self._opacity * 0.8),
-                show_scalar_bar=False, render=False, reset_camera=False,
-            )
-            mp = actor.mapper
-            mp.SetScaleArray("radius"); mp.SetScaleFactor(1.0)
-            if not self._visible:
-                actor.SetVisibility(False)
-            self._actors.append(actor)
-
-        # ---- (4) Outer coolwarm scatter (sparser, larger sigma) ------
-        n_outer = (n_per_gal // 3).astype(np.int32)
-        positions_outer, scalars_outer = _scatter_particles(
-            pos, r_outer * 0.5, n_outer, rng,
-        )
-        if len(positions_outer) > 0:
-            cloud = pv.PolyData(positions_outer)
-            cloud["scalar"] = scalars_outer
-            cloud["radius"] = np.full(len(positions_outer),
-                                      0.05 * float(r_stars.mean()),
-                                      dtype=np.float32)
-            actor = self._pl.add_mesh(
-                cloud, scalars="scalar", cmap="coolwarm", clim=[0.0, 1.0],
-                style="points_gaussian", emissive=False,
-                opacity=max(0.2, self._opacity * 0.4),
-                show_scalar_bar=False, render=False, reset_camera=False,
-            )
-            mp = actor.mapper
-            mp.SetScaleArray("radius"); mp.SetScaleFactor(1.0)
-            if not self._visible:
-                actor.SetVisibility(False)
-            self._actors.append(actor)
-
-        # ---- (5) Tiny black BH cores ----------------------------------
-        # Only galaxies with a real BH; sized by BH mass.
-        if np.any(snap.bh_mass > 0):
-            bh_idx = snap.bh_mass > 0
-            cloud = pv.PolyData(pos[bh_idx])
-            cloud["scalar"] = bh_scalar[bh_idx].astype(np.float32)
-            cloud["radius"] = (r_bh[bh_idx] * (0.5 + 0.5 * bh_scalar[bh_idx])).astype(np.float32)
-            actor = self._pl.add_mesh(
-                cloud, scalars="scalar", cmap="Greys_r", clim=[0.0, 1.0],
-                style="points_gaussian", emissive=False,
-                opacity=min(1.0, self._opacity + 0.2),
-                show_scalar_bar=False, render=False, reset_camera=False,
-            )
-            mp = actor.mapper
-            mp.SetScaleArray("radius"); mp.SetScaleFactor(1.0)
-            if not self._visible:
-                actor.SetVisibility(False)
-            self._actors.append(actor)
+        # (Per-galaxy star scatter and BH accretion-disk cores both
+        # removed — invisible / negligible at typical zoom levels and
+        # together they were the bulk of the per-frame splat cost.)
 
     def _render_outer_property(
         self,

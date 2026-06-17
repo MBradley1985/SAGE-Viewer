@@ -19,9 +19,11 @@ def parse_par(par_path: str | Path) -> SimConfig:
     with open(par_path) as f:
         for line in f:
             line = line.strip()
-            # Strip inline comments
-            if "%" in line:
-                line = line[: line.index("%")].strip()
+            # Strip inline comments — SAGE par files use either '%' (old
+            # style) or ';' (newer style) as the comment marker.
+            for marker in ("%", ";", "#"):
+                if marker in line:
+                    line = line[: line.index(marker)].strip()
             if not line:
                 continue
             # Skip snapshot list arrow

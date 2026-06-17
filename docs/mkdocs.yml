@@ -81,6 +81,7 @@ nav:
   - User Guide:
       - Interface: user_guide/interface.md
       - Navigation: user_guide/navigation.md
+      - Console: user_guide/console.md
       - Data Sources: user_guide/data_sources.md
       - Colormaps: user_guide/colormaps.md
   - Physics Reference:

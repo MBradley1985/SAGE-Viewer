@@ -23,6 +23,8 @@ class GalaxySnapshot:
     cgm_regime: np.ndarray      # (N,)   int32, 0=cold 1=hot (Regime field)
     central_mvir: np.ndarray    # (N,)   float32, Msun (host FOF Mvir)
     h2_mass: np.ndarray         # (N,)   float32, Msun
+    cgm_gas: np.ndarray         # (N,)   float32, Msun — CGMgas (CGM-regime envelope)
+    hot_gas: np.ndarray         # (N,)   float32, Msun — HotGas (Hot-regime atmosphere)
     galaxy_id: np.ndarray       # (N,)   int64 — SAGE GalaxyIndex
     central_id: np.ndarray      # (N,)   int64 — SAGE CentralGalaxyIndex
     time_of_infall: np.ndarray  # (N,)   int32 — snapshot index of infall
@@ -45,7 +47,7 @@ class GalaxySnapshot:
             gal_type=zi,
             bh_mass=z, ics_mass=z, central_mvir=z,
             ffb_regime=zi, cgm_regime=zi,
-            h2_mass=z,
+            h2_mass=z, cgm_gas=z, hot_gas=z,
             galaxy_id=zi64, central_id=zi64,
             time_of_infall=zi,
             mean_age=z,
@@ -123,6 +125,8 @@ def load_galaxy_snapshot(
         cgm_regime_raw = _opt("Regime", np.int32).astype(np.int32)
         cmvir_raw      = _opt("CentralMvir", np.float32)
         h2_raw         = _opt("H2gas", np.float32)
+        cgm_gas_raw    = _opt("CGMgas", np.float32)
+        hot_gas_raw    = _opt("HotGas", np.float32)
         galid_raw      = _opt("GalaxyIndex", np.int64).astype(np.int64)
         cid_raw        = _opt("CentralGalaxyIndex", np.int64).astype(np.int64)
         tinfall_raw    = _opt("TimeOfInfall", np.int32).astype(np.int32)
@@ -142,6 +146,8 @@ def load_galaxy_snapshot(
     ics_mass      = ics_raw.astype(np.float32) * f
     central_mvir  = cmvir_raw.astype(np.float32) * f
     h2_mass       = h2_raw.astype(np.float32) * f
+    cgm_gas       = cgm_gas_raw.astype(np.float32) * f
+    hot_gas       = hot_gas_raw.astype(np.float32) * f
     sfr           = (sfr_disk + sfr_bulge).astype(np.float32)
     ssfr          = sfr / np.where(stellar_mass > 0, stellar_mass, np.inf)
 
@@ -181,6 +187,8 @@ def load_galaxy_snapshot(
         cgm_regime=cgm_regime_raw[indices],
         central_mvir=central_mvir[indices],
         h2_mass=h2_mass[indices],
+        cgm_gas=cgm_gas[indices],
+        hot_gas=hot_gas[indices],
         galaxy_id=galid_raw[indices],
         central_id=cid_raw[indices],
         time_of_infall=tinfall_raw[indices],

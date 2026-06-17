@@ -59,61 +59,57 @@ def build_info_panel(server, scene: Scene) -> None:
             ss = galaxies.ssfr[gidx]
             gt = "central" if galaxies.gal_type[gidx] == 0 else "satellite"
             lines.append(
-                f"Galaxy M* = {sm:.2e} Msun  sSFR = {ss:.2e} yr⁻¹  "
+                f"Galaxy M* = {sm:.2e} Msun  sSFR = {ss:.2e} yr^-1  "
                 f"({gt})  →  idx {gidx} selected"
             )
 
             # Update the galaxy index field in the nav panel
             state.nav_gal_idx = gidx
-            # Flush so the VTextField updates immediately (PyVista callbacks
-            # run outside Trame's event dispatch and need an explicit flush)
-            state.flush()
 
+            # Always show a red marker at the picked galaxy so the user
+            # has visual feedback for what they just selected, regardless
+            # of focus / tab state.
             gpos = galaxies.positions[gidx]
             scene.camera._add_circle_indicator(
                 (float(gpos[0]), float(gpos[1]), float(gpos[2])), 0.0
             )
-            _push()
+
+            # If the user is already zoomed/focused on a region, carry
+            # the camera to the new selection within that region (using
+            # the last-used target radius). Without an active focus,
+            # picking is purely declarative — no camera move.
+            if bool(state.focus_active):
+                try:
+                    radius = float(state.nav_gal_last_radius)
+                except (TypeError, ValueError):
+                    radius = 10.0
+                scene.camera.go_to_galaxy(int(gidx), radius)
+                scene.set_focus_sphere(
+                    (float(gpos[0]), float(gpos[1]), float(gpos[2])), radius
+                )
+
+        # Double-click is an "I want to look at this" signal: jump to
+        # the Target tab so the user sees the populated galaxy / halo
+        # IDs ready to act on.
+        state.nav_active_tab = "target"
+        state.flush()
+        _push()
 
         state.pick_info = "   |   ".join(lines)
 
-    # Picker is only useful when actively selecting a target. Enable it only
-    # when the Target tab is active so that clicks on other tabs don't trigger
-    # an expensive ray-cast + render cycle.
-    _picker_enabled = [False]
-
-    def _enable_picker() -> None:
-        if _picker_enabled[0]:
-            return
-        scene.plotter.enable_point_picking(
-            callback=_on_pick,
-            show_message=False,
-            show_point=False,
-            left_clicking=True,
-            tolerance=0.025,
-        )
-        _picker_enabled[0] = True
-
-    def _disable_picker() -> None:
-        if not _picker_enabled[0]:
-            return
-        try:
-            scene.plotter.disable_picking()
-        except Exception:
-            pass
-        _picker_enabled[0] = False
-
-    @state.change("nav_active_tab")
-    def on_tab_for_picker(nav_active_tab, **_):
-        # Picker is useful in both Target (per-galaxy info) and Environment
-        # (group inspection) tabs — they both rely on a clicked selection.
-        if nav_active_tab in ("target", "environment"):
-            _enable_picker()
-        else:
-            _disable_picker()
-            scene.camera._clear_indicator()
-            scene.camera._clear_member_indicators()
-            _push()
+    # Picker is on globally: a double-click anywhere is the "I want to
+    # inspect this object" gesture — it populates the Target tab's
+    # galaxy + halo IDs and switches to that tab. Switching tabs must
+    # NOT clear indicators (box / sphere / member dots) — exploring
+    # panels is non-destructive; clearing is explicit (Reset / Go /
+    # Clear / focus toggle).
+    scene.plotter.enable_point_picking(
+        callback=_on_pick,
+        show_message=False,
+        show_point=False,
+        left_clicking=True,
+        tolerance=0.025,
+    )
 
 
     v3.VLabel(

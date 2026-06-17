@@ -172,15 +172,51 @@ class CameraController:
         center: tuple[float, float, float],
         radius: float,
     ) -> None:
+        """Three orthogonal great-circle rings — minimal wireframe look,
+        much sparser than a full sphere mesh."""
         self._clear_indicator()
-        sphere = pv.Sphere(radius=radius, center=center, theta_resolution=16, phi_resolution=16)
+        cx, cy, cz = center
+        t = np.linspace(0.0, 2.0 * np.pi, 64, dtype=np.float64)
+        c, s = np.cos(t) * radius, np.sin(t) * radius
+        # 1 equator (XY) + 4 meridians around the polar (Z) axis at
+        # azimuths 0°, 45°, 90°, 135°.
+        rings = [np.column_stack([cx + c, cy + s, np.full_like(c, cz)])]
+        for deg in (0.0, 45.0, 90.0, 135.0):
+            ca, sa = np.cos(np.deg2rad(deg)), np.sin(np.deg2rad(deg))
+            rings.append(np.column_stack([cx + c * ca, cy + c * sa, cz + s]))
+        # Build one PolyData with 5 closed polylines.
+        all_pts = np.vstack(rings)
+        n = len(t)
+        n_rings = len(rings)
+        lines = []
+        for i in range(n_rings):
+            lines.append(n + 1)
+            lines.extend([i * n + j for j in range(n)])
+            lines.append(i * n)   # close the loop
+        poly = pv.PolyData(all_pts)
+        # pv.PolyData(points) auto-creates a verts cell per point, which
+        # VTK renders as visible point markers. Strip them so we get
+        # pure lines.
+        poly.verts = np.empty(0, dtype=np.int64)
+        poly.lines = np.array(lines, dtype=np.int64)
         self._indicator_actor = self._pl.add_mesh(
-            sphere,
+            poly,
             color=_INDICATOR_COLOR,
             opacity=_INDICATOR_OPACITY,
-            style="wireframe",
             line_width=_INDICATOR_WIDTH,
+            style="wireframe",
+            render_points_as_spheres=False,
+            point_size=0,
         )
+        # Belt-and-braces: explicitly turn off vertex rendering on the
+        # actor's property so VTK never draws point markers at the ring
+        # vertices.
+        try:
+            self._indicator_actor.GetProperty().SetRenderPointsAsSpheres(False)
+            self._indicator_actor.GetProperty().SetVertexVisibility(False)
+            self._indicator_actor.GetProperty().SetPointSize(0)
+        except Exception:
+            pass
 
     def _add_point_indicator(
         self,
@@ -263,11 +299,13 @@ class CameraController:
         z: float,
         distance: float = 5.0,
     ) -> None:
-        """Point camera at (x, y, z) from a given standoff distance."""
-        self._clear_indicator()
+        """Point camera at (x, y, z) from a given standoff distance, and
+        draw a wireframe sphere of radius `distance` at the target so the
+        focus region is visible (matches the Box-mode wireframe convention)."""
         self._pl.camera.focal_point = (x, y, z)
         self._pl.camera.position    = (x, y, z + distance)
         self._pl.camera.up          = (0.0, 1.0, 0.0)
+        self._add_sphere_indicator((x, y, z), distance)
 
     def go_to_halo(self, halo_idx: int, distance: float = 5.0) -> None:
         """Fly to the halo at halo_idx and mark it with a red circle."""

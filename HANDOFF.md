@@ -1,27 +1,27 @@
 # SAGE-Viewer Handoff
 
-A snapshot of where the project sits so a fresh chat can pick it up cleanly.
+Snapshot of the project so a new chat can pick up cleanly. Reflects state at the close of the 0.3.0 work cycle.
 
 ---
 
 ## How to launch
 
 ```bash
-# Activate the environment with sage-viewer installed
 export PATH="/Users/mbradley/Library/Python/3.12/bin:$PATH"
 
-# Run against miniMillennium
 sage-viewer --par /Users/mbradley/Documents/PhD/SAGE26/input/millennium.par --snap 63
 ```
 
-Then open <http://localhost:8080> in any browser.
+Open <http://localhost:8080> in any browser. For HPC use, SSH-tunnel the port.
 
 Useful flags:
-- `--snap N` initial snapshot (default: last = z = 0)
-- `--port N` (default 8080)
+
+- `--snap N` initial snapshot (default: z = 0)
+- `--port N` Trame server port (default 8080)
 - `--n-jobs N` halo loader threads (default: CPUs − 1)
-- `--max-halos N`, `--max-galaxies N` downsample ceilings
-- `--min-halo-mass M`, `--min-stellar-mass M` (Msun)
+- `--max-halos N` / `--max-galaxies N` uniform-random downsample ceilings (both default 100,000)
+- `--min-halo-mass M` / `--min-stellar-mass M` (Msun)
+- `--par-dir DIR` override the auto-detected par-scan dir for the multi-model dropdown
 
 ---
 
@@ -31,30 +31,39 @@ Useful flags:
 SAGE-Viewer/
 ├── sage_viewer/
 │   ├── _version.py
-│   ├── app.py                  # Trame layout + view wiring
+│   ├── app.py                       # Trame layout, toolbar, viewport, pop-out console
 │   ├── cli.py
-│   ├── config.py               # SimConfig dataclass
+│   ├── config.py                    # SimConfig dataclass
 │   ├── io/
-│   │   ├── par_reader.py       # parses .par into SimConfig
-│   │   ├── snapshot_table.py   # scale-factor / redshift lookup
-│   │   ├── halo_reader.py      # lhalo_binary reader, joblib threads
-│   │   └── galaxy_reader.py    # SAGE HDF5 reader
-│   ├── parallel/loader.py      # prefetch + LRU snapshot cache
+│   │   ├── par_reader.py            # parses .par into SimConfig; strips %, ;, # comments
+│   │   ├── sage_header.py           # reads Header/Simulation cosmology from HDF5
+│   │   ├── snapshot_table.py        # scale-factor / redshift lookup
+│   │   ├── halo_reader.py           # lhalo_binary reader
+│   │   └── galaxy_reader.py         # SAGE HDF5 reader; cgm_gas + hot_gas added
+│   ├── parallel/loader.py           # prefetch + LRU snapshot cache
 │   ├── scene/
-│   │   ├── scene.py            # owns plotter, layers, focus state
-│   │   ├── halo_layer.py
-│   │   ├── galaxy_layer.py
-│   │   └── camera.py           # all fly-to / zoom / indicator drawing
+│   │   ├── scene.py                 # Plotter, layers, focus state, interactor
+│   │   ├── model.py                 # one SAGE model (loader + layers + cfg)
+│   │   ├── halo_layer.py            # 3-layer NFW gaussian splats
+│   │   ├── galaxy_layer.py          # outer envelope + cold-gas envelope + outer property
+│   │   └── camera.py                # fly-to / sphere & box wireframe indicators
 │   ├── ui/
-│   │   ├── toolbar.py          # transport buttons + snapshot slider
-│   │   ├── navigation_panel.py # right panel with Layers + 4 nav tabs
-│   │   └── info_panel.py       # footer + left-click galaxy select
-│   └── utils/
-│       ├── colormap.py         # normalize_log + KDE density
-│       ├── sizing.py           # point size scalers
-│       └── kdtree.py           # nearest-halo lookup wrapper
-├── tests/                      # 22 unit tests, all passing
-├── docs/                       # MkDocs Material site
+│   │   ├── toolbar.py               # transport + slider + speed/rotation
+│   │   ├── navigation_panel.py      # right panel: tabs + console + filters + ...
+│   │   └── info_panel.py            # footer + double-click galaxy selection
+│   ├── utils/
+│   │   ├── colormap.py
+│   │   ├── sizing.py
+│   │   ├── command_parser.py        # natural-language SAGE commands (Console "sage" mode)
+│   │   ├── galaxy_info.py           # builds Galaxy Info card rows
+│   │   └── group_info.py            # builds Group Info card rows
+│   └── static/
+│       └── sage_viewer.js           # pop-out drag handler + Enter-to-click handler
+├── tests/                           # unit tests
+├── docs/                            # MkDocs Material site
+├── CHANGELOG.md
+├── README.md
+├── HANDOFF.md                       # this file
 └── pyproject.toml
 ```
 
@@ -62,68 +71,143 @@ SAGE-Viewer/
 
 ## What works today
 
-- **Rendering**: haloes + galaxies as point clouds, both with independent
-  toggle / opacity / colour-by mode / colormap dropdowns
-- **Playback**: play / pause / stop / reverse / repeat with 1× / 2× / 5×
-  speed, snapshot slider tracks position, stop returns to z = 0
-- **Navigation tabs** (right panel, Layers is primary on top):
-  - **Halo** — fly to halo index with standoff
-  - **Galaxy** — fly to galaxy index, 1/3/5 Mpc/h presets (Enter to go),
-    auto-enables focus
-  - **Coords** — fly to (x, y, z) at a chosen standoff
-  - **Box** — frame an axis-aligned sub-box
-- **Focus mode** (target icon button) — masks haloes and galaxies outside
-  the active zoom region; persists across snapshot changes
-- **Left-click any point** → selects nearest galaxy, updates index field
-  in panel, draws a face-on red circle around the galaxy
-- **Mouse wheel** does NOT change values in inputs / sliders (intentional)
+### Rendering
+- Haloes: 3-layer NFW-style gaussian splats (envelope + mid + core), single colormap, sized by mass/Rvir/Vmax.
+- Galaxies (Structure mode): two envelopes per galaxy — outer (Greens for CGM-regime sized by `CGMgas`, Reds for Hot-regime sized by `HotGas`), inner cold-gas (Blues, sized by `ColdGas`). Optional outer property layer when the color-by mode isn't "structure".
+- Full still-quality at all times — no resolution drop during drag, playback, or rotation.
+- 27 selectable matplotlib colormaps per layer.
+
+### Playback
+- 0.1× / 0.25× / 0.5× / 0.75× / 1× / 2× / 5× speeds.
+- Rotate: Off / CW / CCW at 15° / 30° / 60° per second.
+- Pause / Stop interrupt cleanly (asyncio.Event + cancellable Task).
+
+### Console tab (0.3.0 big change)
+- **Default mode = shell** — every command runs through `$SHELL` with persistent `cwd` + `env`. `cd`, `pwd`, `export` are in-process built-ins.
+- Type `python` → embedded REPL (locals: `scene`, `state`, `ctrl`, `server`, `plotter`, `np`).
+- Type `sage` → natural-language SAGE command parser.
+- `exit` / `quit` / `shell` from any non-default mode returns to shell.
+- Multi-session: `+` button creates new sessions; each has its own history, mode, cwd, env, Python interpreter.
+- **Load Script** button reads a `.py` path and `exec`s it in the active session.
+- **Pop-out** button floats a movable + resizable card over the viewport mirroring the active session.
+- Console fills most of the right panel; inputs + 4 buttons anchored at the bottom.
+
+### Navigation
+- **Focus button** is tab-aware: Target → galaxy, Environment → halo, Coords → sphere, Box → box. Off always clears.
+- **Double-click** any point on any tab → populates Target halo + galaxy IDs, draws red marker, switches to Target tab. If Focus is already active, camera carries to the new selection.
+- **Indicators persist** across tab changes (only Reset Camera / Go / Clear / Focus toggle clear them).
+- "Use Current Position" (Coords) populates X/Y/Z + Standoff from the camera.
+- "Use Current View" (Box) populates the 6 bounds from the camera frustum.
+- Camera bookmarks save/restore/delete.
+
+### Enter to run
+Every typed field now Enter-submits the same as clicking its action button. Wiring is per-field via `data-enter-click="<button-id>"` on a wrapping `<div>`; a global JS handler (in `sage_viewer/static/sage_viewer.js`) walks up to find the attribute and `.click()`s the button. Works in: Target Halo idx, Target Standoff, Galaxy idx, Environment Halo idx + Standoff, Coords X/Y/Z + Standoff, Box 6 bounds, Console command, Console script path, Pop-out console command, Screenshot label, Movie label.
+
+### Multi-model
+- Auto-scan `<sage_root>/output/` for `model_0.hdf5` subdirs.
+- Hamburger menu (top-left) → Models section to switch primary or toggle overlays.
+- "SWITCHING MODELS, PLEASE HOLD..." overlay with rotating quips during loads.
+
+### Output
+- Screenshots: PNG / JPG / TIFF.
+- Movies: GIF / MOV (ffmpeg) / PNG sequence; 1–60 fps; Native / 2× / 4× supersample.
+- One session folder per app launch under `<repo>/sage_outputs/session_*`.
+
+### Library tab
+- Browse stored screenshots / movies from `<repo>/sage_library/` and `sage_outputs/`.
+- Click a row to display inline.
 
 ---
 
-## Likely next-up things
+## Architecture notes
 
-- Halo and galaxy point sizes are fixed (mass-binned) — could expose as a
-  slider per layer
-- No saved camera positions / bookmarks yet
-- No screenshot / movie export from the live viewer (only the headless
-  flythrough script in SAGE26)
-- Density colour mode does KDE per snapshot which is slow; could be cached
-- microUchuu is wired up (single huge tree file) but not stress-tested
-- Search by halo mass or galaxy property could replace fly-to by index
-- Hover tooltip with object info (currently only on click)
-- The right panel's content scrolls when long; might want responsive
-  re-layout for narrow screens
+### Static asset system
+Vue 3 silently strips `<script>` tags from templates, so any client JS must come in as a real `.js` file. We register a trame module:
 
----
+```python
+server.enable_module({
+    "serve":   {"sage_static": "<package>/static"},
+    "scripts": ["sage_static/sage_viewer.js"],
+})
+```
 
-## Style / housekeeping
+`sage_viewer/static/sage_viewer.js` currently contains:
+- Pop-out drag handler (delegated `mousedown` on `.sage-popout-handle`).
+- Enter-to-click handler (capture-phase `keydown` on `<input>` / `<textarea>`).
 
-- No Claude/Anthropic mentions anywhere (commits, code, docs) — keep it that way
-- Comments only when the *why* is non-obvious; no chapter-doc paragraphs
-- Black + ruff configured; `pre-commit install` to enable on commit
-- `pytest tests/ -v` → 22 passing
-- Python ≥ 3.10; PyVista 0.46, Trame 3.13, Vuetify 3 (vue3 client)
+Add new client-side helpers to the same file (or add new files + extend `scripts`).
+
+### Per-session console state
+`navigation_panel.py` keeps a Python-side dict:
+
+```python
+_consoles_data: dict[int, dict] = {
+    1: {
+        "history":   [...],
+        "input":     "",
+        "mode":      "shell",  # "shell" | "python" | "sage"
+        "prompt":    "$",
+        "cwd":       "/home/me",
+        "env":       {...},
+        "py_buffer": [],                    # multi-line REPL accumulator
+        "py_interp": code.InteractiveInterpreter(...),
+        "py_locals": {"scene": ..., ...},
+        "counter":   0,
+    },
+    ...
+}
+```
+
+The single set of Vue-bound `state.console_*` vars always reflects the *active* session. On `console_switch` we `_save_active()` then `_load_console(new_id)` to snap the bindings into the new session's data.
+
+### Layered rendering
+Both halo and galaxy layers use `vtkPointGaussianMapper` with a per-point `radius` array in Mpc/h (world space). In-place data updates on snap change when the point count matches; full rebuild when it doesn't (avoids heap corruption from VTK's array-reuse).
+
+### Focus mode
+`scene._focus_region` is a dict describing the active focus area (`{"kind": "sphere", "center": ..., "radius": ...}` or `{"kind": "box", "bounds": ...}`). `set_focus_sphere` / `set_focus_box` populate it and immediately `_apply_focus_masks(halos.positions, galaxies.positions)` to filter both layers.
 
 ---
 
 ## Known quirks worth knowing
 
-- `state.focus_active` in Trame is a proxy — read with `bool(state.focus_active)`
-  inside callbacks, never use truthy `state.focus_active` directly
-- The async play loop reads from a plain Python dict `_ctl` not from
-  `state.is_playing` (the proxy isn't reactive inside a running coroutine)
-- VTK is single-threaded — all rendering / camera mutation must happen on
-  the main Trame event loop thread, not in joblib workers
-- After PyVista callbacks (the point picker), call `state.flush()` to push
-  state changes to the client — they run outside the normal event dispatch
-- Relative paths in `.par` files resolve against `parent.parent` of the
-  par file (i.e. the SAGE root, not the par file's dir)
+- `state.focus_active` is a Trame proxy — always coerce with `bool(state.focus_active)` inside callbacks.
+- The async play loop reads from a plain Python `_ctl` dict, not from `state.is_playing` (proxies aren't reactive inside a running coroutine).
+- VTK is single-threaded — all rendering / camera mutation must run on the Trame event loop.
+- After PyVista picker callbacks, call `state.flush()` to push state to the client (they run outside the normal event dispatch).
+- Relative paths in `.par` files resolve against `parent.parent` of the par file (the SAGE root, not the par file's dir).
+- Console shell mode has no pty — `vim`, `top`, `less` won't render. For HPC workflows (`sbatch`, `python plot.py`, `ls`, `tail file.log`) this is fine.
+- `code.compile_command` returns `None` for incomplete Python input; in the REPL we buffer the line and show `...`. A blank line force-executes the buffer.
+
+---
+
+## Likely next-up things
+
+- **PTY-backed shell mode** so `vim`, `top`, `less`, and other terminal apps work — would need a JS terminal emulator (xterm.js) and a websocket pty bridge.
+- **Streaming command output** — current `subprocess.run` blocks until the command finishes; long-running scripts go silent until completion. Switch to `Popen` + async readline + state push.
+- **Threading for long Python REPL execs** — currently blocks the event loop. Wrap in `asyncio.to_thread`?
+- **Stress-test microUchuu** at higher `--max-halos` / `--max-galaxies` once perf is stable.
+- **Density colour mode** still does KDE per snapshot — could be cached or precomputed.
+- **Camera bookmarks UI** lives in a tab; could surface as a hover-out menu in the toolbar.
+- **Library tab** could support deletion + renaming, and inline thumbnails for movies.
+- **`HALO_CB` / `GAL_CB` colour-by descriptors** still hard-coded — could be derived from `model_fields` so unsupported fields don't even appear in the dropdown.
+
+---
+
+## Style / housekeeping
+
+- No Claude/Anthropic mentions in commits, code, or docs.
+- Comments only when the *why* is non-obvious.
+- No Unicode super/subscripts in user-visible strings (use ASCII: `Msun`, `10^12.5`, `log10`, `H2`, `yr^-1`).
+- `pytest tests/ -v` before committing.
+- Python ≥ 3.10; PyVista 0.46, Trame 3.13, Vuetify 3.
 
 ---
 
 ## Status at handoff
 
-All UI requests implemented. Right panel re-arranged with Layers as the
-primary horizontal tab, four small nav tabs below it, render window fills
-the rest of the screen. `layer_panel.py` deleted; its contents live in
-`navigation_panel.py` as the Layers tab.
+- All UI-polish requests from the 0.3.0 cycle implemented.
+- Enter-to-run wired everywhere via the global JS handler.
+- Pop-out console is draggable + resizable.
+- Console is a real shell terminal with Python / SAGE modes and multi-session support.
+- Star-scatter + BH-disk render layers removed — Structure mode is back to fast core layers only.
+- Right panel is locked at 300 px and never scrolls.
