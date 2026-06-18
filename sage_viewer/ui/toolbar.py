@@ -323,23 +323,39 @@ def build_toolbar(server, scene: Scene) -> None:
         _play_task[0] = asyncio.ensure_future(_play_sequence())
 
     def _end_playback_to(snap: int) -> None:
-        """Stop any playback / prerender, hide the overlay, and show `snap`
-        in the live view."""
+        """Stop any playback / prerender and hand back to the live view at
+        `snap`. The overlay is kept up — showing the matching frame — until
+        the live render of `snap` has streamed, so there's no black flash as
+        it hands off."""
         if _stop_evt[0] is not None:
             _stop_evt[0].set()
         if _play_task[0] is not None and not _play_task[0].done():
             _play_task[0].cancel()
         _suppress_snap[0] = False
-        state.is_playing = False
-        state.playback_active = False
+        state.is_playing      = False
         state.prerender_busy  = False
         state.preload_status  = ""
+        # Keep the overlay up, showing the target frame if we have it, so it
+        # matches the live view we're about to reveal.
+        if snap in _frames["data"]:
+            state.playback_frame = _frames["data"][snap]
+        state.playback_active = True
+        # Render the live view at `snap` behind the overlay.
         scene.set_snapshot(snap)
         state.snap_num   = snap
         state.snap_label = scene.snap_label
         state.flush()
         _push()
         _ensure_rotate_loop()
+
+        async def _reveal():
+            # Let the live frame land, then drop the overlay — but only if no
+            # new playback has started in the meantime.
+            await asyncio.sleep(0.35)
+            if _play_task[0] is None or _play_task[0].done():
+                state.playback_active = False
+                state.flush()
+        asyncio.ensure_future(_reveal())
 
     @ctrl.set("pause")
     def on_pause():
