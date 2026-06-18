@@ -108,19 +108,28 @@
     'd': 'right',   'arrowright': 'right',
     'q': 'up',      'e': 'down'
   };
-  var flyTimers = {};
+  var heldKeys = {};      // key -> true while physically held
+  var dirCount = {};      // direction -> number of held keys mapping to it
   function inEditable(el) {
     if (!el) return false;
     var t = el.tagName;
     return t === 'INPUT' || t === 'TEXTAREA' || el.isContentEditable;
   }
-  function clickCam(dir) {
-    var b = document.getElementById('cam-' + dir);
+  function clickBtn(id) {
+    var b = document.getElementById(id);
     if (b) b.click();
   }
-  function stopFly() {
-    for (var k in flyTimers) clearInterval(flyTimers[k]);
-    flyTimers = {};
+  function pressDir(dir) {
+    dirCount[dir] = (dirCount[dir] || 0) + 1;
+    if (dirCount[dir] === 1) clickBtn('cam-press-' + dir);   // 0 -> 1
+  }
+  function releaseDir(dir) {
+    dirCount[dir] = (dirCount[dir] || 1) - 1;
+    if (dirCount[dir] <= 0) { dirCount[dir] = 0; clickBtn('cam-release-' + dir); }
+  }
+  function releaseAll() {
+    for (var d in dirCount) { if (dirCount[d] > 0) clickBtn('cam-release-' + d); }
+    heldKeys = {}; dirCount = {};
   }
   document.addEventListener('keydown', function (e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -129,13 +138,16 @@
     var dir = FLY_KEYS[k];
     if (!dir) return;
     e.preventDefault();
-    if (flyTimers[k]) return;             // ignore the OS key-repeat
-    clickCam(dir);                        // immediate first step
-    flyTimers[k] = setInterval(function () { clickCam(dir); }, 45);
+    if (heldKeys[k]) return;        // ignore the OS auto-repeat
+    heldKeys[k] = true;
+    pressDir(dir);
   }, true);
   document.addEventListener('keyup', function (e) {
     var k = (e.key || '').toLowerCase();
-    if (flyTimers[k]) { clearInterval(flyTimers[k]); delete flyTimers[k]; }
+    if (!heldKeys[k]) return;
+    delete heldKeys[k];
+    var dir = FLY_KEYS[k];
+    if (dir) releaseDir(dir);
   }, true);
-  window.addEventListener('blur', stopFly);   // don't fly off if focus leaves
+  window.addEventListener('blur', releaseAll);   // stop if focus leaves
 })();

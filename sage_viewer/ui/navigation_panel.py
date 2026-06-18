@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from trame.widgets import html
 from trame.widgets import vuetify3 as v3
 
@@ -488,14 +490,33 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.flush()
         _push()
 
-    @ctrl.set("cam_fly")
-    def on_cam_fly(direction=None, **_):
-        """Keyboard fly movement (WASD / arrow keys), routed from JS via the
-        hidden cam-* buttons."""
+    # Keyboard fly movement (WASD / arrow keys). A held key is pressed/
+    # released via the hidden cam-press-*/cam-release-* buttons; a single
+    # server loop flies every currently-held direction each tick. Driving it
+    # off held-state (not per-key clicks) means movement stops the instant
+    # the key is released — no queued-click drift.
+    _held_dirs: set[str] = set()
+    _fly_task: list = [None]
+
+    async def _fly_loop():
+        while _held_dirs:
+            for d in list(_held_dirs):
+                scene.camera.fly(d, step_frac=0.008)
+            _push()
+            await asyncio.sleep(0.033)
+        _fly_task[0] = None
+
+    @ctrl.set("cam_press")
+    def on_cam_press(direction=None, **_):
         if not direction:
             return
-        scene.camera.fly(str(direction))
-        _push()
+        _held_dirs.add(str(direction))
+        if _fly_task[0] is None or _fly_task[0].done():
+            _fly_task[0] = asyncio.ensure_future(_fly_loop())
+
+    @ctrl.set("cam_release")
+    def on_cam_release(direction=None, **_):
+        _held_dirs.discard(str(direction))
 
     @ctrl.set("go_to_env_halo")
     def on_go_to_env_halo():
@@ -1608,9 +1629,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
         with html.Div(style="display:none;"):
             for _dir in ("forward", "back", "left", "right", "up", "down"):
                 v3.VBtn(
-                    "",
-                    id=f"cam-{_dir}",
-                    click=(server.controller.cam_fly, f"['{_dir}']"),
+                    "", id=f"cam-press-{_dir}",
+                    click=(server.controller.cam_press, f"['{_dir}']"),
+                )
+                v3.VBtn(
+                    "", id=f"cam-release-{_dir}",
+                    click=(server.controller.cam_release, f"['{_dir}']"),
                 )
 
         # ── Reset + Focus + Centre ─────────────────────────────────
