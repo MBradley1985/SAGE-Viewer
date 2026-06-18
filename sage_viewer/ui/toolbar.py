@@ -107,8 +107,8 @@ def build_toolbar(server, scene: Scene) -> None:
     # Playback — driven by a single task + asyncio.Event for instant stop
     # ------------------------------------------------------------------
 
-    # Cached frames + the camera/rotation signature they were rendered for.
-    _frames: dict = {"key": None, "data": []}
+    # Per-snapshot frame cache + the camera/rotation signature it's valid for.
+    _frames: dict = {"key": None, "data": {}}
 
     def _cam_key():
         cam = scene.plotter.camera
@@ -147,9 +147,11 @@ def build_toolbar(server, scene: Scene) -> None:
         arr = vtk_to_numpy(vimg.GetPointData().GetScalars()).reshape(h, w, -1)
         return arr[::-1]   # VTK image origin is bottom-left
 
-    async def _render_frames() -> list[str]:
-        """Render every snapshot to a JPEG data URL, baking in rotation when a
-        rotate mode is active. Camera + snapshot are restored afterwards."""
+    async def _render_frames(order: list[int]) -> None:
+        """Render the snapshots in `order` (skipping any already cached) into
+        _frames['data']. Rotation, when active, is baked by play-order
+        position so the spin starts from the current view. Camera + snapshot
+        are restored afterwards."""
         from PIL import Image
         pl     = scene.plotter
         cam    = pl.camera
@@ -157,39 +159,44 @@ def build_toolbar(server, scene: Scene) -> None:
         focal0 = np.array(cam.focal_point, dtype=np.float64)
         save_snap = scene.current_snap
         sign, dps = _parse_rotate(_ctl["rotate_mode"])
-        per_snap  = np.deg2rad(sign * dps / 3.0)   # angle baked per snapshot
+        per_snap  = np.deg2rad(sign * dps / 3.0)
         stop_evt  = _get_stop_evt()
+
+        todo = [(pos, s) for pos, s in enumerate(order)
+                if s not in _frames["data"]]
+        total = len(todo)
+        if total == 0:
+            return
 
         state.prerender_busy = True
         state.flush()
-        frames: list[str] = []
         # Off-screen rendering writes to an FBO we can actually read back —
         # the on-screen/back buffer comes out black on this setup.
         rw = pl.ren_win
         prev_offscreen = rw.GetOffScreenRendering()
         rw.SetOffScreenRendering(1)
         try:
-            for i in range(snap_count):
+            done = 0
+            for pos, s in todo:
                 if stop_evt.is_set():
                     break
-                scene.set_snapshot(i)
+                scene.set_snapshot(s)
                 if per_snap:
-                    ang = per_snap * i
-                    c, s = np.cos(ang), np.sin(ang)
-                    rm = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+                    ang = per_snap * pos
+                    c, sn = np.cos(ang), np.sin(ang)
+                    rm = np.array([[c, 0, sn], [0, 1, 0], [-sn, 0, c]])
                     cam.position    = tuple(focal0 + rm @ (pos0 - focal0))
                     cam.focal_point = tuple(focal0)
                     cam.up          = (0.0, 1.0, 0.0)
                 img = _capture_frame()
                 buf = io.BytesIO()
                 Image.fromarray(img[..., :3]).save(buf, format="JPEG", quality=85)
-                frames.append(
+                _frames["data"][s] = (
                     "data:image/jpeg;base64,"
                     + base64.b64encode(buf.getvalue()).decode("ascii")
                 )
-                state.preload_status = (
-                    f"Loading galaxies.....  {i + 1}/{snap_count}"
-                )
+                done += 1
+                state.preload_status = f"Loading galaxies.....  {done}/{total}"
                 state.flush()
                 await asyncio.sleep(0)
         finally:
@@ -202,34 +209,35 @@ def build_toolbar(server, scene: Scene) -> None:
             state.preload_status = ""
             state.flush()
             _push()
-        return frames
 
-    async def _image_playback(frames: list[str]) -> None:
+    async def _image_playback(order: list[int]) -> None:
         stop_evt = _get_stop_evt()
-        n = len(frames)
+        n = len(order)
         if n == 0:
             return
-        i = (n - 1) if _ctl["reverse"] else 0
         state.playback_active = True
         state.is_playing = True
         state.flush()
+        idx = 0
         try:
             while not stop_evt.is_set():
                 interval = 1.0 / _FPS.get(float(state.play_speed), 3)
-                state.playback_frame = frames[i]
-                state.snap_num   = i
-                state.snap_label = scene._snap_table.label(i)
+                s = order[idx]
+                frame = _frames["data"].get(s)
+                if frame is not None:
+                    state.playback_frame = frame
+                state.snap_num   = s
+                state.snap_label = scene._snap_table.label(s)
                 state.flush()
 
-                at_end = (i == 0) if _ctl["reverse"] else (i == n - 1)
-                if at_end and not _ctl["repeat"]:
+                if idx == n - 1 and not _ctl["repeat"]:
                     break
                 try:
                     await asyncio.wait_for(stop_evt.wait(), timeout=interval)
                     break
                 except asyncio.TimeoutError:
                     pass
-                i = (i - 1) % n if _ctl["reverse"] else (i + 1) % n
+                idx = (idx + 1) % n
         finally:
             state.is_playing = False
             state.flush()
@@ -240,16 +248,24 @@ def build_toolbar(server, scene: Scene) -> None:
         await _await_preload()
         if stop_evt.is_set():
             return
+        # Invalidate the frame cache if the camera / rotation changed.
         key = _cam_key()
-        if _frames["key"] != key or not _frames["data"]:
-            data = await _render_frames()
-            if stop_evt.is_set():
-                state.playback_active = False
-                state.flush()
-                return
+        if _frames["key"] != key:
             _frames["key"]  = key
-            _frames["data"] = data
-        await _image_playback(_frames["data"])
+            _frames["data"] = {}
+        # Play from the current slider position toward z=0 (forward) or toward
+        # high-z (reverse). Only that range is rendered.
+        start = int(state.snap_num)
+        if _ctl["reverse"]:
+            order = list(range(start, -1, -1))
+        else:
+            order = list(range(start, snap_count))
+        await _render_frames(order)
+        if stop_evt.is_set():
+            state.playback_active = False
+            state.flush()
+            return
+        await _image_playback(order)
         # Ended naturally — drop back to the live view at the last frame.
         last = int(state.snap_num)
         scene.set_snapshot(last)
