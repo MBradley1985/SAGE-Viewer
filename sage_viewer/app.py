@@ -330,7 +330,8 @@ def create_app(
     from sage_viewer.wizard.controller import WizardController
     from sage_viewer.wizard.ui import build_wizard_ui
 
-    server.state.wiz_active = False
+    server.state.wiz_active  = False
+    server.state.page_reload = False
 
     def _on_wizard_model(par_path, model_name: str):
         """Called by the wizard when a model is ready; loads it into the scene."""
@@ -363,14 +364,14 @@ def create_app(
         if wiz_active:
             _wiz_ctrl.reset_and_start()
         else:
-            # Overlay just closed — push a fresh frame so the 3D view
-            # shows the current scene without needing a manual refresh.
+            # Overlay closed — trigger a browser reload so the VTK stream
+            # re-establishes cleanly with the new model.
             import asyncio as _aio
-            async def _repush():
-                await _aio.sleep(0.1)
-                if hasattr(server.controller, "view_update"):
-                    server.controller.view_update()
-            _aio.ensure_future(_repush())
+            async def _trigger_reload():
+                await _aio.sleep(0.3)
+                server.state.page_reload = True
+                server.state.flush()
+            _aio.ensure_future(_trigger_reload())
 
     # `theme=("ui_theme",)` reactively binds the active Vuetify theme to
     # our state variable — Vuetify swaps the entire palette plus the root
@@ -696,6 +697,17 @@ def create_app(
                         location="top",
                         contained=True,
                         style="margin-top:16px;",
+                    )
+
+                    # Reload trigger — when page_reload becomes True this div
+                    # is mounted and immediately reloads the browser, giving
+                    # the VTK stream a clean reconnect with the new model.
+                    html.Div(
+                        v_if=("page_reload",),
+                        style="display:none;",
+                        raw_attrs=[
+                            '@vue:mounted="() => window.location.reload()"',
+                        ],
                     )
 
                     # Galaxy info panel — semi-transparent card pinned to

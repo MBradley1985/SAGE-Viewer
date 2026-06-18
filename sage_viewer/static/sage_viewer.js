@@ -164,4 +164,32 @@
     setTimeout(grabKeyboardFocus, 500);
     setTimeout(grabKeyboardFocus, 1500);
   });
+
+  // ─── Page-reload trigger ──────────────────────────────────────────────
+  // When the Python server sets page_reload=True (e.g. after the wizard
+  // loads a model), the Vue reactive state updates. We poll lightly for
+  // that flag and reload when it appears, then clear it so the next
+  // reload of the page starts fresh.
+  (function watchReload() {
+    var app = document.getElementById('app');
+    if (app && app.__vue_app__) {
+      var globals = app.__vue_app__.config.globalProperties;
+      if (globals && globals.$data && globals.$data.page_reload) {
+        window.location.reload();
+        return;
+      }
+      // Use Vue's watch if accessible
+      try {
+        var Vue = app.__vue_app__;
+        var { watch } = Vue;
+        if (watch && globals.$data) {
+          watch(function () { return globals.$data.page_reload; }, function (v) {
+            if (v) window.location.reload();
+          });
+          return;
+        }
+      } catch (e) {}
+    }
+    setTimeout(watchReload, 600);
+  })();
 })();
