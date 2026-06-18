@@ -1734,25 +1734,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSwitch(
                         v_model=("galaxies_visible",), label="Visible",
-                        color="green", hide_details=True, density="compact",
+                        color="#FFD700", hide_details=True, density="compact",
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSlider(
                         v_model=("galaxy_opacity",), label="Opacity",
                         min=0.0, max=1.0, step=0.01,
-                        thumb_label=True, color="green", hide_details=True,
+                        thumb_label=True, color="#FFD700", hide_details=True,
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
                         v_model=("galaxy_color_mode",), items=(_GALAXY_MODES,),
                         label="Colour by", hide_details=True,
-                        variant="outlined", color="green", density="compact",
+                        variant="outlined", color="#FFD700", density="compact",
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
                         v_model=("galaxy_colormap",), items=(_CMAPS,),
                         label="Colormap", hide_details=True,
-                        variant="outlined", color="green", density="compact",
+                        variant="outlined", color="#FFD700", density="compact",
                         # Structure mode is the bare composition (no outer
                         # property halo) — the colormap doesn't apply.
                         # For every other mode the colormap drives the
@@ -1826,7 +1826,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         target_id="btn-target-galaxy-go")
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
-                        "Go", block=True, color="green",
+                        "Go", block=True, color="#FFD700",
                         density="compact", click=ctrl.go_to_galaxy_enter,
                         id="btn-target-galaxy-go",
                     )
@@ -1841,18 +1841,18 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     variant="outlined", density="compact",
                     style="width:100%;",
                 ):
-                    v3.VBtn("3",  style="flex:1;", color="green",
+                    v3.VBtn("3",  style="flex:1;", color="#FFD700",
                             click=ctrl.go_to_galaxy_1)
-                    v3.VBtn("5",  style="flex:1;", color="green",
+                    v3.VBtn("5",  style="flex:1;", color="#FFD700",
                             click=ctrl.go_to_galaxy_3)
-                    v3.VBtn("10", style="flex:1;", color="green",
+                    v3.VBtn("10", style="flex:1;", color="#FFD700",
                             click=ctrl.go_to_galaxy_5)
 
                 v3.VDivider(style="margin:14px 0 10px;")
 
                 v3.VBtn(
                     "Galaxy Info",
-                    block=True, color="green",
+                    block=True, color="#FFD700",
                     density="compact",
                     prepend_icon="mdi-information-outline",
                     click=ctrl.show_galaxy_info,
@@ -1924,7 +1924,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v_model=("env_show_field",),
                     label="Field        (< 10^11 Msun)",
                     hide_details=True, density="compact",
-                    color="green",
+                    color="#FFD700",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
@@ -1932,7 +1932,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v_model=("env_show_isolated",),
                     label="Isolated   (10^11 - 10^12.5 Msun)",
                     hide_details=True, density="compact",
-                    color="green",
+                    color="#FFD700",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
@@ -1940,7 +1940,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v_model=("env_show_group",),
                     label="Group      (10^12.5 - 10^14 Msun)",
                     hide_details=True, density="compact",
-                    color="green",
+                    color="#FFD700",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
@@ -1948,7 +1948,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v_model=("env_show_cluster",),
                     label="Cluster    (> 10^14 Msun)",
                     hide_details=True, density="compact",
-                    color="green",
+                    color="#FFD700",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
@@ -1957,7 +1957,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 v3.VBtn(
                     "Group Info",
-                    block=True, color="green",
+                    block=True, color="#FFD700",
                     density="compact",
                     prepend_icon="mdi-account-group-outline",
                     click=ctrl.show_group_info,
@@ -2220,12 +2220,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
             with v3.VSheet(
                 color="transparent",
                 v_show=("nav_active_tab === 'library'",),
+                style=(
+                    "display:flex;flex-direction:column;"
+                    "height:100%;min-height:0;width:100%;"
+                ),
             ):
                 v3.VLabel(
                     "MEDIA LIBRARY",
                     style=(
                         "font-size:0.95rem;font-weight:700;letter-spacing:0.08em;"
                         "color:#06b6d4;padding:4px 0 4px;display:block;"
+                        "flex-shrink:0;"
                     ),
                 )
                 v3.VLabel(
@@ -2233,29 +2238,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "<SAGE-Viewer>/sage_outputs/.  Click a row to display.",
                     style=(
                         "font-size:0.6rem;color:#9ca3af;line-height:1.35;"
-                        "display:block;padding:0 0 4px;"
+                        "display:block;padding:0 0 4px;flex-shrink:0;"
                     ),
                 )
-                with v3.VRow(no_gutters=True, style="gap:6px;padding:4px 0;"):
-                    with v3.VCol(style="padding:0;"):
-                        v3.VBtn(
-                            "Refresh", block=True, color="cyan",
-                            density="compact", size="small",
-                            prepend_icon="mdi-refresh",
-                            click=ctrl.library_refresh,
-                        )
-                    with v3.VCol(style="padding:0;"):
-                        v3.VBtn(
-                            "Close viewer", block=True, variant="outlined",
-                            color="red", density="compact", size="small",
-                            prepend_icon="mdi-close-circle-outline",
-                            click=ctrl.library_close,
-                        )
-                # File list
+                # File list — flex-fills the available vertical space so the
+                # black box runs the full height of the panel.
                 with v3.VSheet(
                     color="#0a0a0f",
                     style=(
-                        "max-height:340px;min-height:120px;overflow-y:auto;"
+                        "flex:1 1 0;min-height:0;overflow-y:auto;"
                         "border:1px solid #1f2937;border-radius:4px;"
                         "margin-top:6px;"
                     ),
@@ -2279,11 +2270,36 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             ),
                             color="cyan",
                         )
-                v3.VLabel(
-                    "{{ library_files.length }} file"
-                    "{{ library_files.length === 1 ? '' : 's' }}",
-                    style="font-size:0.6rem;color:#6b7280;padding:6px 0;display:block;",
-                )
+                # Bottom block — count + action buttons anchored to the
+                # panel's bottom edge, mirroring the Console tab layout.
+                with html.Div(
+                    style=(
+                        "margin-top:6px;flex-shrink:0;"
+                        "display:flex;flex-direction:column;gap:6px;"
+                    ),
+                ):
+                    v3.VLabel(
+                        "{{ library_files.length }} file"
+                        "{{ library_files.length === 1 ? '' : 's' }}",
+                        style=(
+                            "font-size:0.6rem;color:#6b7280;display:block;"
+                        ),
+                    )
+                    with v3.VRow(no_gutters=True, style="gap:6px;"):
+                        with v3.VCol(style="padding:0;"):
+                            v3.VBtn(
+                                "Refresh", block=True, color="cyan",
+                                density="compact", size="small",
+                                prepend_icon="mdi-refresh",
+                                click=ctrl.library_refresh,
+                            )
+                        with v3.VCol(style="padding:0;"):
+                            v3.VBtn(
+                                "Close viewer", block=True, variant="outlined",
+                                color="red", density="compact", size="small",
+                                prepend_icon="mdi-close-circle-outline",
+                                click=ctrl.library_close,
+                            )
 
             # ── FILTERS tab ────────────────────────────────────
             with v3.VSheet(
@@ -2343,7 +2359,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VRangeSlider(
                     v_model=("filter_gal_smass",),
                     min=8.0, max=12.5, step=0.1,
-                    thumb_label=True, color="green",
+                    thumb_label=True, color="#FFD700",
                     density="compact", hide_details=True,
                     style=_FSLD,
                 )
@@ -2351,7 +2367,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VRangeSlider(
                     v_model=("filter_gal_ssfr",),
                     min=-14.0, max=-8.0, step=0.1,
-                    thumb_label=True, color="green",
+                    thumb_label=True, color="#FFD700",
                     density="compact", hide_details=True,
                     style=_FSLD,
                 )
@@ -2359,7 +2375,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VRangeSlider(
                     v_model=("filter_gal_bt",),
                     min=0.0, max=1.0, step=0.02,
-                    thumb_label=True, color="green",
+                    thumb_label=True, color="#FFD700",
                     density="compact", hide_details=True,
                     style=_FSLD,
                 )
@@ -2367,7 +2383,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VRangeSlider(
                     v_model=("filter_gal_age",),
                     min=0.0, max=14.0, step=0.1,
-                    thumb_label=True, color="green",
+                    thumb_label=True, color="#FFD700",
                     density="compact", hide_details=True,
                     disabled=("!model_fields.mean_age",),
                     style=_FSLD,
@@ -2376,7 +2392,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VRangeSlider(
                     v_model=("filter_gal_bhmass",),
                     min=0.0, max=10.0, step=0.1,
-                    thumb_label=True, color="green",
+                    thumb_label=True, color="#FFD700",
                     density="compact", hide_details=True,
                     disabled=("!model_fields.bh_mass",),
                     style=_FSLD,
@@ -2385,7 +2401,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VRangeSlider(
                     v_model=("filter_gal_ics",),
                     min=0.0, max=12.0, step=0.1,
-                    thumb_label=True, color="green",
+                    thumb_label=True, color="#FFD700",
                     density="compact", hide_details=True,
                     disabled=("!model_fields.ics_mass",),
                     style=_FSLD,
@@ -2400,7 +2416,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         {"title": "Satellites",  "value": "satellite"},
                     ],),
                     hide_details=True, variant="outlined",
-                    color="green", density="compact",
+                    color="#FFD700", density="compact",
                     style=_FSEL,
                 )
 
@@ -2413,7 +2429,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         {"title": "Non-FFB only", "value": "no"},
                     ],),
                     hide_details=True, variant="outlined",
-                    color="green", density="compact",
+                    color="#FFD700", density="compact",
                     disabled=("!model_fields.ffb_regime",),
                     style=_FSEL,
                 )
@@ -2427,7 +2443,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         {"title": "Hot atmosphere galaxies", "value": "hot"},
                     ],),
                     hide_details=True, variant="outlined",
-                    color="green", density="compact",
+                    color="#FFD700", density="compact",
                     disabled=("!model_fields.cgm_regime",),
                     style=_FSEL,
                 )
