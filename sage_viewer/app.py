@@ -419,25 +419,23 @@ def create_app(
                         color="#FFD700",
                     )
                     v3.VDivider(style="margin:4px 0;")
-                    # ── Models below ──────────────────────────────────────
+                    # ── Models (switch rows) ───────────────────────────────
                     v3.VListSubheader(
                         "MODELS",
                         style="color:#9ca3af;font-size:0.65rem;",
                         v_show=("models_list && models_list.length > 0",),
                     )
-                    # v-for on models_list sorted primary-first reactively
                     with html.Div(
                         v_for=(
                             "m in [...models_list].sort("
                             "(a,b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0))",
                         ),
-                        key=("m.name",),
+                        key=("'sw-' + m.name",),
                     ):
                         v3.VListItem(
                             title=("m.name",),
                             subtitle=(
-                                "m.primary ? 'primary' : "
-                                "(m.overlay ? 'overlay on' : 'click to switch')",
+                                "m.primary ? 'primary' : 'click to switch'",
                             ),
                             prepend_icon=(
                                 "m.primary ? 'mdi-check-circle' : 'mdi-circle-outline'",
@@ -446,16 +444,37 @@ def create_app(
                             active=("m.primary",),
                             color="cyan",
                         )
+                    # ── Divider + overlay rows ─────────────────────────────
+                    v3.VDivider(
+                        v_show=("models_list && models_list.length > 1",),
+                        style="margin:4px 0;",
+                    )
+                    v3.VListSubheader(
+                        "OVERLAYS",
+                        style="color:#9ca3af;font-size:0.65rem;",
+                        v_show=("models_list && models_list.length > 1",),
+                    )
+                    with html.Div(
+                        v_for=("m in models_list",),
+                        key=("'ov-' + m.name",),
+                        v_show=("!m.primary",),
+                    ):
                         v3.VListItem(
                             title=(
                                 "m.overlay "
-                                "? '✓ overlay: ' + m.name "
-                                ": '+ overlay: ' + m.name",
+                                "? '✓ ' + m.name "
+                                ": '+ ' + m.name",
+                            ),
+                            subtitle=(
+                                "m.overlay ? 'overlay on' : 'add as overlay'",
+                            ),
+                            prepend_icon=(
+                                "m.overlay ? 'mdi-layers' : 'mdi-layers-plus'",
                             ),
                             click=(server.controller.toggle_overlay, "[m.name]"),
-                            v_show=("!m.primary",),
+                            active=("m.overlay",),
+                            color="cyan",
                             density="compact",
-                            style="padding-left:24px;font-size:0.7rem;",
                         )
 
             # Title
