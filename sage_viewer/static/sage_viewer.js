@@ -150,4 +150,18 @@
     if (dir) releaseDir(dir);
   }, true);
   window.addEventListener('blur', releaseAll);   // stop if focus leaves
+
+  // Grab keyboard focus as soon as the page is up so WASD / arrow keys work
+  // immediately, without the user having to click the viewport first.
+  function grabKeyboardFocus() {
+    if (!document.body) return;
+    if (document.activeElement && inEditable(document.activeElement)) return;
+    document.body.setAttribute('tabindex', '-1');
+    try { window.focus(); document.body.focus(); } catch (e) {}
+  }
+  window.addEventListener('load', function () {
+    grabKeyboardFocus();
+    setTimeout(grabKeyboardFocus, 500);
+    setTimeout(grabKeyboardFocus, 1500);
+  });
 })();
