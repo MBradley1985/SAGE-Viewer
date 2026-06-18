@@ -332,26 +332,23 @@ def create_app(
 
     server.state.wiz_active = False
 
-    def _on_wizard_model(par_path):
+    def _on_wizard_model(par_path, model_name: str):
         """Called by the wizard when a model is ready; loads it into the scene."""
         from pathlib import Path as _P
         par_path = _P(par_path)
-        name = par_path.parent.name
+        server.state.model_loading = True
+        server.state.flush()
         try:
-            server.state.model_loading = True
-            server.state.flush()
-            if not scene.has_model(name):
+            if not scene.has_model(model_name):
                 scene.add_model(par_path)
-            scene.switch_primary(name)
-        finally:
-            server.state.model_loading = False
+            scene.switch_primary(model_name)
             _refresh_models_state()
-            # Sync snap slider + label to the new primary, then push the frame
             server.state.snap_num   = scene.current_snap
             server.state.snap_label = scene.snap_label
             server.state.flush()
-            if hasattr(server.controller, "view_update"):
-                server.controller.view_update()
+        finally:
+            server.state.model_loading = False
+            server.state.flush()
 
     _wiz_ctrl = WizardController(
         server,

@@ -245,7 +245,7 @@ class WizardController:
             name  = value[6:]
             model = next((m for m in self._models if m["name"] == name), None)
             if model:
-                await self._launch_explore(model["par"])
+                await self._launch_explore(model["par"], model_name=name)
 
         elif value == "new_model":
             await self._step_pick_par()
@@ -444,14 +444,16 @@ class WizardController:
                                 "icon": "mdi-arrow-left", "disabled": False}])
             return
         if len(self._models) == 1:
-            await self._launch_explore(self._models[0]["par"])
+            m = self._models[0]
+            await self._launch_explore(m["par"], model_name=m["name"])
         else:
             await self._step_select_model()
 
-    async def _launch_explore(self, par_path: Path) -> None:
+    async def _launch_explore(self, par_path: Path, model_name: str | None = None) -> None:
+        name = model_name or par_path.stem
         self._st.wiz_step = 5
         self._emit("", "info")
-        self._emit(f"Loading model: {par_path.parent.name}", "title")
+        self._emit(f"Loading model: {name}", "title")
 
         if self._on_model_loaded is not None:
             # Embedded in Explore Mode — load into the existing scene
@@ -459,7 +461,7 @@ class WizardController:
             self._st.flush()
             await asyncio.sleep(0.3)
             try:
-                self._on_model_loaded(par_path)
+                self._on_model_loaded(par_path, name)
                 self._emit("Done! Closing wizard.", "ok")
                 self._st.flush()
                 await asyncio.sleep(0.8)
@@ -467,6 +469,8 @@ class WizardController:
                 self._st.flush()
             except Exception as exc:
                 self._emit(f"Error loading model: {exc}", "err")
+                self._st.wiz_busy = False
+                self._st.flush()
         else:
             # Standalone Launch Mode — restart as Explore Mode via execv
             self._emit("Starting Explore Mode...", "info")
