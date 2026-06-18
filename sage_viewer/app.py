@@ -337,10 +337,21 @@ def create_app(
         from pathlib import Path as _P
         par_path = _P(par_path)
         name = par_path.parent.name
-        if not scene.has_model(name):
-            scene.add_model(par_path)
-        scene.switch_primary(name)
-        _refresh_models_state()
+        try:
+            server.state.model_loading = True
+            server.state.flush()
+            if not scene.has_model(name):
+                scene.add_model(par_path)
+            scene.switch_primary(name)
+        finally:
+            server.state.model_loading = False
+            _refresh_models_state()
+            # Sync snap slider + label to the new primary, then push the frame
+            server.state.snap_num   = scene.current_snap
+            server.state.snap_label = scene.snap_label
+            server.state.flush()
+            if hasattr(server.controller, "view_update"):
+                server.controller.view_update()
 
     _wiz_ctrl = WizardController(
         server,
