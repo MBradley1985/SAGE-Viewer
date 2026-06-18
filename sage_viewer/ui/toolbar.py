@@ -150,22 +150,31 @@ def build_toolbar(server, scene: Scene) -> None:
     async def _render_frames(order: list[int]) -> None:
         """Render the snapshots in `order` (skipping any already cached) into
         _frames['data']. Rotation, when active, is baked by play-order
-        position so the spin starts from the current view. Camera + snapshot
-        are restored afterwards."""
+        position so the spin starts from the current view.
+
+        As soon as the starting frame exists, the playback overlay is raised
+        showing it, so the rest of the render is never visible underneath
+        (the live view would otherwise flicker through every snapshot)."""
         from PIL import Image
         pl     = scene.plotter
         cam    = pl.camera
         pos0   = np.array(cam.position,    dtype=np.float64)
         focal0 = np.array(cam.focal_point, dtype=np.float64)
-        save_snap = scene.current_snap
         sign, dps = _parse_rotate(_ctl["rotate_mode"])
         per_snap  = np.deg2rad(sign * dps / 3.0)
         stop_evt  = _get_stop_evt()
+        first = order[0]
+
+        # Starting frame already cached → raise the overlay before rendering.
+        if first in _frames["data"]:
+            state.playback_frame  = _frames["data"][first]
+            state.playback_active = True
 
         todo = [(pos, s) for pos, s in enumerate(order)
                 if s not in _frames["data"]]
         total = len(todo)
         if total == 0:
+            state.flush()
             return
 
         state.prerender_busy = True
@@ -191,24 +200,25 @@ def build_toolbar(server, scene: Scene) -> None:
                 img = _capture_frame()
                 buf = io.BytesIO()
                 Image.fromarray(img[..., :3]).save(buf, format="JPEG", quality=85)
-                _frames["data"][s] = (
-                    "data:image/jpeg;base64,"
-                    + base64.b64encode(buf.getvalue()).decode("ascii")
-                )
+                url = ("data:image/jpeg;base64,"
+                       + base64.b64encode(buf.getvalue()).decode("ascii"))
+                _frames["data"][s] = url
+                if s == first:
+                    # Cover the rest of the render with the starting frame.
+                    state.playback_frame  = url
+                    state.playback_active = True
                 done += 1
                 state.preload_status = f"Loading galaxies.....  {done}/{total}"
                 state.flush()
                 await asyncio.sleep(0)
         finally:
             rw.SetOffScreenRendering(prev_offscreen)
-            scene.set_snapshot(save_snap)
             cam.position    = tuple(pos0)
             cam.focal_point = tuple(focal0)
             cam.up          = (0.0, 1.0, 0.0)
             state.prerender_busy = False
             state.preload_status = ""
             state.flush()
-            _push()
 
     async def _image_playback(order: list[int]) -> None:
         stop_evt = _get_stop_evt()
@@ -266,21 +276,26 @@ def build_toolbar(server, scene: Scene) -> None:
             order = list(range(start, -1, -1))
         else:
             order = list(range(start, snap_count))
-        await _render_frames(order)
+        await _render_frames(order)   # raises the overlay itself
         if stop_evt.is_set():
             state.playback_active = False
             state.flush()
             return
+        # Park the live scene on the final snapshot now, while the overlay is
+        # still covering it, so revealing it at the end is a seamless match —
+        # no flash of the selected snapshot, no jump.
+        scene.set_snapshot(order[-1])
+        _push()
         await _image_playback(order)
-        # Ended naturally — sync the live view to the last frame and let it
-        # reach the client BEFORE hiding the overlay, so there's no flash of a
-        # stale frame as the overlay drops away.
+        # Ended naturally — the live view is already on the final snapshot, so
+        # just drop the overlay (after giving the live frame a moment to land).
         last = int(state.snap_num)
-        scene.set_snapshot(last)
+        if scene.current_snap != last:
+            scene.set_snapshot(last)
+            _push()
         state.snap_label = scene.snap_label
         state.flush()
-        _push()
-        await asyncio.sleep(0.15)
+        await asyncio.sleep(0.2)
         state.playback_active = False
         state.flush()
         _ensure_rotate_loop()
