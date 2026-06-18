@@ -349,9 +349,15 @@ def build_toolbar(server, scene: Scene) -> None:
         _ensure_rotate_loop()
 
         async def _reveal():
-            # Let the live frame land, then drop the overlay — but only if no
-            # new playback has started in the meantime.
-            await asyncio.sleep(0.35)
+            # The live re-render (rebuild + encode + stream) isn't instant and
+            # the off-screen toggle can leave a black intermediate, so hold the
+            # overlay, re-push once the rebuild has settled, then reveal — only
+            # if no new playback started meanwhile.
+            await asyncio.sleep(0.4)
+            if _play_task[0] is not None and not _play_task[0].done():
+                return
+            _push()
+            await asyncio.sleep(0.55)
             if _play_task[0] is None or _play_task[0].done():
                 state.playback_active = False
                 state.flush()
