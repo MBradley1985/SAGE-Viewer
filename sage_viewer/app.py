@@ -365,6 +365,15 @@ def create_app(
     def _on_wiz_active(wiz_active, **_):
         if wiz_active:
             _wiz_ctrl.reset_and_start()
+        else:
+            # Overlay just closed — push a fresh frame so the 3D view
+            # shows the current scene without needing a manual refresh.
+            import asyncio as _aio
+            async def _repush():
+                await _aio.sleep(0.1)
+                if hasattr(server.controller, "view_update"):
+                    server.controller.view_update()
+            _aio.ensure_future(_repush())
 
     # `theme=("ui_theme",)` reactively binds the active Vuetify theme to
     # our state variable — Vuetify swaps the entire palette plus the root
