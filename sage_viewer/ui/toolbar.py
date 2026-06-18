@@ -230,14 +230,20 @@ def build_toolbar(server, scene: Scene) -> None:
                 state.snap_label = scene._snap_table.label(s)
                 state.flush()
 
-                if idx == n - 1 and not _ctl["repeat"]:
-                    break
+                # Hold every frame — including the last — for the full
+                # interval, otherwise the final snapshot just flashes past.
                 try:
                     await asyncio.wait_for(stop_evt.wait(), timeout=interval)
                     break
                 except asyncio.TimeoutError:
                     pass
-                idx = (idx + 1) % n
+
+                if idx == n - 1:
+                    if not _ctl["repeat"]:
+                        break
+                    idx = 0
+                else:
+                    idx += 1
         finally:
             state.is_playing = False
             state.flush()
@@ -266,13 +272,17 @@ def build_toolbar(server, scene: Scene) -> None:
             state.flush()
             return
         await _image_playback(order)
-        # Ended naturally — drop back to the live view at the last frame.
+        # Ended naturally — sync the live view to the last frame and let it
+        # reach the client BEFORE hiding the overlay, so there's no flash of a
+        # stale frame as the overlay drops away.
         last = int(state.snap_num)
         scene.set_snapshot(last)
         state.snap_label = scene.snap_label
-        state.playback_active = False
         state.flush()
         _push()
+        await asyncio.sleep(0.15)
+        state.playback_active = False
+        state.flush()
         _ensure_rotate_loop()
 
     @ctrl.set("play")

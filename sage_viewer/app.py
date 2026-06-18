@@ -468,11 +468,12 @@ def create_app(
                     )
                     server.controller.view_update = view.update
 
-                    # Pre-rendered playback overlay — covers the live view
-                    # while frames are rendered (hiding flicker) and during
-                    # playback, where it flips through the cached frames.
+                    # Pre-rendered playback overlay — shown only during
+                    # playback, where it flips through the cached frames. While
+                    # frames are being rendered the live view stays put (the
+                    # progress shows in the toolbar chip instead).
                     with html.Div(
-                        v_show=("playback_active || prerender_busy",),
+                        v_show=("playback_active",),
                         style=(
                             "position:absolute;inset:0;z-index:6;"
                             "background:#000;display:flex;"
@@ -480,19 +481,10 @@ def create_app(
                         ),
                     ):
                         html.Img(
-                            v_show=("playback_active",),
                             src=("playback_frame",),
                             style=(
                                 "width:100%;height:100%;object-fit:contain;"
                                 "display:block;"
-                            ),
-                        )
-                        html.Div(
-                            "{{ preload_status || 'Loading galaxies.....' }}",
-                            v_show=("prerender_busy",),
-                            style=(
-                                "color:#FFD700;font-size:1.4rem;"
-                                "font-family:monospace;letter-spacing:0.05em;"
                             ),
                         )
 
