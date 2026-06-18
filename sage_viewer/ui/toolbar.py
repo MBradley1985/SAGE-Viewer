@@ -113,6 +113,10 @@ def build_toolbar(server, scene: Scene) -> None:
     async def _play_loop():
         stop_evt = _get_stop_evt()
         stop_evt.clear()
+        # Wait for the whole-run cache to warm so playback is evenly paced.
+        await _await_preload()
+        if stop_evt.is_set():
+            return
         state.is_playing = True
         state.flush()
         try:
@@ -226,12 +230,14 @@ def build_toolbar(server, scene: Scene) -> None:
     # ------------------------------------------------------------------
 
     _preload_started = [False]
+    _preload_done    = [False]
 
     async def _preload_loop():
         loader  = scene._loader
         futures = loader.preload_all()
         total   = len(futures)
         if total == 0:
+            _preload_done[0] = True
             return
         while True:
             done = sum(1 for f in futures if f.done())
@@ -240,6 +246,7 @@ def build_toolbar(server, scene: Scene) -> None:
             state.preload_status = f"Caching snapshots  {done}/{total}"
             state.flush()
             await asyncio.sleep(0.25)
+        _preload_done[0] = True
         state.preload_status = ""
         state.flush()
 
@@ -252,6 +259,17 @@ def build_toolbar(server, scene: Scene) -> None:
         except RuntimeError:
             # No running loop yet — fall back to first play press.
             _preload_started[0] = False
+
+    async def _await_preload():
+        """Block until every snapshot is cached so playback runs at an even
+        cadence — without this, playback overtakes the background preload and
+        stalls on uncached snapshots mid-run, then bursts through the rest."""
+        _start_preload()
+        if not _preload_started[0]:        # no loop earlier — start inline now
+            _preload_started[0] = True
+            asyncio.ensure_future(_preload_loop())
+        while not _preload_done[0]:
+            await asyncio.sleep(0.1)
 
     if hasattr(ctrl, "on_server_ready"):
         ctrl.on_server_ready.add(_start_preload)
