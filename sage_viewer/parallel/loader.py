@@ -57,8 +57,12 @@ class SnapshotLoader:
         self._lock = Lock()
 
         # Wrap the actual load call in an LRU cache so repeated requests
-        # for the same snapshot skip disk entirely.
-        self._cached_load = lru_cache(maxsize=cache_size)(self._load)
+        # for the same snapshot skip disk entirely. Size the cache to hold
+        # every snapshot — these are small boxes, so caching the whole run
+        # keeps playback free of disk stalls once preloaded.
+        self._cached_load = lru_cache(
+            maxsize=max(cache_size, snap_table.count)
+        )(self._load)
 
     def _load(
         self, snap_num: int
@@ -73,6 +77,7 @@ class SnapshotLoader:
             max_halos=self._max_halos,
             hubble_h=self._cfg.hubble_h,
             n_jobs=self._n_jobs,
+            box_size=self._cfg.box_size,
         )
         galaxies = load_galaxy_snapshot(
             hdf5_path=self._cfg.hdf5_path,
@@ -95,6 +100,21 @@ class SnapshotLoader:
         result = self._cached_load(snap_num)
         self._prefetch_neighbours(snap_num)
         return result
+
+    def preload_all(self) -> list[Future]:
+        """Kick off background loads of every snapshot. Returns the futures
+        so a caller can track progress. Already-loaded / in-flight snapshots
+        are not resubmitted."""
+        n = self._snap_table.count
+        futures: list[Future] = []
+        with self._lock:
+            for snap in range(n):
+                if snap not in self._futures:
+                    self._futures[snap] = self._executor.submit(
+                        self._cached_load, snap
+                    )
+                futures.append(self._futures[snap])
+        return futures
 
     def _prefetch_neighbours(self, current: int) -> None:
         n = self._snap_table.count

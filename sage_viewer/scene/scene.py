@@ -89,6 +89,14 @@ class Scene:
         return self.primary.galaxy_layer
 
     @property
+    def fof_links_visible(self) -> bool:
+        return self.primary.fof_layer.visible
+
+    def set_fof_links_visible(self, visible: bool) -> None:
+        """Toggle FoF-link lines for the primary model."""
+        self.primary.fof_layer.visible = bool(visible)
+
+    @property
     def camera(self) -> CameraController:
         return self._camera
 
@@ -167,8 +175,9 @@ class Scene:
         if name == self._primary_name or name not in self._models:
             return
         old_primary_box = self.primary.box_size
-        # Hide the old primary
+        # Hide the old primary (including any FoF links it was showing)
         self._models[self._primary_name].visible = False
+        self._models[self._primary_name].fof_layer.visible = False
         self._primary_name = name
         # Hide any overlay that is now incompatible with the new primary
         for other_name, m in self._models.items():

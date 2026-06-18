@@ -54,6 +54,15 @@ class HaloSnapshot:
     rvir: np.ndarray        # (N,)   float32, Mpc/h  (computed from Mvir)
     vvir: np.ndarray        # (N,)   float32, km/s   (computed from Rvir)
     snap_num: int
+    # FoF-link segments: (M, 2, 3) float32, each row is a [satellite, central]
+    # position pair (Mpc/h). Built for groups whose central passes the halo
+    # mass cut. Used to draw FoF links; satellites themselves carry Mvir=0 in
+    # the lhalo trees so they don't appear in the mass-cut halo set.
+    fof_segments: np.ndarray = None   # (M, 2, 3) float32
+
+    def __post_init__(self) -> None:
+        if self.fof_segments is None:
+            self.fof_segments = np.empty((0, 2, 3), dtype=np.float32)
 
     @property
     def count(self) -> int:
@@ -66,6 +75,7 @@ class HaloSnapshot:
             positions=np.empty((0, 3), dtype=np.float32),
             masses=z, vmax=z, rvir=z, vvir=z,
             snap_num=snap_num,
+            fof_segments=np.empty((0, 2, 3), dtype=np.float32),
         )
 
 
@@ -74,37 +84,79 @@ def _read_tree_file(
     snap_num: int,
     mass_cut_msun: float,
     hubble_h: float,
+    box_size: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Read one lhalo_binary tree file and return (positions, masses) for snap_num."""
     if not tree_file.exists():
         return np.empty((0, 3), dtype=np.float32), np.empty(0, dtype=np.float32)
 
+    _empty = np.empty((0, 3), dtype=np.float32)
+    _empty_seg = np.empty((0, 2, 3), dtype=np.float32)
+    _empty_ret = (_empty, _empty, _empty, _empty, _empty, _empty_seg)
     with open(tree_file, "rb") as f:
         nforests = np.fromfile(f, dtype=np.int32, count=1)[0]
         nhalos_total = np.fromfile(f, dtype=np.int32, count=1)[0]
 
         if nhalos_total == 0:
-            return np.empty((0, 3), dtype=np.float32), np.empty(0, dtype=np.float32)
+            return _empty_ret
 
-        # Skip the per-forest halo counts header
-        np.fromfile(f, dtype=np.int32, count=nforests)
+        # Per-forest halo counts — needed to resolve FOF indices, which are
+        # local to each forest (tree), not to the whole file.
+        nhalos_per_forest = np.fromfile(f, dtype=np.int32, count=nforests)
         halos = np.fromfile(f, dtype=HALO_DTYPE, count=nhalos_total)
 
-    snap_mask = halos["SnapNum"] == snap_num
-    halos = halos[snap_mask]
-    if len(halos) == 0:
-        return np.empty((0, 3), dtype=np.float32), np.empty(0, dtype=np.float32)
+    # FirstHaloInFOFgroup is an index within the halo's own forest, so add the
+    # forest's base offset to get a global index into `halos` (the file-wide
+    # array). Satellites point to their group's central; centrals to self.
+    forest_offsets = np.zeros(nforests, dtype=np.int64)
+    if nforests > 1:
+        forest_offsets[1:] = np.cumsum(nhalos_per_forest.astype(np.int64))[:-1]
+    halo_forest = np.repeat(np.arange(nforests), nhalos_per_forest)
+    fof_idx = halos["FirstHaloInFOFgroup"]
+    global_central = forest_offsets[halo_forest] + fof_idx
+    valid = (fof_idx >= 0) & (global_central >= 0) & (global_central < len(halos))
 
-    # Mvir in tree files is in units of 1e10 Msun/h
-    mvir_tree = halos["Mvir"].astype(np.float32)          # 10^10 Msun/h
-    masses    = mvir_tree * 1.0e10 / hubble_h              # Msun
+    snap_glob = np.flatnonzero(halos["SnapNum"] == snap_num)
+    if len(snap_glob) == 0:
+        return _empty_ret
+    snap_halos = halos[snap_glob]
+
+    # Mvir in tree files is in units of 1e10 Msun/h. Satellites carry Mvir=0,
+    # so the mass cut keeps only FOF centrals (what we render as splats).
+    mvir_tree = snap_halos["Mvir"].astype(np.float32)     # 10^10 Msun/h
+    masses    = mvir_tree * 1.0e10 / hubble_h             # Msun
     mass_mask = masses > mass_cut_msun
+
+    # ---- FoF links: satellite -> central segments -------------------------
+    # Built across the FULL snapshot (not the mass-cut set) so satellites are
+    # included, but kept only for groups whose central is above the mass cut.
+    gc_snap   = global_central[snap_glob]
+    is_sat    = valid[snap_glob] & (gc_snap != snap_glob)
+    cen_mass  = halos["Mvir"][gc_snap].astype(np.float32) * 1.0e10 / hubble_h
+    seg_keep  = is_sat & (cen_mass > mass_cut_msun)
+    if np.any(seg_keep):
+        sat_pos  = snap_halos["Pos"][seg_keep]
+        cen_pos  = halos["Pos"][gc_snap[seg_keep]]
+        # Drop periodic-boundary wraps: a real intra-group link spans at most
+        # a few Mpc/h, so any segment longer than half the box across an axis
+        # is a satellite linking to its central's far-side periodic image.
+        if box_size > 0:
+            inside = np.all(np.abs(sat_pos - cen_pos) < 0.5 * box_size, axis=1)
+            sat_pos, cen_pos = sat_pos[inside], cen_pos[inside]
+        segments = (
+            np.stack([sat_pos, cen_pos], axis=1).astype(np.float32)
+            if len(sat_pos) else _empty_seg
+        )
+    else:
+        segments = _empty_seg
+
     return (
-        halos["Pos"][mass_mask],
+        snap_halos["Pos"][mass_mask],
         masses[mass_mask],
-        halos["Vmax"].astype(np.float32)[mass_mask],
+        snap_halos["Vmax"].astype(np.float32)[mass_mask],
         _compute_rvir(mvir_tree[mass_mask]),
         _compute_vvir(_compute_rvir(mvir_tree[mass_mask])),
+        segments,
     )
 
 
@@ -118,6 +170,7 @@ def load_halo_snapshot(
     max_halos: int = 100_000,
     hubble_h: float = 0.73,
     n_jobs: int = -1,
+    box_size: float = 0.0,
 ) -> HaloSnapshot:
     """Load halo positions and masses for one snapshot from lhalo_binary tree files.
 
@@ -141,7 +194,7 @@ def load_halo_snapshot(
     # prefer="threads": file I/O releases the GIL so threads are fully parallel
     # and avoid the semaphore / mmap leak that loky process pools produce
     results = Parallel(n_jobs=n_jobs, prefer="threads")(
-        delayed(_read_tree_file)(tf, snap_num, mass_cut, hubble_h)
+        delayed(_read_tree_file)(tf, snap_num, mass_cut, hubble_h, box_size)
         for tf in tree_files
     )
 
@@ -155,6 +208,8 @@ def load_halo_snapshot(
     vmax      = np.concatenate([r[2] for r in results])
     rvir      = np.concatenate([r[3] for r in results])
     vvir      = np.concatenate([r[4] for r in results])
+    # FoF segments are independent of the halo downsample below.
+    fof_segments = np.vstack([r[5] for r in results])
 
     if len(positions) > max_halos:
         rng = np.random.default_rng(42)
@@ -167,5 +222,5 @@ def load_halo_snapshot(
     return HaloSnapshot(
         positions=positions, masses=masses,
         vmax=vmax, rvir=rvir, vvir=vvir,
-        snap_num=snap_num,
+        snap_num=snap_num, fof_segments=fof_segments,
     )

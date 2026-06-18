@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 import numpy as np
 from trame.widgets import vuetify3 as v3
@@ -60,6 +61,7 @@ def build_toolbar(server, scene: Scene) -> None:
     state.is_reverse  = False
     state.is_repeat   = False
     state.rotate_mode = "off"
+    state.preload_status = ""   # non-empty while the snapshot cache warms
 
     # Plain dict — direction/repeat flags read from the play coroutine
     _ctl = {"reverse": False, "repeat": False, "rotate_mode": "off"}
@@ -87,7 +89,9 @@ def build_toolbar(server, scene: Scene) -> None:
         scene.set_snapshot(snap)
         state.snap_num   = snap
         state.snap_label = scene.snap_label
-        # No state.flush() here — let Trame batch state with the next render
+        # Push the snapshot index + label to the client every frame so the
+        # transport slider and the redshift chip track playback live.
+        state.flush()
         _push()
 
     # ------------------------------------------------------------------
@@ -123,14 +127,22 @@ def build_toolbar(server, scene: Scene) -> None:
                     next_snap = (scene.current_snap + 1) % snap_count
                     at_end    = next_snap == snap_count - 1
 
+                # Time the render work so the wait below holds a constant
+                # cadence regardless of how long the snapshot swap took —
+                # this keeps playback evenly paced instead of bunching up.
+                frame_start = time.perf_counter()
                 _go_to(next_snap)
+                work = time.perf_counter() - frame_start
 
                 if at_end and not _ctl["repeat"]:
                     break
 
-                # Sleep but break early if stop fires
+                # Sleep the remainder of the frame budget, but break early
+                # if stop fires. If the work already overran the budget we
+                # proceed immediately (sleep_for == 0).
+                sleep_for = max(0.0, interval - work)
                 try:
-                    await asyncio.wait_for(stop_evt.wait(), timeout=interval)
+                    await asyncio.wait_for(stop_evt.wait(), timeout=sleep_for)
                     break
                 except asyncio.TimeoutError:
                     pass
@@ -140,6 +152,7 @@ def build_toolbar(server, scene: Scene) -> None:
 
     @ctrl.set("play")
     async def on_play():
+        _start_preload()   # ensure cache warm-up has begun
         if _play_task[0] is not None and not _play_task[0].done():
             return
         _play_task[0] = asyncio.ensure_future(_play_loop())
@@ -207,6 +220,43 @@ def build_toolbar(server, scene: Scene) -> None:
             _rotate_task[0] = asyncio.ensure_future(_rotate_loop())
 
     # ------------------------------------------------------------------
+    # Snapshot preloading — warm the whole cache in the background so
+    # playback steps frame-to-frame without disk stalls. A status chip in
+    # the toolbar reports progress while it runs.
+    # ------------------------------------------------------------------
+
+    _preload_started = [False]
+
+    async def _preload_loop():
+        loader  = scene._loader
+        futures = loader.preload_all()
+        total   = len(futures)
+        if total == 0:
+            return
+        while True:
+            done = sum(1 for f in futures if f.done())
+            if done >= total:
+                break
+            state.preload_status = f"Caching snapshots  {done}/{total}"
+            state.flush()
+            await asyncio.sleep(0.25)
+        state.preload_status = ""
+        state.flush()
+
+    def _start_preload(**_):
+        if _preload_started[0]:
+            return
+        _preload_started[0] = True
+        try:
+            asyncio.ensure_future(_preload_loop())
+        except RuntimeError:
+            # No running loop yet — fall back to first play press.
+            _preload_started[0] = False
+
+    if hasattr(ctrl, "on_server_ready"):
+        ctrl.on_server_ready.add(_start_preload)
+
+    # ------------------------------------------------------------------
     # Widgets
     # ------------------------------------------------------------------
 
@@ -214,6 +264,17 @@ def build_toolbar(server, scene: Scene) -> None:
     # of the toolbar, immediately adjacent to the title / hamburger on
     # the left.
     v3.VSpacer()
+
+    # Cache warm-up indicator — sits just left of the transport controls and
+    # only shows while snapshots are still loading in the background.
+    v3.VChip(
+        "{{ preload_status }}",
+        v_show=("preload_status",),
+        size="small",
+        color="#FFD700",
+        prepend_icon="mdi-database-clock-outline",
+        style="font-family:monospace;margin-right:10px;",
+    )
 
     # Transport controls — leftmost of the right-hand cluster.
     with v3.VBtnGroup(variant="outlined", density="compact"):

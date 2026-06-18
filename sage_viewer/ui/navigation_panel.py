@@ -154,6 +154,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.env_show_isolated = True
     state.env_show_group    = True
     state.env_show_cluster  = True
+    state.fof_links_on      = False           # FoF-link gold lines toggle
     state.filter_gal_age    = [0.0, 14.0]    # Gyr  (mass-weighted stellar age)
 
     # ── Galaxy info panel ──────────────────────────────────────
@@ -476,6 +477,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.galinfo_items  = []
         state.groupinfo_show = False
         state.groupinfo_items = []
+        state.flush()
+        _push()
+
+    @ctrl.set("toggle_fof_links")
+    def on_toggle_fof_links():
+        new_state = not bool(state.fof_links_on)
+        scene.set_fof_links_visible(new_state)
+        state.fof_links_on = new_state
         state.flush()
         _push()
 
@@ -1969,6 +1978,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     density="compact",
                     prepend_icon="mdi-bullseye-arrow",
                     click=ctrl.highlight_group_members,
+                    style="margin-bottom:6px;",
+                )
+                v3.VBtn(
+                    "{{ fof_links_on ? 'FoF Links: On' : 'FoF Links: Off' }}",
+                    block=True, density="compact",
+                    variant=("fof_links_on ? 'flat' : 'outlined'",),
+                    color="#FFD700",
+                    prepend_icon="mdi-vector-polyline",
+                    click=ctrl.toggle_fof_links,
                     style="margin-bottom:6px;",
                 )
                 v3.VBtn(

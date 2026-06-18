@@ -54,6 +54,15 @@ _THEME_CSS = dedent("""
 .v-theme--dos_blue .v-field input,
 .v-theme--dos_blue input { font-size: 1.05rem !important; }
 .v-theme--dos_blue .v-chip { font-size: 1.0rem !important; }
+/* Slider value bubbles (thumb labels) — default is tiny and unreadable;
+   enlarge the bubble and its text on every slider / range slider. */
+.v-theme--dos_blue .v-slider-thumb__label {
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
+    min-width: 2.4em !important;
+    height: 1.9em !important;
+    padding: 0 6px !important;
+}
 .v-theme--dos_blue .v-select__selection-text { font-size: 1.0rem !important; }
 .v-theme--dos_blue .v-select__selection { font-size: 1.0rem !important; }
 .v-theme--dos_blue span { font-size: 1em; }       /* keep inheritance */

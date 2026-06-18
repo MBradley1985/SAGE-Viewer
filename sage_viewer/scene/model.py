@@ -9,6 +9,7 @@ from sage_viewer.config import SimConfig
 from sage_viewer.io.par_reader import parse_par
 from sage_viewer.io.snapshot_table import SnapshotTable
 from sage_viewer.parallel.loader import SnapshotLoader
+from sage_viewer.scene.fof_layer import FofLinkLayer
 from sage_viewer.scene.galaxy_layer import GalaxyLayer
 from sage_viewer.scene.halo_layer import HaloLayer
 
@@ -57,6 +58,7 @@ class Model:
         )
         self.halo_layer:   HaloLayer   = HaloLayer(plotter)
         self.galaxy_layer: GalaxyLayer = GalaxyLayer(plotter)
+        self.fof_layer:    FofLinkLayer = FofLinkLayer(plotter)
         self.fields_available: dict[str, bool] = self._detect_fields()
         self._current_snap: int = -1
 
@@ -99,6 +101,7 @@ class Model:
         halos, galaxies = self.loader.get(snap_num)
         self.halo_layer.update(halos)
         self.galaxy_layer.update(galaxies)
+        self.fof_layer.update(halos)
         self._current_snap = snap_num
 
     @property
