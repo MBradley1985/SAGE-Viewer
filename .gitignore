@@ -62,3 +62,5 @@ sage_library/
 *.jpeg
 *.tif
 *.tiff
+
+.claude/settings.local.json
