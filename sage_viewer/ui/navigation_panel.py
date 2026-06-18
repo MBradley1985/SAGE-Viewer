@@ -2351,6 +2351,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     min=10.0, max=15.0, step=0.1,
                     thumb_label=True, color="cyan",
                     density="compact", hide_details=True,
+                    classes="sage-fslider",
                     style=_FSLD,
                 )
                 v3.VLabel("Rvir  (Mpc/h)", style=_FLBL)
@@ -2359,6 +2360,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     min=0.0, max=3.0, step=0.05,
                     thumb_label=True, color="cyan",
                     density="compact", hide_details=True,
+                    classes="sage-fslider",
                     style=_FSLD,
                 )
                 v3.VLabel("Vvir  (km/s)", style=_FLBL)
@@ -2367,6 +2369,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     min=0.0, max=1000.0, step=10.0,
                     thumb_label=True, color="cyan",
                     density="compact", hide_details=True,
+                    classes="sage-fslider",
                     style=_FSLD,
                 )
 
@@ -2379,6 +2382,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     min=8.0, max=12.5, step=0.1,
                     thumb_label=True, color="#FFD700",
                     density="compact", hide_details=True,
+                    classes="sage-fslider",
                     style=_FSLD,
                 )
                 v3.VLabel("sSFR  (log10 yr^-1)", style=_FLBL)
@@ -2387,6 +2391,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     min=-14.0, max=-8.0, step=0.1,
                     thumb_label=True, color="#FFD700",
                     density="compact", hide_details=True,
+                    classes="sage-fslider",
                     style=_FSLD,
                 )
                 v3.VLabel("B / T  (bulge / stellar)", style=_FLBL)
@@ -2395,6 +2400,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     min=0.0, max=1.0, step=0.02,
                     thumb_label=True, color="#FFD700",
                     density="compact", hide_details=True,
+                    classes="sage-fslider",
                     style=_FSLD,
                 )
                 v3.VLabel("Stellar age  (Gyr, mass-weighted)", style=_FLBL)
@@ -2404,6 +2410,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     thumb_label=True, color="#FFD700",
                     density="compact", hide_details=True,
                     disabled=("!model_fields.mean_age",),
+                    classes="sage-fslider",
                     style=_FSLD,
                 )
                 v3.VLabel("BH mass  (log10 Msun)", style=_FLBL)
@@ -2413,6 +2420,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     thumb_label=True, color="#FFD700",
                     density="compact", hide_details=True,
                     disabled=("!model_fields.bh_mass",),
+                    classes="sage-fslider",
                     style=_FSLD,
                 )
                 v3.VLabel("ICS mass  (log10 Msun)", style=_FLBL)
@@ -2422,6 +2430,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     thumb_label=True, color="#FFD700",
                     density="compact", hide_details=True,
                     disabled=("!model_fields.ics_mass",),
+                    classes="sage-fslider",
                     style=_FSLD,
                 )
 

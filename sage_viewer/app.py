@@ -63,6 +63,12 @@ _THEME_CSS = dedent("""
     height: 1.9em !important;
     padding: 0 6px !important;
 }
+/* Filter range sliders are rendered at transform:scale(0.7) to save space,
+   which shrinks their value bubble. Bump the font so the on-screen size
+   matches the (unscaled) opacity sliders: 1.5rem * 0.7 ~= 1.05rem. */
+.v-theme--dos_blue .sage-fslider .v-slider-thumb__label {
+    font-size: 1.5rem !important;
+}
 .v-theme--dos_blue .v-select__selection-text { font-size: 1.0rem !important; }
 .v-theme--dos_blue .v-select__selection { font-size: 1.0rem !important; }
 .v-theme--dos_blue span { font-size: 1em; }       /* keep inheritance */
