@@ -77,14 +77,23 @@ def build_toolbar(server, scene: Scene) -> None:
     _stop_evt: list[asyncio.Event | None] = [None]
     _play_task: list[asyncio.Task | None] = [None]
     _rotate_task: list[asyncio.Task | None] = [None]
+    # While True, internal snapshot changes (the pre-render sweep) don't push
+    # snap_num / snap_label to the client, so the slider and the redshift/scale
+    # readout stay still during loading.
+    _suppress_snap = [False]
 
     def _get_stop_evt() -> asyncio.Event:
         if _stop_evt[0] is None:
             _stop_evt[0] = asyncio.Event()
         return _stop_evt[0]
 
+    def _on_snap_change(n):
+        if _suppress_snap[0]:
+            return
+        state.update({"snap_num": n, "snap_label": scene.snap_label})
+
     scene.register_snap_change_callback(
-        lambda n: state.update({"snap_num": n, "snap_label": scene.snap_label})
+        lambda n: _on_snap_change(n)
     )
 
     def _push():
@@ -208,7 +217,7 @@ def build_toolbar(server, scene: Scene) -> None:
                     state.playback_frame  = url
                     state.playback_active = True
                 done += 1
-                state.preload_status = f"Loading galaxies.....  {done}/{total}"
+                state.preload_status = f"Loading snapshots...  {done}/{total}"
                 state.flush()
                 await asyncio.sleep(0)
         finally:
@@ -276,8 +285,12 @@ def build_toolbar(server, scene: Scene) -> None:
             order = list(range(start, -1, -1))
         else:
             order = list(range(start, snap_count))
+        # Freeze the slider + redshift readout while rendering — the snapshot
+        # sweep below shouldn't drag them around.
+        _suppress_snap[0] = True
         await _render_frames(order)   # raises the overlay itself
         if stop_evt.is_set():
+            _suppress_snap[0] = False
             state.playback_active = False
             state.flush()
             return
@@ -286,6 +299,7 @@ def build_toolbar(server, scene: Scene) -> None:
         # no flash of the selected snapshot, no jump.
         scene.set_snapshot(order[-1])
         _push()
+        _suppress_snap[0] = False   # playback drives the slider from here
         await _image_playback(order)
         # Ended naturally — the live view is already on the final snapshot, so
         # just drop the overlay (after giving the live frame a moment to land).
@@ -315,6 +329,7 @@ def build_toolbar(server, scene: Scene) -> None:
             _stop_evt[0].set()
         if _play_task[0] is not None and not _play_task[0].done():
             _play_task[0].cancel()
+        _suppress_snap[0] = False
         state.is_playing = False
         state.playback_active = False
         state.prerender_busy  = False
@@ -398,7 +413,7 @@ def build_toolbar(server, scene: Scene) -> None:
             done = sum(1 for f in futures if f.done())
             if done >= total:
                 break
-            state.preload_status = f"Loading galaxies.....  {done}/{total}"
+            state.preload_status = f"Loading snapshots...  {done}/{total}"
             state.flush()
             await asyncio.sleep(0.25)
         _preload_done[0] = True
