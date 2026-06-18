@@ -345,7 +345,7 @@ def create_app(
             tb.density = "compact"
             tb.color = "#1a1a2e"
 
-            # ── Tabs menu (hamburger) ──────────────────────────────────────
+            # ── Explore Mode menu (hamburger) — tabs + model switching ────────
             with v3.VMenu(close_on_content_click=False):
                 with v3.Template(v_slot_activator="{ props }"):
                     v3.VBtn(
@@ -353,9 +353,10 @@ def create_app(
                         variant="text",
                         density="compact",
                         v_bind="props",
-                        title="Navigation tabs",
+                        title="Explore Mode",
                     )
                 with v3.VList(density="compact", bg_color="#1a1a2e"):
+                    # ── Tabs ──────────────────────────────────────
                     for label, value in _NAV_TABS:
                         v3.VListItem(
                             title=label,
@@ -364,20 +365,9 @@ def create_app(
                             active=(f"nav_active_tab === '{value}'",),
                             color="cyan",
                         )
-
-            # ── Models menu (separate button) ──────────────────────────────
-            with v3.VMenu(close_on_content_click=False):
-                with v3.Template(v_slot_activator="{ props }"):
-                    v3.VBtn(
-                        icon="mdi-database-cog",
-                        variant="text",
-                        density="compact",
-                        v_bind="props",
-                        title="Models",
-                    )
-                with v3.VList(density="compact", bg_color="#1a1a2e"):
-                    v3.VListSubheader("EXPLORE MODE", style="color:#FFD700;font-size:0.65rem;")
+                    # ── Models ────────────────────────────────────
                     if discovered:
+                        v3.VDivider()
                         for entry in discovered:
                             mname = entry["name"]
                             v3.VListItem(
@@ -414,21 +404,16 @@ def create_app(
                                 density="compact",
                                 style="padding-left:24px;font-size:0.7rem;",
                             )
-                    else:
-                        v3.VListItem(
-                            title="No models found",
-                            subtitle="Check your output directory",
-                            disabled=True,
-                        )
-                    v3.VDivider(style="margin:4px 0;")
-                    v3.VListSubheader("LAUNCH MODE", style="color:#06b6d4;font-size:0.65rem;")
-                    v3.VListItem(
-                        title="Wizard",
-                        subtitle="Run  sage-viewer  (no args) to start wizard",
-                        prepend_icon="mdi-rocket-launch",
-                        disabled=True,
-                        style="opacity:0.6;",
-                    )
+
+            # ── Launch Mode button ─────────────────────────────────────────
+            v3.VBtn(
+                icon="mdi-rocket-launch",
+                variant="text",
+                density="compact",
+                title="Launch Mode  (run sage-viewer with no arguments)",
+                disabled=True,
+                style="opacity:0.45;",
+            )
 
             # Title
             v3.VToolbarTitle(
