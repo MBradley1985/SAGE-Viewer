@@ -7,7 +7,7 @@ from sage_viewer.wizard.controller import WizardController, _STEPS
 
 
 _WIZ_CSS = """
-.wiz-title { color: #FFD700; font-weight: 700; letter-spacing: 0.08em; }
+.wiz-title { color: #06b6d4; font-weight: 700; letter-spacing: 0.08em; }
 .wiz-ok    { color: #22c55e; }
 .wiz-warn  { color: #f59e0b; }
 .wiz-err   { color: #ef4444; font-weight: 600; }
@@ -28,7 +28,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
 
     with html.Div(
         style=(
-            "display:flex;flex-direction:column;height:100vh;"
+            "display:flex;flex-direction:column;height:100%;"
             "background:#0a0a1a;font-family:monospace;"
         ),
     ):
@@ -37,15 +37,15 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
         # ── Header ──────────────────────────────────────────────────────────
         with html.Div(
             style=(
-                "background:#1a1a2e;border-bottom:2px solid #FFD700;"
+                "background:#1a1a2e;border-bottom:2px solid #06b6d4;"
                 "padding:10px 20px;display:flex;align-items:center;gap:12px;"
                 "flex-shrink:0;"
             ),
         ):
-            v3.VIcon("mdi-rocket-launch", color="#FFD700", size="large")
+            v3.VIcon("mdi-rocket-launch", color="#06b6d4", size="large")
             html.Span(
                 "SAGE-Viewer",
-                style="font-size:1.3rem;font-weight:700;color:#FFD700;",
+                style="font-size:1.3rem;font-weight:700;color:#06b6d4;",
             )
             html.Span(
                 "Launch Mode",
@@ -55,7 +55,22 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                 ),
             )
             v3.VSpacer()
-            # Close button — only meaningful when wizard is embedded in Explore Mode
+            # Step indicator chips
+            with html.Div(style="display:flex;gap:6px;align-items:center;"):
+                for i, label in enumerate(_STEPS):
+                    v3.VChip(
+                        label,
+                        size="small",
+                        color=(
+                            f"wiz_step === {i} ? '#06b6d4' : "
+                            f"(wiz_step > {i} ? '#22c55e' : '#374151')",
+                        ),
+                        variant=(
+                            f"wiz_step === {i} ? 'elevated' : 'outlined'",
+                        ),
+                        style="font-family:monospace;font-size:0.7rem;",
+                    )
+            # Close button — only shown when embedded in Explore Mode
             v3.VBtn(
                 icon="mdi-close",
                 variant="text",
@@ -64,22 +79,8 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                 title="Close wizard and return to Explore Mode",
                 click=server.controller.wiz_close,
                 v_show=("wiz_active !== undefined",),
+                style="margin-left:8px;",
             )
-            # Step indicator chips
-            with html.Div(style="display:flex;gap:6px;align-items:center;"):
-                for i, label in enumerate(_STEPS):
-                    v3.VChip(
-                        label,
-                        size="small",
-                        color=(
-                            f"wiz_step === {i} ? '#FFD700' : "
-                            f"(wiz_step > {i} ? '#22c55e' : '#374151')",
-                        ),
-                        variant=(
-                            f"wiz_step === {i} ? 'elevated' : 'outlined'",
-                        ),
-                        style="font-family:monospace;font-size:0.7rem;",
-                    )
 
         # ── Main area ────────────────────────────────────────────────────────
         with html.Div(
@@ -91,7 +92,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
             with v3.VCard(
                 style=(
                     "width:860px;max-width:96vw;height:640px;max-height:80vh;"
-                    "background:#1a1a2e;border:2px solid #FFD700;"
+                    "background:#1a1a2e;border:2px solid #06b6d4;"
                     "display:flex;flex-direction:column;"
                 ),
                 elevation=0,
@@ -112,7 +113,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                         key="idx",
                     ):
                         html.Div(
-                            "{{ line.text || ' ' }}",
+                            "{{ line.text || ' ' }}",
                             classes=("'wiz-' + line.kind",),
                             style="white-space:pre-wrap;",
                         )
@@ -153,7 +154,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                     v3.VProgressLinear(
                         v_show=("wiz_busy",),
                         indeterminate=True,
-                        color="#FFD700",
+                        color="#06b6d4",
                         height=3,
                         style="width:100%;",
                     )
@@ -168,7 +169,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                             v3.VBtn(
                                 "{{ ch.label }}",
                                 prepend_icon=("ch.icon",),
-                                color=("#FFD700" if True else ""),
+                                color="#06b6d4",
                                 variant="outlined",
                                 size="small",
                                 disabled=("ch.disabled",),

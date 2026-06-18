@@ -18,7 +18,7 @@ _STEPS = [
 ]
 
 _KIND_COLORS = {
-    "title": "#FFD700",
+    "title": "#06b6d4",
     "ok":    "#22c55e",
     "warn":  "#f59e0b",
     "err":   "#ef4444",
