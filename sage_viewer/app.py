@@ -443,7 +443,8 @@ def create_app(
                                 "m.primary ? 'mdi-check-circle' : 'mdi-circle-outline'",
                             ),
                             click=(server.controller.switch_model, "[m.name]"),
-                            color=("m.primary ? '#22c55e' : 'cyan'",),
+                            active=("m.primary",),
+                            color="cyan",
                         )
                         v3.VListItem(
                             title=(
