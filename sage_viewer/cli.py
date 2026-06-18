@@ -15,9 +15,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--par",
-        required=True,
+        default=None,
         metavar="FILE",
-        help="Path to SAGE .par file (e.g. input/millennium.par)",
+        help=(
+            "Path to SAGE .par file (e.g. input/millennium.par). "
+            "Omit to start in Launch Mode (interactive setup wizard)."
+        ),
     )
     p.add_argument(
         "--par-dir",
@@ -88,17 +91,35 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
 
+    if args.par is None:
+        _launch_mode(args)
+    else:
+        _explore_mode(args)
+
+
+def _launch_mode(args) -> None:
+    from sage_viewer._version import __version__ as _ver
+    print(f"\nSAGE-Viewer {_ver}  —  Launch Mode")
+    print(f"Port     : {args.port}")
+    print(f"\n  --> Open http://localhost:{args.port} in your browser\n")
+
+    from sage_viewer.wizard.launch import create_launch_app
+    server = create_launch_app(port=args.port)
+    server.start(port=args.port, open_browser=False)
+
+
+def _explore_mode(args) -> None:
     par_path = Path(args.par)
     if not par_path.exists():
         print(f"Error: par file not found: {par_path}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"\nSAGE-Viewer {__version__}")
+    from sage_viewer._version import __version__ as _ver
+    print(f"\nSAGE-Viewer {_ver}  —  Explore Mode")
     print(f"Par file : {par_path.resolve()}")
     print(f"Workers  : {args.n_jobs}")
     print("\n[1/4] Parsing par file and snapshot table...")
 
-    # Import here so CLI --help/--version are fast
     from sage_viewer.app import create_app
 
     print("[2/4] Loading initial snapshot (haloes + galaxies)...")
@@ -113,7 +134,6 @@ def main(argv: list[str] | None = None) -> None:
         max_galaxies=args.max_galaxies,
     )
     print("[3/4] Building scene and Trame UI...")
-
     print(f"Snapshot : {scene.snap_label}")
     print(f"[4/4] Starting server on port {args.port}...")
     print(f"\n  --> Open http://localhost:{args.port} in your browser\n")

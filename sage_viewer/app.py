@@ -345,7 +345,7 @@ def create_app(
             tb.density = "compact"
             tb.color = "#1a1a2e"
 
-            # Tab dropdown menu — sits in the natural nav-icon position
+            # ── Tabs menu (hamburger) ──────────────────────────────────────
             with v3.VMenu(close_on_content_click=False):
                 with v3.Template(v_slot_activator="{ props }"):
                     v3.VBtn(
@@ -353,10 +353,9 @@ def create_app(
                         variant="text",
                         density="compact",
                         v_bind="props",
-                        title="Tab menu",
+                        title="Navigation tabs",
                     )
                 with v3.VList(density="compact", bg_color="#1a1a2e"):
-                    # ── Tabs ───────────────────────────────────────
                     for label, value in _NAV_TABS:
                         v3.VListItem(
                             title=label,
@@ -366,12 +365,21 @@ def create_app(
                             color="cyan",
                         )
 
-                    # ── Models (one row per discovered output folder) ──
+            # ── Models menu (separate button) ──────────────────────────────
+            with v3.VMenu(close_on_content_click=False):
+                with v3.Template(v_slot_activator="{ props }"):
+                    v3.VBtn(
+                        icon="mdi-database-cog",
+                        variant="text",
+                        density="compact",
+                        v_bind="props",
+                        title="Models",
+                    )
+                with v3.VList(density="compact", bg_color="#1a1a2e"):
+                    v3.VListSubheader("EXPLORE MODE", style="color:#FFD700;font-size:0.65rem;")
                     if discovered:
-                        v3.VDivider()
                         for entry in discovered:
                             mname = entry["name"]
-                            # Switch row
                             v3.VListItem(
                                 title=mname,
                                 subtitle=(
@@ -389,8 +397,6 @@ def create_app(
                                 active=(f"primary_model === '{mname}'",),
                                 color="cyan",
                             )
-                            # Overlay sub-row (shown only when model is loaded
-                            # and compatible with the current primary)
                             v3.VListItem(
                                 title=(
                                     f"model_flags['{mname}'] && "
@@ -408,9 +414,23 @@ def create_app(
                                 density="compact",
                                 style="padding-left:24px;font-size:0.7rem;",
                             )
+                    else:
+                        v3.VListItem(
+                            title="No models found",
+                            subtitle="Check your output directory",
+                            disabled=True,
+                        )
+                    v3.VDivider(style="margin:4px 0;")
+                    v3.VListSubheader("LAUNCH MODE", style="color:#06b6d4;font-size:0.65rem;")
+                    v3.VListItem(
+                        title="Wizard",
+                        subtitle="Run  sage-viewer  (no args) to start wizard",
+                        prepend_icon="mdi-rocket-launch",
+                        disabled=True,
+                        style="opacity:0.6;",
+                    )
 
-            # Title sits directly to the right of the hamburger menu —
-            # both kept close together on the LEFT side of the toolbar.
+            # Title
             v3.VToolbarTitle(
                 "SAGE-Viewer",
                 style="padding-left:4px;",
