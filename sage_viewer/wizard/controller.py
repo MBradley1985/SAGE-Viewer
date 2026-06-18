@@ -30,10 +30,20 @@ _KIND_COLORS = {
 
 
 class WizardController:
-    def __init__(self, server, port: int) -> None:
-        self._sv   = server
-        self._st   = server.state
-        self._port = port
+    def __init__(
+        self,
+        server,
+        port: int,
+        *,
+        scene=None,
+        on_model_loaded=None,
+        auto_start: bool = True,
+    ) -> None:
+        self._sv             = server
+        self._st             = server.state
+        self._port           = port
+        self._scene          = scene          # None in Launch Mode
+        self._on_model_loaded = on_model_loaded  # called on completion in Explore Mode
 
         self._sage26_dir: Path | None = None
         self._par_path:   Path | None = None
@@ -48,8 +58,28 @@ class WizardController:
         self._st.wiz_kind_colors = _KIND_COLORS
 
         server.controller.set("wiz_choose")(self._on_choice)
+        server.controller.set("wiz_close")(self._on_close)
 
+        if auto_start:
+            asyncio.ensure_future(self._step_scan())
+
+    def reset_and_start(self) -> None:
+        """Clear terminal and restart the scan — used when re-opening wizard."""
+        self._sage26_dir = None
+        self._par_path   = None
+        self._models     = []
+        self._st.wiz_step     = 0
+        self._st.wiz_lines    = []
+        self._st.wiz_choices  = []
+        self._st.wiz_busy     = True
+        self._st.wiz_par_show = False
+        self._st.wiz_par_text = ""
+        self._st.flush()
         asyncio.ensure_future(self._step_scan())
+
+    def _on_close(self, **_) -> None:
+        self._st.wiz_active = False
+        self._st.flush()
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -405,18 +435,34 @@ class WizardController:
         self._st.wiz_step = 5
         self._emit("", "info")
         self._emit(f"Loading model: {par_path.parent.name}", "title")
-        self._emit("Starting Explore Mode...", "info")
-        self._emit("Your browser will reconnect in a few seconds.", "info")
-        self._st.flush()
-        await asyncio.sleep(1.5)
 
-        sage_cmd = shutil.which("sage-viewer")
-        if sage_cmd:
-            os.execv(sage_cmd, [
-                sage_cmd, "--par", str(par_path), "--port", str(self._port),
-            ])
+        if self._on_model_loaded is not None:
+            # Embedded in Explore Mode — load into the existing scene
+            self._emit("Adding model to current session...", "info")
+            self._st.flush()
+            await asyncio.sleep(0.3)
+            try:
+                self._on_model_loaded(par_path)
+                self._emit("Done! Closing wizard.", "ok")
+                self._st.flush()
+                await asyncio.sleep(0.8)
+                self._st.wiz_active = False
+                self._st.flush()
+            except Exception as exc:
+                self._emit(f"Error loading model: {exc}", "err")
         else:
-            os.execv(sys.executable, [
-                sys.executable, "-m", "sage_viewer",
-                "--par", str(par_path), "--port", str(self._port),
-            ])
+            # Standalone Launch Mode — restart as Explore Mode via execv
+            self._emit("Starting Explore Mode...", "info")
+            self._emit("Your browser will reconnect in a few seconds.", "info")
+            self._st.flush()
+            await asyncio.sleep(1.5)
+            sage_cmd = shutil.which("sage-viewer")
+            if sage_cmd:
+                os.execv(sage_cmd, [
+                    sage_cmd, "--par", str(par_path), "--port", str(self._port),
+                ])
+            else:
+                os.execv(sys.executable, [
+                    sys.executable, "-m", "sage_viewer",
+                    "--par", str(par_path), "--port", str(self._port),
+                ])

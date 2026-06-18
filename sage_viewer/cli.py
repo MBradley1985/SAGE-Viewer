@@ -132,6 +132,7 @@ def _explore_mode(args) -> None:
         min_stellar_mass=args.min_stellar_mass,
         max_halos=args.max_halos,
         max_galaxies=args.max_galaxies,
+        port=args.port,
     )
     print("[3/4] Building scene and Trame UI...")
     print(f"Snapshot : {scene.snap_label}")

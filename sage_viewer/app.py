@@ -108,6 +108,7 @@ def create_app(
     min_stellar_mass: float = 1.0e8,
     max_halos: int = 100_000,
     max_galaxies: int = 100_000,
+    port: int = 8080,
 ):
     scene = Scene(
         primary_par_path=par_path,
@@ -325,6 +326,35 @@ def create_app(
             server.state.model_loading = False
             _refresh_models_state()
 
+    # ── Launch Mode wizard (embedded overlay) ────────────────────────────────
+    from sage_viewer.wizard.controller import WizardController
+    from sage_viewer.wizard.ui import build_wizard_ui
+
+    server.state.wiz_active = False
+
+    def _on_wizard_model(par_path):
+        """Called by the wizard when a model is ready; loads it into the scene."""
+        from pathlib import Path as _P
+        par_path = _P(par_path)
+        name = par_path.parent.name
+        if not scene.has_model(name):
+            scene.add_model(par_path)
+        scene.switch_primary(name)
+        _refresh_models_state()
+
+    _wiz_ctrl = WizardController(
+        server,
+        port=port,
+        scene=scene,
+        on_model_loaded=_on_wizard_model,
+        auto_start=False,
+    )
+
+    @server.state.change("wiz_active")
+    def _on_wiz_active(wiz_active, **_):
+        if wiz_active:
+            _wiz_ctrl.reset_and_start()
+
     # `theme=("ui_theme",)` reactively binds the active Vuetify theme to
     # our state variable — Vuetify swaps the entire palette plus the root
     # `v-theme--<name>` class instantly when ui_theme changes.
@@ -345,7 +375,7 @@ def create_app(
             tb.density = "compact"
             tb.color = "#1a1a2e"
 
-            # ── Explore Mode menu (hamburger) — tabs + model switching ────────
+            # ── Explore Mode menu (hamburger) — tabs only ──────────────────
             with v3.VMenu(close_on_content_click=False):
                 with v3.Template(v_slot_activator="{ props }"):
                     v3.VBtn(
@@ -356,7 +386,6 @@ def create_app(
                         title="Explore Mode",
                     )
                 with v3.VList(density="compact", bg_color="#1a1a2e"):
-                    # ── Tabs ──────────────────────────────────────
                     for label, value in _NAV_TABS:
                         v3.VListItem(
                             title=label,
@@ -365,55 +394,68 @@ def create_app(
                             active=(f"nav_active_tab === '{value}'",),
                             color="cyan",
                         )
-                    # ── Models ────────────────────────────────────
-                    if discovered:
-                        v3.VDivider()
-                        for entry in discovered:
-                            mname = entry["name"]
-                            v3.VListItem(
-                                title=mname,
-                                subtitle=(
-                                    f"model_flags['{mname}'] && "
-                                    f"model_flags['{mname}'].primary "
-                                    f"? 'primary' : "
-                                    f"(model_flags['{mname}'] && "
-                                    f"model_flags['{mname}'].overlay "
-                                    f"? 'overlay on' : 'click to switch')",
-                                ),
-                                click=(
-                                    server.controller.switch_model,
-                                    f"['{mname}']",
-                                ),
-                                active=(f"primary_model === '{mname}'",),
-                                color="cyan",
-                            )
-                            v3.VListItem(
-                                title=(
-                                    f"model_flags['{mname}'] && "
-                                    f"model_flags['{mname}'].overlay "
-                                    f"? '✓ overlay: {mname}' "
-                                    f": '+ overlay: {mname}'",
-                                ),
-                                click=(
-                                    server.controller.toggle_overlay,
-                                    f"['{mname}']",
-                                ),
-                                v_show=(
-                                    f"primary_model !== '{mname}'",
-                                ),
-                                density="compact",
-                                style="padding-left:24px;font-size:0.7rem;",
-                            )
 
-            # ── Launch Mode button ─────────────────────────────────────────
-            v3.VBtn(
-                icon="mdi-rocket-launch",
-                variant="text",
-                density="compact",
-                title="Launch Mode  (run sage-viewer with no arguments)",
-                disabled=True,
-                style="opacity:0.45;",
-            )
+            # ── Launch Mode button — wizard + models ───────────────────────
+            with v3.VMenu(close_on_content_click=False):
+                with v3.Template(v_slot_activator="{ props }"):
+                    v3.VBtn(
+                        icon="mdi-rocket-launch",
+                        variant="text",
+                        density="compact",
+                        v_bind="props",
+                        title="Launch Mode",
+                    )
+                with v3.VList(density="compact", bg_color="#1a1a2e"):
+                    # ── Launch Mode at the top ─────────────────────────────
+                    v3.VListSubheader(
+                        "LAUNCH MODE",
+                        style="color:#FFD700;font-size:0.65rem;",
+                    )
+                    v3.VListItem(
+                        title="Setup Wizard",
+                        subtitle="Add a model or run SAGE26",
+                        prepend_icon="mdi-console",
+                        click="wiz_active = true",
+                        color="#FFD700",
+                    )
+                    v3.VDivider(style="margin:4px 0;")
+                    # ── Models below ──────────────────────────────────────
+                    v3.VListSubheader(
+                        "MODELS",
+                        style="color:#9ca3af;font-size:0.65rem;",
+                        v_show=("models_list && models_list.length > 0",),
+                    )
+                    # v-for on models_list sorted primary-first reactively
+                    with html.Div(
+                        v_for=(
+                            "m in [...models_list].sort("
+                            "(a,b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0))",
+                        ),
+                        key=("m.name",),
+                    ):
+                        v3.VListItem(
+                            title=("m.name",),
+                            subtitle=(
+                                "m.primary ? 'primary' : "
+                                "(m.overlay ? 'overlay on' : 'click to switch')",
+                            ),
+                            prepend_icon=(
+                                "m.primary ? 'mdi-check-circle' : 'mdi-circle-outline'",
+                            ),
+                            click=(server.controller.switch_model, "[m.name]"),
+                            color=("m.primary ? '#22c55e' : 'cyan'",),
+                        )
+                        v3.VListItem(
+                            title=(
+                                "m.overlay "
+                                "? '✓ overlay: ' + m.name "
+                                ": '+ overlay: ' + m.name",
+                            ),
+                            click=(server.controller.toggle_overlay, "[m.name]"),
+                            v_show=("!m.primary",),
+                            density="compact",
+                            style="padding-left:24px;font-size:0.7rem;",
+                        )
 
             # Title
             v3.VToolbarTitle(
@@ -447,6 +489,7 @@ def create_app(
 
             with v3.VSheet(
                 style=(
+                    "position:relative;"
                     "display:flex;flex-direction:row;"
                     "height:100%;width:100%;overflow:hidden;"
                 ),
@@ -454,6 +497,16 @@ def create_app(
                 elevation=0,
                 color="#0a0a0f",
             ):
+                # ── Launch Mode wizard overlay ─────────────────────────────
+                with html.Div(
+                    v_show=("wiz_active",),
+                    style=(
+                        "position:absolute;inset:0;z-index:50;"
+                        "background:#0a0a1a;overflow:hidden;"
+                    ),
+                ):
+                    build_wizard_ui(server, _wiz_ctrl)
+
                 # Render window + loading overlay
                 with v3.VSheet(
                     style="position:relative;flex:1;height:100%;display:flex;min-width:0;",

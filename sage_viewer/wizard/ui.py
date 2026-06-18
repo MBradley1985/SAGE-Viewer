@@ -55,6 +55,16 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                 ),
             )
             v3.VSpacer()
+            # Close button — only meaningful when wizard is embedded in Explore Mode
+            v3.VBtn(
+                icon="mdi-close",
+                variant="text",
+                color="#9ca3af",
+                size="small",
+                title="Close wizard and return to Explore Mode",
+                click=server.controller.wiz_close,
+                v_show=("wiz_active !== undefined",),
+            )
             # Step indicator chips
             with html.Div(style="display:flex;gap:6px;align-items:center;"):
                 for i, label in enumerate(_STEPS):
