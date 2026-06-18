@@ -105,6 +105,11 @@ class SnapshotLoader:
         """Kick off background loads of every snapshot. Returns the futures
         so a caller can track progress. Already-loaded / in-flight snapshots
         are not resubmitted."""
+        # Silence per-snapshot load chatter so it doesn't bury the startup
+        # browser URL in the terminal.
+        from sage_viewer.io import halo_reader, galaxy_reader
+        halo_reader.VERBOSE = False
+        galaxy_reader.VERBOSE = False
         n = self._snap_table.count
         futures: list[Future] = []
         with self._lock:

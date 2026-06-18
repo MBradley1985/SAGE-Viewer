@@ -34,6 +34,10 @@ HALO_DTYPE = np.dtype([
 _RHOCRIT0 = 27.75  # critical density at z=0, units: 10^10 Msun/h per (Mpc/h)^3
 _DELTA    = 200.0  # virial overdensity
 
+# Per-snapshot load chatter is silenced (e.g. during background preload) by
+# flipping this off, so the startup browser URL isn't buried in the terminal.
+VERBOSE = True
+
 
 def _compute_rvir(mvir_tree: np.ndarray) -> np.ndarray:
     """Rvir in Mpc/h from Mvir in 10^10 Msun/h (z=0 approximation)."""
@@ -189,7 +193,8 @@ def load_halo_snapshot(
         for i in range(first_file, last_file + 1)
     ]
     n_files = len(tree_files)
-    print(f"  Haloes: reading {n_files} tree file(s) in parallel (snap {snap_num})...")
+    if VERBOSE:
+        print(f"  Haloes: reading {n_files} tree file(s) in parallel (snap {snap_num})...")
 
     # prefer="threads": file I/O releases the GIL so threads are fully parallel
     # and avoid the semaphore / mmap leak that loky process pools produce
@@ -200,7 +205,8 @@ def load_halo_snapshot(
 
     results = [r for r in results if len(r[0]) > 0]
     if not results:
-        print(f"  Haloes: none found above mass cut ({mass_cut:.1e} Msun)")
+        if VERBOSE:
+            print(f"  Haloes: none found above mass cut ({mass_cut:.1e} Msun)")
         return HaloSnapshot.empty(snap_num)
 
     positions = np.vstack([r[0] for r in results])
@@ -218,7 +224,8 @@ def load_halo_snapshot(
             positions[idx], masses[idx], vmax[idx], rvir[idx], vvir[idx]
         )
 
-    print(f"  Haloes: {len(positions):,} loaded")
+    if VERBOSE:
+        print(f"  Haloes: {len(positions):,} loaded")
     return HaloSnapshot(
         positions=positions, masses=masses,
         vmax=vmax, rvir=rvir, vvir=vvir,

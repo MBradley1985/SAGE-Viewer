@@ -55,6 +55,9 @@ class GalaxySnapshot:
         )
 
 
+VERBOSE = True
+
+
 def load_galaxy_snapshot(
     hdf5_path: str | Path,
     snap_num: int,
@@ -86,10 +89,12 @@ def load_galaxy_snapshot(
     hdf5_path = Path(hdf5_path)
     group_key = f"Snap_{snap_num}"
 
-    print(f"  Galaxies: reading {hdf5_path.name} / {group_key}...")
+    if VERBOSE:
+        print(f"  Galaxies: reading {hdf5_path.name} / {group_key}...")
     with h5py.File(hdf5_path, "r") as f:
         if group_key not in f:
-            print(f"  Galaxies: group {group_key} not found — empty snapshot")
+            if VERBOSE:
+                print(f"  Galaxies: group {group_key} not found — empty snapshot")
             return GalaxySnapshot.empty(snap_num)
 
         grp = f[group_key]
@@ -158,7 +163,8 @@ def load_galaxy_snapshot(
         rng = np.random.default_rng(42)
         indices = rng.choice(indices, max_galaxies, replace=False)
 
-    print(f"  Galaxies: {len(indices):,} loaded")
+    if VERBOSE:
+        print(f"  Galaxies: {len(indices):,} loaded")
     positions = np.column_stack(
         [posx[indices], posy[indices], posz[indices]]
     ).astype(np.float32)
