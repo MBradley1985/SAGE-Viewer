@@ -488,6 +488,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.flush()
         _push()
 
+    @ctrl.set("cam_fly")
+    def on_cam_fly(direction=None, **_):
+        """Keyboard fly movement (WASD / arrow keys), routed from JS via the
+        hidden cam-* buttons."""
+        if not direction:
+            return
+        scene.camera.fly(str(direction))
+        _push()
+
     @ctrl.set("go_to_env_halo")
     def on_go_to_env_halo():
         """Fly to the chosen halo and snap nav_gal_idx to the FOF central there."""
@@ -1593,6 +1602,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
             "color:#e2e8f0;overflow:hidden;"
         ),
     ):
+        # Hidden fly-movement triggers — clicked by the keyboard handler in
+        # sage_viewer.js (WASD / arrow keys). Kept in the DOM at all times so
+        # getElementById always resolves regardless of the active tab.
+        with html.Div(style="display:none;"):
+            for _dir in ("forward", "back", "left", "right", "up", "down"):
+                v3.VBtn(
+                    "",
+                    id=f"cam-{_dir}",
+                    click=(server.controller.cam_fly, f"['{_dir}']"),
+                )
+
         # ── Reset + Focus + Centre ─────────────────────────────────
         with v3.VSheet(color="transparent", style="padding:8px;flex-shrink:0;"):
             with v3.VRow(no_gutters=True, style="gap:6px;"):

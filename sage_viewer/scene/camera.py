@@ -278,6 +278,47 @@ class CameraController:
         else:
             self._pl.enable_trackball_style()
 
+    def fly(self, direction: str, step_frac: float = 0.012) -> None:
+        """Translate the camera (and its focal point) one step in a view-
+        relative direction. Because both move together this is a true fly —
+        it carries the camera through the box centre and out the far side,
+        unlike trackball dolly/orbit which stall at the focal point.
+
+        direction: 'forward' | 'back' | 'left' | 'right' | 'up' | 'down'.
+        """
+        cam   = self._pl.camera
+        pos   = np.array(cam.position,    dtype=np.float64)
+        focal = np.array(cam.focal_point, dtype=np.float64)
+
+        view = focal - pos
+        nv = np.linalg.norm(view)
+        if nv < 1e-9:
+            return
+        view /= nv
+        up = np.array(cam.up, dtype=np.float64)
+        nu = np.linalg.norm(up)
+        up = up / nu if nu > 1e-9 else np.array([0.0, 1.0, 0.0])
+        right = np.cross(view, up)
+        nr = np.linalg.norm(right)
+        right = right / nr if nr > 1e-9 else np.array([1.0, 0.0, 0.0])
+        up = np.cross(right, view)   # re-orthonormalise
+
+        basis = {
+            "forward": view, "back": -view,
+            "right": right,  "left": -right,
+            "up": up,        "down": -up,
+        }
+        d = basis.get(direction)
+        if d is None:
+            return
+
+        delta = d * (self._box_size * float(step_frac))
+        cam.position    = tuple(pos + delta)
+        cam.focal_point = tuple(focal + delta)
+        # Keep near/far planes around the scene so nothing gets clipped as we
+        # move through it — this is what stops geometry vanishing mid-box.
+        self._pl.renderer.ResetCameraClippingRange()
+
     def _push_focal_ahead(self, distance: float = 10.0) -> None:
         """Move the focal point `distance` Mpc/h ahead of the camera in
         the current view direction.  Keeps zoom dolly room available."""

@@ -95,4 +95,47 @@
       return;
     el.__sageStick = isNearBottom(el);
   }, true);
+
+  // ─── Keyboard fly navigation (WASD / arrow keys) ──────────────────
+  // Holding a key flies the camera that way continuously. Each tick
+  // clicks a hidden cam-<dir> button which the server turns into a
+  // view-relative translation. Movement is gated out while typing in a
+  // field so console / input keys aren't hijacked.
+  var FLY_KEYS = {
+    'w': 'forward', 'arrowup': 'forward',
+    's': 'back',    'arrowdown': 'back',
+    'a': 'left',    'arrowleft': 'left',
+    'd': 'right',   'arrowright': 'right',
+    'q': 'up',      'e': 'down'
+  };
+  var flyTimers = {};
+  function inEditable(el) {
+    if (!el) return false;
+    var t = el.tagName;
+    return t === 'INPUT' || t === 'TEXTAREA' || el.isContentEditable;
+  }
+  function clickCam(dir) {
+    var b = document.getElementById('cam-' + dir);
+    if (b) b.click();
+  }
+  function stopFly() {
+    for (var k in flyTimers) clearInterval(flyTimers[k]);
+    flyTimers = {};
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (inEditable(e.target)) return;
+    var k = (e.key || '').toLowerCase();
+    var dir = FLY_KEYS[k];
+    if (!dir) return;
+    e.preventDefault();
+    if (flyTimers[k]) return;             // ignore the OS key-repeat
+    clickCam(dir);                        // immediate first step
+    flyTimers[k] = setInterval(function () { clickCam(dir); }, 45);
+  }, true);
+  document.addEventListener('keyup', function (e) {
+    var k = (e.key || '').toLowerCase();
+    if (flyTimers[k]) { clearInterval(flyTimers[k]); delete flyTimers[k]; }
+  }, true);
+  window.addEventListener('blur', stopFly);   // don't fly off if focus leaves
 })();
