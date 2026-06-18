@@ -135,10 +135,22 @@ class WizardController:
         binary  = sage26 / "bin" / "sage"
         return (len(o_files) > 0 or binary.is_file()), len(o_files)
 
-    def _find_models(self) -> list[dict]:
+    def _find_models(self, verbose: bool = False) -> list[dict]:
         from sage_viewer.utils.discover import find_models
         results: list[dict] = []
         checked: set[Path]  = set()
+
+        # Candidate (output_dir, par_dir) pairs to scan
+        pairs: list[tuple[Path, Path]] = []
+
+        # If SAGE26 is known, its output/ + input/ is the primary pair
+        if self._sage26_dir:
+            sage_out = self._sage26_dir / "output"
+            sage_par = self._sage26_dir / "input"
+            if sage_out.is_dir():
+                pairs.append((sage_out, sage_par))
+
+        # Also scan common names relative to cwd and parent
         roots = [Path.cwd(), Path.cwd().parent]
         if self._sage26_dir:
             roots.append(self._sage26_dir.parent)
@@ -148,14 +160,18 @@ class WizardController:
                 if out_d in checked or not out_d.is_dir():
                     continue
                 checked.add(out_d)
-                par_dirs = [root / "input"]
-                if self._sage26_dir:
-                    par_dirs.append(self._sage26_dir / "input")
-                for par_d in par_dirs:
+                for par_name in ("input", "input/millennium", "."):
+                    par_d = root / par_name
                     if par_d.is_dir():
-                        for m in find_models(out_d, par_dir=par_d):
-                            if not any(r["par"] == m["par"] for r in results):
-                                results.append(m)
+                        pairs.append((out_d, par_d))
+
+        for out_d, par_d in pairs:
+            if verbose:
+                self._emit(f"  scanning {out_d}", "out")
+                self._emit(f"  par dir  {par_d}", "out")
+            for m in find_models(out_d, par_dir=par_d):
+                if not any(r["par"] == m["par"] for r in results):
+                    results.append(m)
         return results
 
     def _find_par_files(self) -> list[Path]:
@@ -191,13 +207,14 @@ class WizardController:
         else:
             self._emit("  SAGE26       : Not found in common locations", "warn")
 
-        self._models = self._find_models()
+        self._emit("  Scanning for models...", "info")
+        self._models = self._find_models(verbose=True)
         if self._models:
             self._emit(f"  Models found : {len(self._models)}", "ok")
             for m in self._models:
                 self._emit(f"    - {m['name']}   ({m['hdf5'].parent})", "out")
         else:
-            self._emit("  Models       : None found", "info")
+            self._emit("  Models       : None found", "warn")
 
         self._emit("", "info")
         await self._step_main_choice()
