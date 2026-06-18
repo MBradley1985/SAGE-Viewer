@@ -113,7 +113,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.nav_box_zmin         = 0.0
     state.nav_box_zmax         = round(scene._cfg.box_size / 2, 2)
     state.focus_active         = False
-    state.free_roam            = False
     state.nav_active_tab       = "layers"
 
     # Console — supports multiple parallel sessions. The state vars
@@ -1030,12 +1029,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
         scene.camera.go_to_box_center()
         _push()
 
-    @ctrl.set("toggle_free_roam")
-    def on_toggle_free_roam():
-        state.free_roam = not bool(state.free_roam)
-        scene.camera.set_free_roam(bool(state.free_roam))
-        _push()
-
     # ------------------------------------------------------------------
     # Console — natural-language command interpreter
     # ------------------------------------------------------------------
@@ -1660,17 +1653,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         density="compact", click=ctrl.center_camera,
                         color="#6b7280",
                         title="Place camera at box centre",
-                    )
-                with v3.VCol(cols="auto", style="padding:0;"):
-                    v3.VBtn(
-                        icon="mdi-airplane",
-                        variant="outlined",
-                        density="compact", click=ctrl.toggle_free_roam,
-                        color=("free_roam ? 'cyan' : '#6b7280'",),
-                        title=(
-                            "Free-roam mode (terrain-style fly-through) — "
-                            "off: orbit, on: free traverse anywhere"
-                        ),
                     )
 
         v3.VDivider(style="flex-shrink:0;")
