@@ -12,7 +12,10 @@
       "Bash(curl -s http://localhost:8099/)",
       "Bash(curl -s http://localhost:8099/index.html)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git rev-list *)",
+      "Bash(git remote *)",
+      "Bash(cd *)"
     ]
   }
 }
