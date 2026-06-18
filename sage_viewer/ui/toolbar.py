@@ -243,7 +243,7 @@ def build_toolbar(server, scene: Scene) -> None:
             done = sum(1 for f in futures if f.done())
             if done >= total:
                 break
-            state.preload_status = f"Caching snapshots  {done}/{total}"
+            state.preload_status = f"Loading galaxies.....  {done}/{total}"
             state.flush()
             await asyncio.sleep(0.25)
         _preload_done[0] = True
