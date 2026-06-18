@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import time
+import base64
+import io
 
 import numpy as np
 from trame.widgets import vuetify3 as v3
@@ -62,6 +63,11 @@ def build_toolbar(server, scene: Scene) -> None:
     state.is_repeat   = False
     state.rotate_mode = "off"
     state.preload_status = ""   # non-empty while the snapshot cache warms
+    # Pre-rendered playback: frames are rendered once on play, then flipped
+    # through as images for stutter-free playback.
+    state.playback_active = False   # showing pre-rendered frames
+    state.playback_frame  = ""      # current frame data URL
+    state.prerender_busy  = False   # rendering frames (full-viewport overlay)
 
     # Plain dict — direction/repeat flags read from the play coroutine
     _ctl = {"reverse": False, "repeat": False, "rotate_mode": "off"}
@@ -85,15 +91,6 @@ def build_toolbar(server, scene: Scene) -> None:
         if hasattr(ctrl, "view_update"):
             ctrl.view_update()
 
-    def _go_to(snap: int) -> None:
-        scene.set_snapshot(snap)
-        state.snap_num   = snap
-        state.snap_label = scene.snap_label
-        # Push the snapshot index + label to the client every frame so the
-        # transport slider and the redshift chip track playback live.
-        state.flush()
-        _push()
-
     # ------------------------------------------------------------------
     # Slider
     # ------------------------------------------------------------------
@@ -110,74 +107,191 @@ def build_toolbar(server, scene: Scene) -> None:
     # Playback — driven by a single task + asyncio.Event for instant stop
     # ------------------------------------------------------------------
 
-    async def _play_loop():
+    # Cached frames + the camera/rotation signature they were rendered for.
+    _frames: dict = {"key": None, "data": []}
+
+    def _cam_key():
+        cam = scene.plotter.camera
+        return (
+            tuple(np.round(cam.position, 2)),
+            tuple(np.round(cam.focal_point, 2)),
+            tuple(np.round(cam.up, 3)),
+            _ctl["rotate_mode"],
+        )
+
+    def _cancel_rotate():
+        if _rotate_task[0] is not None and not _rotate_task[0].done():
+            _rotate_task[0].cancel()
+
+    def _ensure_rotate_loop():
+        if _ctl["rotate_mode"] != "off" and (
+            _rotate_task[0] is None or _rotate_task[0].done()
+        ):
+            _rotate_task[0] = asyncio.ensure_future(_rotate_loop())
+
+    def _capture_frame() -> "np.ndarray":
+        """Grab the current render-window image as an (H, W, 3) uint8 array.
+        Uses vtkWindowToImageFilter directly because the remote-view plotter
+        is never .show()n, so pyvista's screenshot() refuses to run."""
+        from vtkmodules.vtkRenderingCore import vtkWindowToImageFilter
+        from vtkmodules.util.numpy_support import vtk_to_numpy
+        rw = scene.plotter.ren_win
+        rw.Render()
+        w2if = vtkWindowToImageFilter()
+        w2if.SetInput(rw)
+        w2if.SetInputBufferTypeToRGB()
+        w2if.ReadFrontBufferOff()
+        w2if.Update()
+        vimg = w2if.GetOutput()
+        w, h, _ = vimg.GetDimensions()
+        arr = vtk_to_numpy(vimg.GetPointData().GetScalars()).reshape(h, w, -1)
+        return arr[::-1]   # VTK image origin is bottom-left
+
+    async def _render_frames() -> list[str]:
+        """Render every snapshot to a JPEG data URL, baking in rotation when a
+        rotate mode is active. Camera + snapshot are restored afterwards."""
+        from PIL import Image
+        pl     = scene.plotter
+        cam    = pl.camera
+        pos0   = np.array(cam.position,    dtype=np.float64)
+        focal0 = np.array(cam.focal_point, dtype=np.float64)
+        save_snap = scene.current_snap
+        sign, dps = _parse_rotate(_ctl["rotate_mode"])
+        per_snap  = np.deg2rad(sign * dps / 3.0)   # angle baked per snapshot
+        stop_evt  = _get_stop_evt()
+
+        state.prerender_busy = True
+        state.flush()
+        frames: list[str] = []
+        # Off-screen rendering writes to an FBO we can actually read back —
+        # the on-screen/back buffer comes out black on this setup.
+        rw = pl.ren_win
+        prev_offscreen = rw.GetOffScreenRendering()
+        rw.SetOffScreenRendering(1)
+        try:
+            for i in range(snap_count):
+                if stop_evt.is_set():
+                    break
+                scene.set_snapshot(i)
+                if per_snap:
+                    ang = per_snap * i
+                    c, s = np.cos(ang), np.sin(ang)
+                    rm = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+                    cam.position    = tuple(focal0 + rm @ (pos0 - focal0))
+                    cam.focal_point = tuple(focal0)
+                    cam.up          = (0.0, 1.0, 0.0)
+                img = _capture_frame()
+                buf = io.BytesIO()
+                Image.fromarray(img[..., :3]).save(buf, format="JPEG", quality=85)
+                frames.append(
+                    "data:image/jpeg;base64,"
+                    + base64.b64encode(buf.getvalue()).decode("ascii")
+                )
+                state.preload_status = (
+                    f"Loading galaxies.....  {i + 1}/{snap_count}"
+                )
+                state.flush()
+                await asyncio.sleep(0)
+        finally:
+            rw.SetOffScreenRendering(prev_offscreen)
+            scene.set_snapshot(save_snap)
+            cam.position    = tuple(pos0)
+            cam.focal_point = tuple(focal0)
+            cam.up          = (0.0, 1.0, 0.0)
+            state.prerender_busy = False
+            state.preload_status = ""
+            state.flush()
+            _push()
+        return frames
+
+    async def _image_playback(frames: list[str]) -> None:
         stop_evt = _get_stop_evt()
-        stop_evt.clear()
-        # Wait for the whole-run cache to warm so playback is evenly paced.
-        await _await_preload()
-        if stop_evt.is_set():
+        n = len(frames)
+        if n == 0:
             return
+        i = (n - 1) if _ctl["reverse"] else 0
+        state.playback_active = True
         state.is_playing = True
         state.flush()
         try:
             while not stop_evt.is_set():
-                fps      = _FPS.get(float(state.play_speed), 3)
-                interval = 1.0 / fps
+                interval = 1.0 / _FPS.get(float(state.play_speed), 3)
+                state.playback_frame = frames[i]
+                state.snap_num   = i
+                state.snap_label = scene._snap_table.label(i)
+                state.flush()
 
-                if _ctl["reverse"]:
-                    next_snap = (scene.current_snap - 1) % snap_count
-                    at_end    = next_snap == 0
-                else:
-                    next_snap = (scene.current_snap + 1) % snap_count
-                    at_end    = next_snap == snap_count - 1
-
-                # Time the render work so the wait below holds a constant
-                # cadence regardless of how long the snapshot swap took —
-                # this keeps playback evenly paced instead of bunching up.
-                frame_start = time.perf_counter()
-                _go_to(next_snap)
-                work = time.perf_counter() - frame_start
-
+                at_end = (i == 0) if _ctl["reverse"] else (i == n - 1)
                 if at_end and not _ctl["repeat"]:
                     break
-
-                # Sleep the remainder of the frame budget, but break early
-                # if stop fires. If the work already overran the budget we
-                # proceed immediately (sleep_for == 0).
-                sleep_for = max(0.0, interval - work)
                 try:
-                    await asyncio.wait_for(stop_evt.wait(), timeout=sleep_for)
+                    await asyncio.wait_for(stop_evt.wait(), timeout=interval)
                     break
                 except asyncio.TimeoutError:
                     pass
+                i = (i - 1) % n if _ctl["reverse"] else (i + 1) % n
         finally:
             state.is_playing = False
             state.flush()
 
+    async def _play_sequence():
+        stop_evt = _get_stop_evt()
+        _cancel_rotate()
+        await _await_preload()
+        if stop_evt.is_set():
+            return
+        key = _cam_key()
+        if _frames["key"] != key or not _frames["data"]:
+            data = await _render_frames()
+            if stop_evt.is_set():
+                state.playback_active = False
+                state.flush()
+                return
+            _frames["key"]  = key
+            _frames["data"] = data
+        await _image_playback(_frames["data"])
+        # Ended naturally — drop back to the live view at the last frame.
+        last = int(state.snap_num)
+        scene.set_snapshot(last)
+        state.snap_label = scene.snap_label
+        state.playback_active = False
+        state.flush()
+        _push()
+        _ensure_rotate_loop()
+
     @ctrl.set("play")
     async def on_play():
-        _start_preload()   # ensure cache warm-up has begun
         if _play_task[0] is not None and not _play_task[0].done():
             return
-        _play_task[0] = asyncio.ensure_future(_play_loop())
+        _get_stop_evt().clear()
+        _start_preload()
+        _play_task[0] = asyncio.ensure_future(_play_sequence())
+
+    def _end_playback_to(snap: int) -> None:
+        """Stop any playback / prerender, hide the overlay, and show `snap`
+        in the live view."""
+        if _stop_evt[0] is not None:
+            _stop_evt[0].set()
+        if _play_task[0] is not None and not _play_task[0].done():
+            _play_task[0].cancel()
+        state.is_playing = False
+        state.playback_active = False
+        state.prerender_busy  = False
+        state.preload_status  = ""
+        scene.set_snapshot(snap)
+        state.snap_num   = snap
+        state.snap_label = scene.snap_label
+        state.flush()
+        _push()
+        _ensure_rotate_loop()
 
     @ctrl.set("pause")
     def on_pause():
-        if _stop_evt[0] is not None:
-            _stop_evt[0].set()
-        if _play_task[0] is not None and not _play_task[0].done():
-            _play_task[0].cancel()
-        state.is_playing = False
-        state.flush()
+        _end_playback_to(int(state.snap_num))
 
     @ctrl.set("stop")
     def on_stop():
-        if _stop_evt[0] is not None:
-            _stop_evt[0].set()
-        if _play_task[0] is not None and not _play_task[0].done():
-            _play_task[0].cancel()
-        state.is_playing = False
-        _go_to(snap_count - 1)
+        _end_playback_to(snap_count - 1)
 
     @ctrl.set("toggle_reverse")
     def on_toggle_reverse():

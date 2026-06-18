@@ -468,6 +468,34 @@ def create_app(
                     )
                     server.controller.view_update = view.update
 
+                    # Pre-rendered playback overlay — covers the live view
+                    # while frames are rendered (hiding flicker) and during
+                    # playback, where it flips through the cached frames.
+                    with html.Div(
+                        v_show=("playback_active || prerender_busy",),
+                        style=(
+                            "position:absolute;inset:0;z-index:6;"
+                            "background:#000;display:flex;"
+                            "align-items:center;justify-content:center;"
+                        ),
+                    ):
+                        html.Img(
+                            v_show=("playback_active",),
+                            src=("playback_frame",),
+                            style=(
+                                "width:100%;height:100%;object-fit:contain;"
+                                "display:block;"
+                            ),
+                        )
+                        html.Div(
+                            "{{ preload_status || 'Loading galaxies.....' }}",
+                            v_show=("prerender_busy",),
+                            style=(
+                                "color:#FFD700;font-size:1.4rem;"
+                                "font-family:monospace;letter-spacing:0.05em;"
+                            ),
+                        )
+
                     # Pop-out console — floats over the viewport, mirrors
                     # the active session's history. Toggle from the
                     # Console tab's "Pop-out" button. Drag-free for now;
