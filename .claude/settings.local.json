@@ -15,7 +15,8 @@
       "Bash(git commit *)",
       "Bash(git rev-list *)",
       "Bash(git remote *)",
-      "Bash(cd *)"
+      "Bash(cd *)",
+      "Bash(git push *)"
     ]
   }
 }
