@@ -2182,13 +2182,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         v3.VDivider(style="flex-shrink:0;")
 
-        # ── Tab content — fills the remaining panel height and clips
-        # overflow rather than scrolling (panel size is fixed; each tab
-        # is responsible for fitting its content).
+        # ── Tab content — fills remaining panel height; scrolls vertically
+        # if a tab's content is taller than the available space so that
+        # nothing is ever cut off on small screens.
         with v3.VSheet(
             color="transparent",
             style=(
-                "flex:1;min-height:0;overflow:hidden;padding:10px 12px;"
+                "flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;"
+                "padding:10px 12px;"
                 "display:flex;flex-direction:column;"
             ),
         ):

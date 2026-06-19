@@ -18,6 +18,43 @@ from sage_viewer.utils.discover import find_models
 # UI palettes
 # ──────────────────────────────────────────────────────────────────────────
 _THEME_CSS = dedent("""
+/* ═══════════════════════════════════════════════════════════════
+   VIEWPORT LOCKDOWN
+   Without this, Vuetify's min-height:100dvh on .v-application
+   combined with tall navigation-panel content (many filter
+   sliders) can make the page grow past the viewport and show a
+   document-level scrollbar.  The VTK canvas size is then derived
+   from the scrolled content height rather than the visible
+   viewport, which changes its aspect ratio and distorts the
+   simulation cube differently on every screen.
+
+   Fix: give html/body explicit height:100% so that all child
+   height:100% declarations resolve against the real viewport, and
+   use overflow:hidden at every Vuetify layout layer so the page
+   can never grow a document scrollbar.  The nav panel and each
+   tab do their own internal overflow-y:auto scrolling instead.
+   ═══════════════════════════════════════════════════════════════ */
+html, body {
+    height: 100% !important;
+    overflow: hidden !important;
+    margin: 0;
+    padding: 0;
+}
+.v-application {
+    height: 100% !important;
+    overflow: hidden !important;
+}
+.v-application__wrap {
+    min-height: 100% !important;
+    overflow: hidden !important;
+}
+.v-main {
+    overflow: hidden !important;
+}
+.v-main__wrap {
+    overflow: hidden !important;
+}
+
 /* ============================================================
    MODERN (default) — colours come from the Vuetify theme.  No
    structural overrides; Vuetify defaults apply.
@@ -619,7 +656,7 @@ def create_app(
                         style="padding:8px 16px 14px;gap:8px;justify-content:flex-end;"
                     ):
                         v3.VBtn(
-                            "Cancel",
+                            "Close",
                             variant="text",
                             color="#9ca3af",
                             click="export_dialog_show = false",
