@@ -18,43 +18,6 @@ from sage_viewer.utils.discover import find_models
 # UI palettes
 # ──────────────────────────────────────────────────────────────────────────
 _THEME_CSS = dedent("""
-/* ═══════════════════════════════════════════════════════════════
-   VIEWPORT LOCKDOWN
-   Vuetify 3's VMain has flex:1 0 auto (flex-shrink:0), so a tall
-   nav panel (Filters tab has dozens of sliders) can push VMain's
-   layout height past the viewport.  The VTK canvas derives its
-   height from its CSS container, so an oversized VMain gives the
-   render window wrong dimensions — the simulation cube looks
-   different on every screen and the page scrolls.
-
-   Chain:  html → body → .v-application → .v-application__wrap
-           all get height:100% so the chain is concrete all the
-           way down.  .v-main gets flex:1 1 0/min-height:0 so it
-           shrinks to fit inside the wrap instead of growing to fit
-           its content.  .v-main__wrap fills VMain's padded content
-           box (toolbar + footer offsets are already baked into
-           VMain's padding-top/bottom by Vuetify's layout system).
-   ═══════════════════════════════════════════════════════════════ */
-html, body {
-    height: 100% !important;
-    overflow: hidden !important;
-}
-.v-application {
-    height: 100% !important;
-}
-.v-application__wrap {
-    height: 100% !important;
-    overflow: hidden !important;
-}
-.v-main {
-    flex: 1 1 0px !important;
-    min-height: 0 !important;
-}
-.v-main__wrap {
-    height: 100% !important;
-    overflow: hidden !important;
-}
-
 /* ============================================================
    MODERN (default) — colours come from the Vuetify theme.  No
    structural overrides; Vuetify defaults apply.
@@ -674,10 +637,13 @@ def create_app(
 
             with v3.VSheet(
                 style=(
-                    "position:relative;"
+                    "position:fixed;"
+                    "top:var(--v-layout-top,48px);"
+                    "left:var(--v-layout-left,0px);"
+                    "right:var(--v-layout-right,0px);"
+                    "bottom:var(--v-layout-bottom,36px);"
                     "display:flex;flex-direction:row;"
-                    "width:100%;overflow:hidden;"
-                    "height:calc(100vh - 84px);"
+                    "overflow:hidden;"
                 ),
                 rounded=False,
                 elevation=0,

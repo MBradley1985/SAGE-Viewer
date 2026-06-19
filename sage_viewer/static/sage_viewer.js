@@ -2,6 +2,19 @@
 // Vue 3 silently strips <script> tags from templates, so any client JS
 // has to come in via a real .js file the browser can load.
 (function () {
+  // ─── Viewport lockdown ────────────────────────────────────────────
+  // Vuetify's normalize CSS sets `overflow-y:scroll` on the html element
+  // (forces a persistent scrollbar).  Counter it immediately here, before
+  // Vue mounts, so no document-level scroll is ever possible.  The
+  // <style> tag injected into <head> wins the cascade because this script
+  // runs from the module's <script> block in <head>, before any <body>
+  // content is processed.
+  (function injectScrollLock() {
+    var s = document.createElement('style');
+    s.id = 'sage-scroll-lock';
+    s.textContent = 'html,body{overflow:hidden!important;height:100%!important}';
+    (document.head || document.documentElement).appendChild(s);
+  }());
   // ─── Pop-out console drag handler ─────────────────────────────────
   // Mousedown on `.sage-popout-handle` starts a drag of the nearest
   // `.sage-popout` ancestor. Repositions via left/top, clearing the
