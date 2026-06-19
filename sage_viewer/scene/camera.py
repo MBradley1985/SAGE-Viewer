@@ -22,7 +22,8 @@ class CameraController:
         self._halo_index: NearestHaloIndex = NearestHaloIndex()
         self._galaxy_positions: np.ndarray | None = None
         self._indicator_actor = None
-        self._member_actor = None     # multi-point gaussian splat for group members
+        self._member_actor = None     # cyan splats for FOF group members
+        self._selected_actor = None   # green splat for the selected galaxy itself
         self._central_actor = None    # thin white outline marking the FOF central
         self._group_ring_actor = None # red ring sized to enclose the group
 
@@ -52,17 +53,17 @@ class CameraController:
         self._indicator_actor = None
 
     def _clear_member_indicators(self) -> None:
-        if self._member_actor is None:
-            return
-        self._pl.remove_actor(self._member_actor, render=False)
-        self._member_actor = None
+        for attr in ("_member_actor", "_selected_actor"):
+            a = getattr(self, attr, None)
+            if a is not None:
+                self._pl.remove_actor(a, render=False)
+                setattr(self, attr, None)
 
-    def _add_member_indicators(
-        self,
-        positions: "np.ndarray",
-    ) -> None:
-        """Highlight a set of group/cluster members as cyan gaussian points."""
-        self._clear_member_indicators()
+    def _add_member_indicators(self, positions: "np.ndarray") -> None:
+        """Cyan gaussian splats for FOF group members (excluding the selected galaxy)."""
+        if self._member_actor is not None:
+            self._pl.remove_actor(self._member_actor, render=False)
+            self._member_actor = None
         if positions is None or len(positions) == 0:
             return
         cloud = pv.PolyData(np.asarray(positions, dtype=np.float64))
@@ -77,9 +78,28 @@ class CameraController:
             reset_camera=False,
         )
 
+    def _add_selected_indicator(self, position: "np.ndarray") -> None:
+        """Green gaussian splat marking the selected galaxy itself."""
+        if self._selected_actor is not None:
+            self._pl.remove_actor(self._selected_actor, render=False)
+            self._selected_actor = None
+        if position is None:
+            return
+        cloud = pv.PolyData(np.asarray([position], dtype=np.float64))
+        self._selected_actor = self._pl.add_mesh(
+            cloud,
+            color="lime",
+            point_size=28.0,
+            render_points_as_spheres=True,
+            opacity=0.75,
+            show_scalar_bar=False,
+            render=False,
+            reset_camera=False,
+        )
+
     @property
     def has_member_indicators(self) -> bool:
-        return self._member_actor is not None
+        return self._member_actor is not None or self._selected_actor is not None
 
     # ---- White central marker -----------------------------------------
 

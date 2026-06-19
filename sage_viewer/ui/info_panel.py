@@ -51,28 +51,35 @@ def build_info_panel(server, scene: Scene) -> None:
             lines.append(f"Halo Mvir = {hm:.2e} Msun (idx {hidx})")
             state.nav_halo_idx = int(hidx)
 
-        # Nearest galaxy — select it and update the nav panel
+        # Nearest galaxy — only among currently visible galaxies so that
+        # environment filters, focus regions, and slider filters are all
+        # respected: you can only click what you can see.
         if galaxies.count > 0:
-            _, gidx = KDTree(galaxies.positions).query(point)
-            gidx = int(gidx)
-            sm = galaxies.stellar_mass[gidx]
-            ss = galaxies.ssfr[gidx]
-            gt = "central" if galaxies.gal_type[gidx] == 0 else "satellite"
-            lines.append(
-                f"Galaxy M* = {sm:.2e} Msun  sSFR = {ss:.2e} yr^-1  "
-                f"({gt})  →  idx {gidx} selected"
-            )
+            mask = scene.galaxy_layer._combined_mask()
+            if mask is None:
+                visible = np.arange(galaxies.count)
+            else:
+                visible = np.where(mask)[0]
 
-            # Update the galaxy index field in the nav panel
-            state.nav_gal_idx = gidx
+            if len(visible) == 0:
+                gidx = None
+            else:
+                _, hit = KDTree(galaxies.positions[visible]).query(point)
+                gidx = int(visible[hit])
 
-            # Always show a red marker at the picked galaxy so the user
-            # has visual feedback for what they just selected, regardless
-            # of focus / tab state.
-            gpos = galaxies.positions[gidx]
-            scene.camera._add_circle_indicator(
-                (float(gpos[0]), float(gpos[1]), float(gpos[2])), 0.0
-            )
+            if gidx is not None:
+                sm = galaxies.stellar_mass[gidx]
+                ss = galaxies.ssfr[gidx]
+                gt = "central" if galaxies.gal_type[gidx] == 0 else "satellite"
+                lines.append(
+                    f"Galaxy M* = {sm:.2e} Msun  sSFR = {ss:.2e} yr^-1  "
+                    f"({gt})  →  idx {gidx} selected"
+                )
+                state.nav_gal_idx = gidx
+                gpos = galaxies.positions[gidx]
+                scene.camera._add_circle_indicator(
+                    (float(gpos[0]), float(gpos[1]), float(gpos[2])), 0.0
+                )
 
         state.flush()
         _push()

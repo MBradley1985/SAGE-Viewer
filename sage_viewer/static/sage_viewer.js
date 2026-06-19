@@ -2,6 +2,19 @@
 // Vue 3 silently strips <script> tags from templates, so any client JS
 // has to come in via a real .js file the browser can load.
 (function () {
+  // ─── Step-button chrome removal ───────────────────────────────────
+  // Vuetify injects ::before/::after pseudo-elements onto VBtn for hover
+  // overlays and focus rings.  Inline style= cannot target pseudo-elements,
+  // so we inject a stylesheet rule targeting our custom sage-step-btn class.
+  (function () {
+    var s = document.createElement('style');
+    s.textContent =
+      '.sage-step-btn::before, .sage-step-btn::after { display:none !important; }' +
+      '.sage-step-btn { border:none !important; outline:none !important;' +
+      ' box-shadow:none !important; }';
+    document.head.appendChild(s);
+  })();
+
   // ─── Viewport fit ─────────────────────────────────────────────────
   // Fit the .sage-content panel to fill exactly the space between the
   // toolbar and footer, measured from actual DOM positions.  Pure CSS

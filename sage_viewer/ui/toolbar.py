@@ -634,9 +634,11 @@ def build_toolbar(server, scene: Scene) -> None:
     v3.VBtn(
         icon="mdi-skip-previous",
         click=ctrl.snap_prev,
-        density="compact", variant="text", color="white",
+        density="compact", variant="plain", color="white",
         title="Previous snapshot",
         size="small",
+        ripple=False,
+        classes="sage-step-btn",
         style="padding:0;min-width:20px;margin-left:10px;",
     )
     with v3.VCol(style="max-width:240px;padding:0 4px;"):
@@ -649,10 +651,12 @@ def build_toolbar(server, scene: Scene) -> None:
     v3.VBtn(
         icon="mdi-skip-next",
         click=ctrl.snap_next,
-        density="compact", variant="text", color="white",
+        density="compact", variant="plain", color="white",
         title="Next snapshot",
         size="small",
-        style="padding:0;min-width:20px;",
+        ripple=False,
+        classes="sage-step-btn",
+        style="padding:0;min-width:20px;margin-right:10px;",
     )
 
     # Snapshot label chip — Mustache interpolation for reactive content

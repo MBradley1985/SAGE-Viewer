@@ -104,7 +104,7 @@ _HALO_CB = {
 
 _GAL_CB = {
     "stellar_mass":    ("M*",          "10^8",    "10^12.5 Msun"),
-    "ssfr":            ("sSFR",        "10^-14",  "10^-8 yr^-1"),
+    "ssfr":            ("sSFR",        "10^-14",  "10^-6 yr^-1"),
     "sfr":             ("SFR",         "10^-3",   "10^2 Msun/yr"),
     "cold_gas":        ("Mgas",        "10^7",    "10^11.5 Msun"),
     "bt":              ("B/T",         "0",       "1"),
@@ -207,43 +207,43 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.filter_halo_conc   = [0.0, 50.0]    # NFW concentration (raw)
     state.filter_halo_spin   = [0.0, 0.2]     # spin parameter (raw)
     # Galaxy mass / rate filters
-    state.filter_gal_smass   = [8.0, 12.5]    # log10 Msun
-    state.filter_gal_sfr     = [-6.0, 3.0]    # log10 Msun/yr (-6 incl. quenched)
-    state.filter_gal_ssfr    = [-14.0, -8.0]  # log10 yr^-1
-    state.filter_gal_coldgas = [0.0, 12.0]    # log10 Msun
-    state.filter_gal_bulge   = [0.0, 12.0]    # log10 Msun
+    state.filter_gal_smass   = [0.0, 14.0]    # log10 Msun
+    state.filter_gal_sfr     = [-6.0, 5.0]    # log10 Msun/yr (-6 incl. quenched)
+    state.filter_gal_ssfr    = [-14.0, 0.0]   # log10 yr^-1
+    state.filter_gal_coldgas = [0.0, 14.0]    # log10 Msun
+    state.filter_gal_bulge   = [0.0, 14.0]    # log10 Msun
     state.filter_gal_bt      = [0.0, 1.0]     # bulge/total
-    state.filter_gal_bhmass  = [0.0, 10.0]    # log10 Msun
-    state.filter_gal_ics     = [0.0, 12.0]    # log10 Msun
-    state.filter_gal_h2      = [0.0, 12.0]    # log10 Msun
-    state.filter_gal_cgmgas  = [0.0, 12.0]    # log10 Msun
-    state.filter_gal_hotgas  = [0.0, 12.0]    # log10 Msun
-    state.filter_gal_h1gas   = [0.0, 12.0]    # log10 Msun
-    state.filter_gal_ejected = [0.0, 12.0]    # log10 Msun
-    state.filter_gal_outflow = [-6.0, 3.0]    # log10 Msun/yr
-    state.filter_gal_massload= [-2.0, 3.0]    # log10 dimensionless
-    state.filter_gal_cooling  = [-5.0, 5.0]   # log10 SAGE units
-    state.filter_gal_heating  = [-5.0, 5.0]   # log10 SAGE units
+    state.filter_gal_bhmass  = [0.0, 14.0]    # log10 Msun
+    state.filter_gal_ics     = [0.0, 14.0]    # log10 Msun
+    state.filter_gal_h2      = [0.0, 14.0]    # log10 Msun
+    state.filter_gal_cgmgas  = [0.0, 14.0]    # log10 Msun
+    state.filter_gal_hotgas  = [0.0, 14.0]    # log10 Msun
+    state.filter_gal_h1gas   = [0.0, 14.0]    # log10 Msun
+    state.filter_gal_ejected = [0.0, 14.0]    # log10 Msun
+    state.filter_gal_outflow = [-6.0, 5.0]    # log10 Msun/yr
+    state.filter_gal_massload= [-3.0, 5.0]    # log10 dimensionless
+    state.filter_gal_cooling  = [-7.0, 7.0]   # log10 SAGE units
+    state.filter_gal_heating  = [-7.0, 7.0]   # log10 SAGE units
     # Galaxy structural
-    state.filter_gal_diskrad  = [-4.0, 0.0]   # log10 Mpc/h
-    state.filter_gal_bulgerad = [-4.0, 0.0]   # log10 Mpc/h
-    state.filter_gal_mb_mass  = [0.0, 12.0]   # log10 Msun (merger bulge mass)
-    state.filter_gal_mb_rad   = [-4.0, 0.0]   # log10 Mpc/h (merger bulge radius)
-    state.filter_gal_ib_mass  = [0.0, 12.0]   # log10 Msun (instability bulge mass)
-    state.filter_gal_ib_rad   = [-4.0, 0.0]   # log10 Mpc/h (instability bulge radius)
+    state.filter_gal_diskrad  = [-4.0, 1.0]   # log10 Mpc/h
+    state.filter_gal_bulgerad = [-4.0, 1.0]   # log10 Mpc/h
+    state.filter_gal_mb_mass  = [0.0, 14.0]   # log10 Msun (merger bulge mass)
+    state.filter_gal_mb_rad   = [-4.0, 1.0]   # log10 Mpc/h (merger bulge radius)
+    state.filter_gal_ib_mass  = [0.0, 14.0]   # log10 Msun (instability bulge mass)
+    state.filter_gal_ib_rad   = [-4.0, 1.0]   # log10 Mpc/h (instability bulge radius)
     # SFR components
-    state.filter_gal_sfr_bulge  = [-6.0, 3.0]   # log10 Msun/yr
-    state.filter_gal_sfr_disk   = [-6.0, 3.0]   # log10 Msun/yr
-    state.filter_gal_sfr_blg_z  = [-6.0, 0.0]   # log10 dimensionless
-    state.filter_gal_sfr_dsk_z  = [-6.0, 0.0]   # log10 dimensionless
+    state.filter_gal_sfr_bulge  = [-6.0, 5.0]   # log10 Msun/yr
+    state.filter_gal_sfr_disk   = [-6.0, 5.0]   # log10 Msun/yr
+    state.filter_gal_sfr_blg_z  = [-6.0, 1.0]   # log10 dimensionless
+    state.filter_gal_sfr_dsk_z  = [-6.0, 1.0]   # log10 dimensionless
     # Metals
-    state.filter_gal_met_cg   = [-2.0, 10.0]  # log10 Msun (metals cold gas)
-    state.filter_gal_met_sm   = [-2.0, 10.0]  # log10 Msun (metals stellar)
-    state.filter_gal_met_bm   = [-2.0, 10.0]  # log10 Msun (metals bulge)
-    state.filter_gal_met_hg   = [-2.0, 10.0]  # log10 Msun (metals hot gas)
-    state.filter_gal_met_em   = [-2.0, 10.0]  # log10 Msun (metals ejected)
-    state.filter_gal_met_ics  = [-2.0, 10.0]  # log10 Msun (metals ICS)
-    state.filter_gal_met_cgm  = [-2.0, 10.0]  # log10 Msun (metals CGM)
+    state.filter_gal_met_cg   = [-2.0, 12.0]  # log10 Msun (metals cold gas)
+    state.filter_gal_met_sm   = [-2.0, 12.0]  # log10 Msun (metals stellar)
+    state.filter_gal_met_bm   = [-2.0, 12.0]  # log10 Msun (metals bulge)
+    state.filter_gal_met_hg   = [-2.0, 12.0]  # log10 Msun (metals hot gas)
+    state.filter_gal_met_em   = [-2.0, 12.0]  # log10 Msun (metals ejected)
+    state.filter_gal_met_ics  = [-2.0, 12.0]  # log10 Msun (metals ICS)
+    state.filter_gal_met_cgm  = [-2.0, 12.0]  # log10 Msun (metals CGM)
     # Misc
     _snap_max = max(0, scene.primary.snap_table.count - 1)
     # Categoricals
@@ -364,30 +364,57 @@ def build_navigation_panel(server, scene: Scene) -> None:
         else:
             g_mask = np.ones(galaxies.count, dtype=bool)
 
+            # Each range filter is only applied when the slider has been moved off its
+            # full-range default — at default every slider is a pass-through.
+            def _active(lo, hi, mn, mx):
+                """True when the slider has been moved away from its default extent."""
+                return float(lo) > mn + 1e-6 or float(hi) < mx - 1e-6
+
+            def _lg(x):  return np.log10(np.maximum(x, 1.0))
+            def _lgr(x): return np.log10(np.maximum(x, 1e-6))
+
+            def _apply(lo, hi, arr, mn, mx):
+                if _active(lo, hi, mn, mx):
+                    g_mask.__iand__((arr >= float(lo)) & (arr <= float(hi)))
+
+            def _apply_nz(lo, hi, raw, mn, mx):
+                # Zero/negative raw values always pass (not "below range", just absent).
+                if _active(lo, hi, mn, mx):
+                    log_v = np.log10(np.maximum(raw, 1e-30))
+                    g_mask.__iand__((raw <= 0) | ((log_v >= float(lo)) & (log_v <= float(hi))))
+
+            # ── Unconditional filters ──────────────────────────────────────────
             sm_lo, sm_hi = state.filter_gal_smass
-            sm_log = np.log10(np.maximum(galaxies.stellar_mass, 1.0))
-            g_mask &= (sm_log >= float(sm_lo)) & (sm_log <= float(sm_hi))
+            if _active(sm_lo, sm_hi, 0.0, 14.0):
+                sm_log = np.log10(np.maximum(galaxies.stellar_mass, 1.0))
+                g_mask &= (sm_log >= float(sm_lo)) & (sm_log <= float(sm_hi))
 
             sfr_lo, sfr_hi = state.filter_gal_sfr
-            sfr_log = np.log10(np.maximum(galaxies.sfr, 1e-6))
-            g_mask &= (sfr_log >= float(sfr_lo)) & (sfr_log <= float(sfr_hi))
+            if _active(sfr_lo, sfr_hi, -6.0, 5.0):
+                sfr_log = np.log10(np.maximum(galaxies.sfr, 1e-6))
+                g_mask &= (sfr_log >= float(sfr_lo)) & (sfr_log <= float(sfr_hi))
 
             ss_lo, ss_hi = state.filter_gal_ssfr
-            ssfr_log = np.log10(np.maximum(galaxies.ssfr, 1e-14))
-            g_mask &= (ssfr_log >= float(ss_lo)) & (ssfr_log <= float(ss_hi))
+            if _active(ss_lo, ss_hi, -14.0, 0.0):
+                ssfr_log = np.log10(np.maximum(galaxies.ssfr, 1e-14))
+                g_mask &= (ssfr_log >= float(ss_lo)) & (ssfr_log <= float(ss_hi))
 
             cg_lo, cg_hi = state.filter_gal_coldgas
-            cg_log = np.log10(np.maximum(galaxies.cold_gas, 1.0))
-            g_mask &= (cg_log >= float(cg_lo)) & (cg_log <= float(cg_hi))
+            if _active(cg_lo, cg_hi, 0.0, 14.0):
+                cg_log = np.log10(np.maximum(galaxies.cold_gas, 1.0))
+                g_mask &= (cg_log >= float(cg_lo)) & (cg_log <= float(cg_hi))
 
             bm_lo, bm_hi = state.filter_gal_bulge
-            bm_log = np.log10(np.maximum(galaxies.bulge_mass, 1.0))
-            g_mask &= (bm_log >= float(bm_lo)) & (bm_log <= float(bm_hi))
+            if _active(bm_lo, bm_hi, 0.0, 14.0):
+                bm_log = np.log10(np.maximum(galaxies.bulge_mass, 1.0))
+                g_mask &= (bm_log >= float(bm_lo)) & (bm_log <= float(bm_hi))
 
             bt_lo, bt_hi = state.filter_gal_bt
-            sm_safe = np.maximum(galaxies.stellar_mass, 1.0)
-            bt = galaxies.bulge_mass / sm_safe
-            g_mask &= (bt >= float(bt_lo)) & (bt <= float(bt_hi))
+            if _active(bt_lo, bt_hi, 0.0, 1.0):
+                sm_safe = np.maximum(galaxies.stellar_mass, 1.0)
+                # Clamp: SAGE can produce BulgeMass > StellarMass numerically.
+                bt_c = np.clip(galaxies.bulge_mass / sm_safe, 0.0, 1.0)
+                g_mask &= (bt_c >= float(bt_lo)) & (bt_c <= float(bt_hi))
 
             t = str(state.filter_gal_type)
             if t == "central":
@@ -397,132 +424,118 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
             fields = scene.primary.fields_available
 
+            # ── Conditional filters ────────────────────────────────────────────
             if fields.get("bh_mass", False):
-                bh_lo, bh_hi = state.filter_gal_bhmass
-                bh_log = np.log10(np.maximum(galaxies.bh_mass, 1.0))
-                g_mask &= (bh_log >= float(bh_lo)) & (bh_log <= float(bh_hi))
+                lo, hi = state.filter_gal_bhmass
+                _apply(lo, hi, _lg(galaxies.bh_mass), 0.0, 14.0)
 
             if fields.get("ics_mass", False):
-                ics_lo, ics_hi = state.filter_gal_ics
-                ics_log = np.log10(np.maximum(galaxies.ics_mass, 1.0))
-                g_mask &= (ics_log >= float(ics_lo)) & (ics_log <= float(ics_hi))
+                lo, hi = state.filter_gal_ics
+                _apply(lo, hi, _lg(galaxies.ics_mass), 0.0, 14.0)
 
             if fields.get("h2_mass", False):
-                h2_lo, h2_hi = state.filter_gal_h2
-                h2_log = np.log10(np.maximum(galaxies.h2_mass, 1.0))
-                g_mask &= (h2_log >= float(h2_lo)) & (h2_log <= float(h2_hi))
+                lo, hi = state.filter_gal_h2
+                _apply(lo, hi, _lg(galaxies.h2_mass), 0.0, 14.0)
 
             if fields.get("cgm_gas", False):
-                cgmgas_lo, cgmgas_hi = state.filter_gal_cgmgas
-                cgmgas_log = np.log10(np.maximum(galaxies.cgm_gas, 1.0))
-                g_mask &= (cgmgas_log >= float(cgmgas_lo)) & (cgmgas_log <= float(cgmgas_hi))
+                lo, hi = state.filter_gal_cgmgas
+                _apply(lo, hi, _lg(galaxies.cgm_gas), 0.0, 14.0)
 
             if fields.get("hot_gas", False):
-                hotgas_lo, hotgas_hi = state.filter_gal_hotgas
-                hotgas_log = np.log10(np.maximum(galaxies.hot_gas, 1.0))
-                g_mask &= (hotgas_log >= float(hotgas_lo)) & (hotgas_log <= float(hotgas_hi))
-
-            def _lg(x): return np.log10(np.maximum(x, 1.0))
-            def _lgr(x): return np.log10(np.maximum(x, 1e-6))   # for rates/radii
-            def _apply(lo, hi, arr):
-                g_mask.__iand__((arr >= float(lo)) & (arr <= float(hi)))
-            def _apply_nz(lo, hi, raw):
-                # Zero/negative raw values always pass — they mean "not active",
-                # not "below detection limit". Non-zero values filtered normally.
-                log_v = np.log10(np.maximum(raw, 1e-30))
-                g_mask.__iand__((raw <= 0) | ((log_v >= float(lo)) & (log_v <= float(hi))))
+                lo, hi = state.filter_gal_hotgas
+                _apply(lo, hi, _lg(galaxies.hot_gas), 0.0, 14.0)
 
             if fields.get("h1_gas", False):
                 lo, hi = state.filter_gal_h1gas
-                _apply(lo, hi, _lg(galaxies.h1_gas))
+                _apply(lo, hi, _lg(galaxies.h1_gas), 0.0, 14.0)
 
             if fields.get("ejected_mass", False):
                 lo, hi = state.filter_gal_ejected
-                _apply(lo, hi, _lg(galaxies.ejected_mass))
+                _apply(lo, hi, _lg(galaxies.ejected_mass), 0.0, 14.0)
 
             if fields.get("outflow_rate", False):
                 lo, hi = state.filter_gal_outflow
-                _apply_nz(lo, hi, galaxies.outflow_rate)
+                _apply_nz(lo, hi, galaxies.outflow_rate, -6.0, 5.0)
 
             if fields.get("mass_loading", False):
                 lo, hi = state.filter_gal_massload
-                _apply_nz(lo, hi, galaxies.mass_loading)
+                _apply_nz(lo, hi, galaxies.mass_loading, -3.0, 5.0)
 
             if fields.get("cooling", False):
                 lo, hi = state.filter_gal_cooling
-                _apply_nz(lo, hi, galaxies.cooling)
+                _apply_nz(lo, hi, galaxies.cooling, -7.0, 7.0)
 
             if fields.get("heating", False):
                 lo, hi = state.filter_gal_heating
-                _apply_nz(lo, hi, galaxies.heating)
+                _apply_nz(lo, hi, galaxies.heating, -7.0, 7.0)
 
             if fields.get("disk_radius", False):
                 lo, hi = state.filter_gal_diskrad
-                _apply_nz(lo, hi, galaxies.disk_radius)
+                _apply_nz(lo, hi, galaxies.disk_radius, -4.0, 1.0)
 
             if fields.get("bulge_radius", False):
                 lo, hi = state.filter_gal_bulgerad
-                _apply_nz(lo, hi, galaxies.bulge_radius)
+                _apply_nz(lo, hi, galaxies.bulge_radius, -4.0, 1.0)
 
             if fields.get("merger_bulge_mass", False):
                 lo, hi = state.filter_gal_mb_mass
-                _apply(lo, hi, _lg(galaxies.merger_bulge_mass))
+                _apply(lo, hi, _lg(galaxies.merger_bulge_mass), 0.0, 14.0)
 
             if fields.get("merger_bulge_radius", False):
                 lo, hi = state.filter_gal_mb_rad
-                _apply_nz(lo, hi, galaxies.merger_bulge_radius)
+                _apply_nz(lo, hi, galaxies.merger_bulge_radius, -4.0, 1.0)
 
             if fields.get("instability_bulge_mass", False):
                 lo, hi = state.filter_gal_ib_mass
-                _apply(lo, hi, _lg(galaxies.instability_bulge_mass))
+                _apply(lo, hi, _lg(galaxies.instability_bulge_mass), 0.0, 14.0)
 
             if fields.get("instability_bulge_radius", False):
                 lo, hi = state.filter_gal_ib_rad
-                _apply_nz(lo, hi, galaxies.instability_bulge_radius)
+                _apply_nz(lo, hi, galaxies.instability_bulge_radius, -4.0, 1.0)
 
             if fields.get("sfr_bulge", False):
                 lo, hi = state.filter_gal_sfr_bulge
-                _apply(lo, hi, _lgr(galaxies.sfr_bulge))
+                _apply(lo, hi, _lgr(galaxies.sfr_bulge), -6.0, 5.0)
 
             if fields.get("sfr_disk", False):
                 lo, hi = state.filter_gal_sfr_disk
-                _apply(lo, hi, _lgr(galaxies.sfr_disk))
+                _apply(lo, hi, _lgr(galaxies.sfr_disk), -6.0, 5.0)
 
             if fields.get("sfr_bulge_z", False):
                 lo, hi = state.filter_gal_sfr_blg_z
-                _apply(lo, hi, _lgr(galaxies.sfr_bulge_z))
+                _apply(lo, hi, _lgr(galaxies.sfr_bulge_z), -6.0, 1.0)
 
             if fields.get("sfr_disk_z", False):
                 lo, hi = state.filter_gal_sfr_dsk_z
-                _apply(lo, hi, _lgr(galaxies.sfr_disk_z))
+                _apply(lo, hi, _lgr(galaxies.sfr_disk_z), -6.0, 1.0)
 
             if fields.get("metals_cold_gas", False):
                 lo, hi = state.filter_gal_met_cg
-                _apply(lo, hi, _lg(galaxies.metals_cold_gas))
+                _apply(lo, hi, _lg(galaxies.metals_cold_gas), -2.0, 12.0)
 
             if fields.get("metals_stellar_mass", False):
                 lo, hi = state.filter_gal_met_sm
-                _apply(lo, hi, _lg(galaxies.metals_stellar_mass))
+                _apply(lo, hi, _lg(galaxies.metals_stellar_mass), -2.0, 12.0)
 
             if fields.get("metals_bulge_mass", False):
                 lo, hi = state.filter_gal_met_bm
-                _apply(lo, hi, _lg(galaxies.metals_bulge_mass))
+                _apply(lo, hi, _lg(galaxies.metals_bulge_mass), -2.0, 12.0)
 
             if fields.get("metals_hot_gas", False):
                 lo, hi = state.filter_gal_met_hg
-                _apply(lo, hi, _lg(galaxies.metals_hot_gas))
+                _apply(lo, hi, _lg(galaxies.metals_hot_gas), -2.0, 12.0)
 
             if fields.get("metals_ejected_mass", False):
                 lo, hi = state.filter_gal_met_em
-                _apply(lo, hi, _lg(galaxies.metals_ejected_mass))
+                _apply(lo, hi, _lg(galaxies.metals_ejected_mass), -2.0, 12.0)
 
             if fields.get("metals_ics", False):
                 lo, hi = state.filter_gal_met_ics
-                _apply(lo, hi, _lg(galaxies.metals_ics))
+                _apply(lo, hi, _lg(galaxies.metals_ics), -2.0, 12.0)
 
             if fields.get("metals_cgm_gas", False):
                 lo, hi = state.filter_gal_met_cgm
-                _apply(lo, hi, _lg(galaxies.metals_cgm_gas))
+                _apply(lo, hi, _lg(galaxies.metals_cgm_gas), -2.0, 12.0)
 
             if fields.get("ffb_regime", False):
                 ffb = str(state.filter_gal_ffb)
@@ -624,41 +637,41 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.filter_halo_vmax    = [0.0, 1000.0]
         state.filter_halo_conc    = [0.0, 50.0]
         state.filter_halo_spin    = [0.0, 0.2]
-        state.filter_gal_smass    = [8.0, 12.5]
-        state.filter_gal_sfr      = [-6.0, 3.0]
-        state.filter_gal_ssfr     = [-14.0, -8.0]
-        state.filter_gal_coldgas  = [0.0, 12.0]
-        state.filter_gal_bulge    = [0.0, 12.0]
+        state.filter_gal_smass    = [0.0, 14.0]
+        state.filter_gal_sfr      = [-6.0, 5.0]
+        state.filter_gal_ssfr     = [-14.0, 0.0]
+        state.filter_gal_coldgas  = [0.0, 14.0]
+        state.filter_gal_bulge    = [0.0, 14.0]
         state.filter_gal_bt       = [0.0, 1.0]
         state.filter_gal_type     = "both"
-        state.filter_gal_bhmass   = [0.0, 10.0]
-        state.filter_gal_ics      = [0.0, 12.0]
-        state.filter_gal_h2       = [0.0, 12.0]
-        state.filter_gal_cgmgas   = [0.0, 12.0]
-        state.filter_gal_hotgas   = [0.0, 12.0]
-        state.filter_gal_h1gas    = [0.0, 12.0]
-        state.filter_gal_ejected  = [0.0, 12.0]
-        state.filter_gal_outflow  = [-6.0, 3.0]
-        state.filter_gal_massload = [-2.0, 3.0]
-        state.filter_gal_cooling  = [-5.0, 5.0]
-        state.filter_gal_heating  = [-5.0, 5.0]
-        state.filter_gal_diskrad  = [-4.0, 0.0]
-        state.filter_gal_bulgerad = [-4.0, 0.0]
-        state.filter_gal_mb_mass  = [0.0, 12.0]
-        state.filter_gal_mb_rad   = [-4.0, 0.0]
-        state.filter_gal_ib_mass    = [0.0, 12.0]
-        state.filter_gal_ib_rad    = [-4.0, 0.0]
-        state.filter_gal_sfr_bulge = [-6.0, 3.0]
-        state.filter_gal_sfr_disk  = [-6.0, 3.0]
-        state.filter_gal_sfr_blg_z = [-6.0, 0.0]
-        state.filter_gal_sfr_dsk_z = [-6.0, 0.0]
-        state.filter_gal_met_cg    = [-2.0, 10.0]
-        state.filter_gal_met_sm    = [-2.0, 10.0]
-        state.filter_gal_met_bm    = [-2.0, 10.0]
-        state.filter_gal_met_hg    = [-2.0, 10.0]
-        state.filter_gal_met_em    = [-2.0, 10.0]
-        state.filter_gal_met_ics   = [-2.0, 10.0]
-        state.filter_gal_met_cgm   = [-2.0, 10.0]
+        state.filter_gal_bhmass   = [0.0, 14.0]
+        state.filter_gal_ics      = [0.0, 14.0]
+        state.filter_gal_h2       = [0.0, 14.0]
+        state.filter_gal_cgmgas   = [0.0, 14.0]
+        state.filter_gal_hotgas   = [0.0, 14.0]
+        state.filter_gal_h1gas    = [0.0, 14.0]
+        state.filter_gal_ejected  = [0.0, 14.0]
+        state.filter_gal_outflow  = [-6.0, 5.0]
+        state.filter_gal_massload = [-3.0, 5.0]
+        state.filter_gal_cooling  = [-7.0, 7.0]
+        state.filter_gal_heating  = [-7.0, 7.0]
+        state.filter_gal_diskrad  = [-4.0, 1.0]
+        state.filter_gal_bulgerad = [-4.0, 1.0]
+        state.filter_gal_mb_mass  = [0.0, 14.0]
+        state.filter_gal_mb_rad   = [-4.0, 1.0]
+        state.filter_gal_ib_mass    = [0.0, 14.0]
+        state.filter_gal_ib_rad    = [-4.0, 1.0]
+        state.filter_gal_sfr_bulge = [-6.0, 5.0]
+        state.filter_gal_sfr_disk  = [-6.0, 5.0]
+        state.filter_gal_sfr_blg_z = [-6.0, 1.0]
+        state.filter_gal_sfr_dsk_z = [-6.0, 1.0]
+        state.filter_gal_met_cg    = [-2.0, 12.0]
+        state.filter_gal_met_sm    = [-2.0, 12.0]
+        state.filter_gal_met_bm    = [-2.0, 12.0]
+        state.filter_gal_met_hg    = [-2.0, 12.0]
+        state.filter_gal_met_em    = [-2.0, 12.0]
+        state.filter_gal_met_ics   = [-2.0, 12.0]
+        state.filter_gal_met_cgm   = [-2.0, 12.0]
         state.filter_gal_ffb       = "any"
         state.filter_gal_cgm      = "any"
         state.env_show_field      = True
@@ -1151,7 +1164,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
             and _highlight_cache["snap"] == cur_snap
         )
         if cached:
-            # Reuse the previous positions verbatim
             cam._add_member_indicators(_highlight_cache["positions"])
         else:
             _, galaxies = scene._loader.get(cur_snap)
@@ -1166,6 +1178,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
             _highlight_cache["positions"] = positions
             _highlight_cache["gidx"]      = gidx
             _highlight_cache["snap"]      = cur_snap
+        # Always re-add the green selected-galaxy marker regardless of cache
+        _, galaxies = scene._loader.get(cur_snap)
+        if 0 <= gidx < galaxies.count:
+            cam._add_selected_indicator(galaxies.positions[gidx])
         _push()
 
     # ------------------------------------------------------------------
@@ -2052,7 +2068,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     @ctrl.set("highlight_galaxy")
     def on_highlight_galaxy():
-        """Toggle a cyan splat on the currently-selected galaxy."""
+        """Toggle a green splat on the currently-selected galaxy."""
         cam = scene.camera
         if cam.has_member_indicators:
             cam._clear_member_indicators()
@@ -2065,9 +2081,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         _, galaxies = scene._loader.get(scene.current_snap)
         if gidx < 0 or gidx >= galaxies.count:
             return
-        import numpy as np
-        pos = np.array([galaxies.positions[gidx]], dtype=np.float64)
-        cam._add_member_indicators(pos)
+        cam._add_selected_indicator(galaxies.positions[gidx])
         _push()
 
     @ctrl.set("toggle_focus")
@@ -3013,7 +3027,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Stellar mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_smass",),
-                        min=8.0, max=12.5, step=0.1,
+                        min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         classes="sage-fslider", style=_FSLD,
@@ -3021,7 +3035,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("SFR  (log10 Msun/yr,  -6 = quenched)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr",),
-                        min=-6.0, max=3.0, step=0.1,
+                        min=-6.0, max=5.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         classes="sage-fslider", style=_FSLD,
@@ -3029,7 +3043,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("sSFR  (log10 yr^-1)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ssfr",),
-                        min=-14.0, max=-8.0, step=0.1,
+                        min=-14.0, max=0.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         classes="sage-fslider", style=_FSLD,
@@ -3055,7 +3069,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("BH mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_bhmass",),
-                        min=0.0, max=10.0, step=0.1,
+                        min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.bh_mass",),
@@ -3064,7 +3078,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Bulge mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_bulge",),
-                        min=0.0, max=12.0, step=0.1,
+                        min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         classes="sage-fslider", style=_FSLD,
@@ -3072,7 +3086,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Bulge radius  (log10 Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_bulgerad",),
-                        min=-4.0, max=0.0, step=0.05,
+                        min=-4.0, max=1.0, step=0.05,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.bulge_radius",),
@@ -3081,7 +3095,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("CGM gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_cgmgas",),
-                        min=0.0, max=12.0, step=0.1,
+                        min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.cgm_gas",),
@@ -3090,7 +3104,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Cold gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_coldgas",),
-                        min=0.0, max=12.0, step=0.1,
+                        min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         classes="sage-fslider", style=_FSLD,
@@ -3098,7 +3112,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Cooling  (log10 SAGE units)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_cooling",),
-                        min=-5.0, max=5.0, step=0.1,
+                        min=-7.0, max=7.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.cooling",),
@@ -3107,7 +3121,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Disk radius  (log10 Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_diskrad",),
-                        min=-4.0, max=0.0, step=0.05,
+                        min=-4.0, max=1.0, step=0.05,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.disk_radius",),
@@ -3116,7 +3130,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Ejected mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ejected",),
-                        min=0.0, max=12.0, step=0.1,
+                        min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.ejected_mass",),
@@ -3125,7 +3139,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("H1 gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_h1gas",),
-                        min=0.0, max=12.0, step=0.1,
+                        min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.h1_gas",),
@@ -3134,7 +3148,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("H2 gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_h2",),
-                        min=0.0, max=12.0, step=0.1,
+                        min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.h2_mass",),
@@ -3143,7 +3157,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Heating  (log10 SAGE units)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_heating",),
-                        min=-5.0, max=5.0, step=0.1,
+                        min=-7.0, max=7.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.heating",),
@@ -3152,7 +3166,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Hot gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_hotgas",),
-                        min=0.0, max=12.0, step=0.1,
+                        min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.hot_gas",),
@@ -3161,7 +3175,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Instability bulge mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ib_mass",),
-                        min=0.0, max=12.0, step=0.1,
+                        min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.instability_bulge_mass",),
@@ -3170,7 +3184,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Instability bulge radius  (log10 Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ib_rad",),
-                        min=-4.0, max=0.0, step=0.05,
+                        min=-4.0, max=1.0, step=0.05,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.instability_bulge_radius",),
@@ -3179,7 +3193,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("ICS mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ics",),
-                        min=0.0, max=12.0, step=0.1,
+                        min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.ics_mass",),
@@ -3188,7 +3202,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Mass loading  (log10 OutflowRate/SFR)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_massload",),
-                        min=-2.0, max=3.0, step=0.05,
+                        min=-3.0, max=5.0, step=0.05,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.mass_loading",),
@@ -3197,7 +3211,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Merger bulge mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_mb_mass",),
-                        min=0.0, max=12.0, step=0.1,
+                        min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.merger_bulge_mass",),
@@ -3206,7 +3220,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Merger bulge radius  (log10 Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_mb_rad",),
-                        min=-4.0, max=0.0, step=0.05,
+                        min=-4.0, max=1.0, step=0.05,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.merger_bulge_radius",),
@@ -3215,7 +3229,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Metals — bulge mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_bm",),
-                        min=-2.0, max=10.0, step=0.1,
+                        min=-2.0, max=12.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_bulge_mass",),
@@ -3224,7 +3238,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Metals — CGM gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_cgm",),
-                        min=-2.0, max=10.0, step=0.1,
+                        min=-2.0, max=12.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_cgm_gas",),
@@ -3233,7 +3247,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Metals — cold gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_cg",),
-                        min=-2.0, max=10.0, step=0.1,
+                        min=-2.0, max=12.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_cold_gas",),
@@ -3242,7 +3256,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Metals — ejected mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_em",),
-                        min=-2.0, max=10.0, step=0.1,
+                        min=-2.0, max=12.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_ejected_mass",),
@@ -3251,7 +3265,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Metals — hot gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_hg",),
-                        min=-2.0, max=10.0, step=0.1,
+                        min=-2.0, max=12.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_hot_gas",),
@@ -3260,7 +3274,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Metals — ICS  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_ics",),
-                        min=-2.0, max=10.0, step=0.1,
+                        min=-2.0, max=12.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_ics",),
@@ -3269,7 +3283,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Metals — stellar mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_sm",),
-                        min=-2.0, max=10.0, step=0.1,
+                        min=-2.0, max=12.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_stellar_mass",),
@@ -3278,7 +3292,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("Outflow rate  (log10 Msun/yr)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_outflow",),
-                        min=-6.0, max=3.0, step=0.1,
+                        min=-6.0, max=5.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.outflow_rate",),
@@ -3287,7 +3301,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("SFR bulge  (log10 Msun/yr)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr_bulge",),
-                        min=-6.0, max=3.0, step=0.1,
+                        min=-6.0, max=5.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.sfr_bulge",),
@@ -3296,7 +3310,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("SFR bulge Z  (log10 dimensionless)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr_blg_z",),
-                        min=-6.0, max=0.0, step=0.1,
+                        min=-6.0, max=1.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.sfr_bulge_z",),
@@ -3305,7 +3319,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("SFR disk  (log10 Msun/yr)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr_disk",),
-                        min=-6.0, max=3.0, step=0.1,
+                        min=-6.0, max=5.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.sfr_disk",),
@@ -3314,7 +3328,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VLabel("SFR disk Z  (log10 dimensionless)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr_dsk_z",),
-                        min=-6.0, max=0.0, step=0.1,
+                        min=-6.0, max=1.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.sfr_disk_z",),
