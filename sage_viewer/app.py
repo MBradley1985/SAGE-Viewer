@@ -20,38 +20,38 @@ from sage_viewer.utils.discover import find_models
 _THEME_CSS = dedent("""
 /* ═══════════════════════════════════════════════════════════════
    VIEWPORT LOCKDOWN
-   Without this, Vuetify's min-height:100dvh on .v-application
-   combined with tall navigation-panel content (many filter
-   sliders) can make the page grow past the viewport and show a
-   document-level scrollbar.  The VTK canvas size is then derived
-   from the scrolled content height rather than the visible
-   viewport, which changes its aspect ratio and distorts the
-   simulation cube differently on every screen.
+   Vuetify 3's VMain has flex:1 0 auto (flex-shrink:0), so a tall
+   nav panel (Filters tab has dozens of sliders) can push VMain's
+   layout height past the viewport.  The VTK canvas derives its
+   height from its CSS container, so an oversized VMain gives the
+   render window wrong dimensions — the simulation cube looks
+   different on every screen and the page scrolls.
 
-   Fix: give html/body explicit height:100% so that all child
-   height:100% declarations resolve against the real viewport, and
-   use overflow:hidden at every Vuetify layout layer so the page
-   can never grow a document scrollbar.  The nav panel and each
-   tab do their own internal overflow-y:auto scrolling instead.
+   Chain:  html → body → .v-application → .v-application__wrap
+           all get height:100% so the chain is concrete all the
+           way down.  .v-main gets flex:1 1 0/min-height:0 so it
+           shrinks to fit inside the wrap instead of growing to fit
+           its content.  .v-main__wrap fills VMain's padded content
+           box (toolbar + footer offsets are already baked into
+           VMain's padding-top/bottom by Vuetify's layout system).
    ═══════════════════════════════════════════════════════════════ */
 html, body {
     height: 100% !important;
     overflow: hidden !important;
-    margin: 0;
-    padding: 0;
 }
 .v-application {
     height: 100% !important;
-    overflow: hidden !important;
 }
 .v-application__wrap {
-    min-height: 100% !important;
+    height: 100% !important;
     overflow: hidden !important;
 }
 .v-main {
-    overflow: hidden !important;
+    flex: 1 1 0px !important;
+    min-height: 0 !important;
 }
 .v-main__wrap {
+    height: 100% !important;
     overflow: hidden !important;
 }
 
