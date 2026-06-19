@@ -1157,17 +1157,29 @@ def build_navigation_panel(server, scene: Scene) -> None:
         return f"{prefix}_{ts}"
 
     def _capture_image(scale: int = 1):
-        """Capture the current render window as a vtkImageData."""
+        """Capture the current render window as a vtkImageData.
+
+        trame's remote view streams frames via its own FBO, so the
+        standard OpenGL back-buffer is stale (stuck on the initial
+        render).  Switching to off-screen rendering first forces VTK
+        to write to an FBO that vtkWindowToImageFilter can actually
+        read back — identical to the approach used in toolbar.py's
+        _capture_frame / _render_frames."""
         import vtk
         rw = scene.plotter.ren_win
-        rw.Render()
-        w2i = vtk.vtkWindowToImageFilter()
-        w2i.SetInput(rw)
-        w2i.SetScale(int(scale), int(scale))
-        w2i.SetInputBufferTypeToRGB()
-        w2i.ReadFrontBufferOff()
-        w2i.Update()
-        return w2i.GetOutput()
+        prev = rw.GetOffScreenRendering()
+        rw.SetOffScreenRendering(1)
+        try:
+            rw.Render()
+            w2i = vtk.vtkWindowToImageFilter()
+            w2i.SetInput(rw)
+            w2i.SetScale(int(scale), int(scale))
+            w2i.SetInputBufferTypeToRGB()
+            w2i.ReadFrontBufferOff()
+            w2i.Update()
+            return w2i.GetOutput()
+        finally:
+            rw.SetOffScreenRendering(prev)
 
     def _save_image(image, path) -> None:
         """Write a vtkImageData to disk; format inferred from extension."""
@@ -1198,14 +1210,22 @@ def build_navigation_panel(server, scene: Scene) -> None:
             sess = _get_session_dir()
             name = _resolve_name(state.screenshot_label, "screenshot")
             path = sess / f"{name}.{ext}"
-            # If a file with this name already exists (user re-used label),
-            # append a short timestamp so we don't overwrite.
             if path.exists():
                 import datetime
                 ts = datetime.datetime.now().strftime("%H%M%S")
                 path = sess / f"{name}_{ts}.{ext}"
-            img = _capture_image(scale=1)
-            _save_image(img, path)
+            pf = str(getattr(state, "playback_frame", "") or "")
+            if pf.startswith("data:image"):
+                # During playback the user sees an HTML overlay image, not the
+                # VTK render window.  Decode the JPEG data URL directly.
+                import base64
+                import io as _io
+                from PIL import Image as _PIL
+                raw = base64.b64decode(pf.split(",", 1)[1])
+                _PIL.open(_io.BytesIO(raw)).convert("RGB").save(str(path))
+            else:
+                img = _capture_image(scale=1)
+                _save_image(img, path)
             state.last_screenshot = str(path)
         except Exception as e:
             state.last_screenshot = f"ERROR: {e!s}"
@@ -1234,25 +1254,64 @@ def build_navigation_panel(server, scene: Scene) -> None:
     _record_task: list = [None]   # asyncio.Task | None
 
     async def _record_loop():
+        """Capture frames for recording.
+
+        Two modes depending on whether playback is active:
+        - Playback active: poll state.playback_frame at 25 Hz and save each
+          *unique* JPEG data URL as a PNG frame.  This captures exactly what
+          the user sees in the HTML overlay without touching the VTK window.
+        - Playback inactive: capture the VTK render window (off-screen mode)
+          at the user-set FPS, giving a live view of whatever is on screen.
+        """
         import asyncio
-        interval = 1.0 / max(1, int(_record_state["fps"]))
+        import base64
+        import io as _io
+        from PIL import Image as _PIL
+
+        record_interval = 1.0 / max(1, int(_record_state["fps"]))
+        last_url: str | None = None
+
         try:
             while _record_state["active"]:
-                outpath = (
-                    _record_state["dir"]
-                    / f"frame_{_record_state['frames']:05d}.png"
-                )
                 try:
-                    img = _capture_image(scale=_record_state["scale"])
-                    _save_image(img, outpath)
-                    _record_state["frames"] += 1
-                    state.recording_frames = _record_state["frames"]
-                    state.flush()
+                    pb_active = bool(getattr(state, "playback_active", False))
+                    pf = str(getattr(state, "playback_frame", "") or "")
+
+                    if pb_active and pf.startswith("data:image") and pf != last_url:
+                        # New unique playback frame — capture from overlay data URL.
+                        last_url = pf
+                        outpath = (
+                            _record_state["dir"]
+                            / f"frame_{_record_state['frames']:05d}.png"
+                        )
+                        raw = base64.b64decode(pf.split(",", 1)[1])
+                        _PIL.open(_io.BytesIO(raw)).convert("RGB").save(str(outpath))
+                        _record_state["frames"] += 1
+                        state.recording_frames = _record_state["frames"]
+                        state.flush()
+                        # Poll fast to catch every playback frame (max ~15 fps)
+                        await asyncio.sleep(0.04)
+                        continue
+
+                    if not pb_active:
+                        # Live (non-playback) view — capture VTK at user FPS.
+                        last_url = None
+                        outpath = (
+                            _record_state["dir"]
+                            / f"frame_{_record_state['frames']:05d}.png"
+                        )
+                        img = _capture_image(scale=_record_state["scale"])
+                        _save_image(img, outpath)
+                        _record_state["frames"] += 1
+                        state.recording_frames = _record_state["frames"]
+                        state.flush()
+
                 except Exception as e:
                     state.last_movie = f"ERROR capturing frame: {e!s}"
                     state.flush()
                     break
-                await asyncio.sleep(interval)
+
+                await asyncio.sleep(record_interval)
         except asyncio.CancelledError:
             pass
 
