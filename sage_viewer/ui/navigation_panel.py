@@ -2562,14 +2562,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
             with v3.VSheet(
                 color="transparent",
                 v_show=("nav_active_tab === 'filters'",),
-                style=(
-                    "display:flex;flex-direction:column;"
-                    "height:100%;min-height:0;width:100%;"
-                ),
             ):
                 _FSEC = (
                     "font-size:0.78rem;font-weight:700;letter-spacing:0.08em;"
-                    "color:#06b6d4;padding:2px 0 2px;display:block;flex-shrink:0;"
+                    "color:#06b6d4;padding:2px 0 2px;display:block;"
                 )
                 _FLBL = (
                     "font-size:0.6rem;color:#9ca3af;display:block;"
@@ -2584,14 +2580,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "--v-input-control-height:30px;"
                     "font-size:0.7rem;margin-top:1px;"
                 )
-                _SCROLL = (
-                    "min-height:0;overflow-y:auto;overflow-x:hidden;"
-                    "padding-right:2px;"
-                )
+                # Explicit heights so each section scrolls independently
+                # while the panel itself never needs an outer scrollbar.
+                _SH = "overflow-y:auto;overflow-x:hidden;padding-right:2px;"
 
                 # ── Halo section ──────────────────────────────
                 v3.VLabel("DARK MATTER HALOES", style=_FSEC)
-                with html.Div(style=_SCROLL + "flex:2;"):
+                with html.Div(style=_SH + "height:105px;"):
                     v3.VLabel("Mvir  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_mvir",),
@@ -2620,11 +2615,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         style=_FSLD,
                     )
 
-                v3.VDivider(style="margin:2px 0;flex-shrink:0;")
+                v3.VDivider(style="margin:4px 0 2px;")
 
                 # ── Galaxy section ────────────────────────────
                 v3.VLabel("GALAXIES", style=_FSEC)
-                with html.Div(style=_SCROLL + "flex:5;"):
+                with html.Div(style=_SH + "height:185px;"):
                     v3.VLabel("Stellar mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_smass",),
@@ -2760,11 +2755,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         style=_FSLD,
                     )
 
-                v3.VDivider(style="margin:2px 0;flex-shrink:0;")
+                v3.VDivider(style="margin:4px 0 2px;")
 
                 # ── Categorical section ───────────────────────
                 v3.VLabel("CATEGORICAL", style=_FSEC)
-                with html.Div(style=_SCROLL + "flex:2;"):
+                with html.Div(style=_SH):
                     v3.VLabel("Type", style=_FLBL)
                     v3.VSelect(
                         v_model=("filter_gal_type",),
@@ -2804,7 +2799,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         style=_FSEL,
                     )
 
-                v3.VDivider(style="margin:3px 0;flex-shrink:0;")
+                v3.VDivider(style="margin:6px 0 4px;")
 
                 v3.VBtn(
                     "Reset Filters",
@@ -2813,7 +2808,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     size="small",
                     prepend_icon="mdi-restore",
                     click=ctrl.reset_filters,
-                    style="flex-shrink:0;",
                 )
 
             # ── RECORD tab ─────────────────────────────────────
