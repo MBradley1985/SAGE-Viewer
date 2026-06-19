@@ -32,6 +32,8 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - Galaxy filters: stellar mass, sSFR, B/T, age, BH mass, ICS mass, type (centrals / satellites), FFB regime, CGM / Hot regime, environment class (Field / Isolated / Group / Cluster, via checkboxes in the Environment tab)
 - Filters auto-disable when the loaded model doesn't contain the underlying field
 - Reset Filters button restores defaults
+- **FoF links are filter-aware** — satellite→central gold lines are only drawn for halos that pass the active filter mask, focus sphere/box, and the halos-visible toggle; they stay correct during playback and recording
+- **Playback respects all scene state** — the pre-render frame cache is keyed on filter values, focus region, layer visibility/opacity/color-mode, and FoF state; changing any of these and pressing Play again always produces fresh frames
 
 ### Multi-model
 - Auto-scans `<sage_root>/output/` for SAGE model subfolders

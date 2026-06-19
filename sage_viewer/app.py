@@ -793,9 +793,9 @@ def create_app(
                                     label=(
                                         "console_mode === 'python' "
                                         "? 'Python REPL  (Enter to run)' "
-                                        ": (console_mode === 'sage' "
-                                        "    ? 'SAGE command  (Enter to run)' "
-                                        "    : 'Shell  (Enter to run)')",
+                                        ": (console_mode === 'command' "
+                                        "    ? 'Command  (Enter to run)' "
+                                        "    : 'Terminal  (Enter to run)')",
                                     ),
                                     hide_details=True, variant="outlined",
                                     bg_color="#1a1a2e", density="compact",

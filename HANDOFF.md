@@ -44,8 +44,9 @@ SAGE-Viewer/
 │   ├── scene/
 │   │   ├── scene.py                 # Plotter, layers, focus state, interactor
 │   │   ├── model.py                 # one SAGE model (loader + layers + cfg)
-│   │   ├── halo_layer.py            # 3-layer NFW gaussian splats
-│   │   ├── galaxy_layer.py          # outer envelope + cold-gas envelope + outer property
+│   │   ├── halo_layer.py            # 3-layer NFW gaussian splats; _combined_mask() guard
+│   │   ├── galaxy_layer.py          # outer envelope + cold-gas envelope + outer property; _combined_mask() guard
+│   │   ├── fof_layer.py             # filter-aware FoF satellite→central gold lines
 │   │   └── camera.py                # fly-to / sphere & box wireframe indicators
 │   ├── ui/
 │   │   ├── toolbar.py               # transport + slider + speed/rotation
@@ -82,11 +83,11 @@ SAGE-Viewer/
 - Rotate: Off / CW / CCW at 15° / 30° / 60° per second.
 - Pause / Stop interrupt cleanly (asyncio.Event + cancellable Task).
 
-### Console tab (0.3.0 big change)
-- **Default mode = shell** — every command runs through `$SHELL` with persistent `cwd` + `env`. `cd`, `pwd`, `export` are in-process built-ins.
+### Console tab
+- **Default mode = terminal** — every command runs through `$SHELL` with persistent `cwd` + `env`. `cd`, `pwd`, `export` are in-process built-ins.
 - Type `python` → embedded REPL (locals: `scene`, `state`, `ctrl`, `server`, `plotter`, `np`).
-- Type `sage` → natural-language SAGE command parser.
-- `exit` / `quit` / `shell` from any non-default mode returns to shell.
+- Type `command` (or `cmd`) → SAGE-Viewer natural-language command mode.
+- `exit` / `quit` / `terminal` from any non-default mode returns to terminal.
 - Multi-session: `+` button creates new sessions; each has its own history, mode, cwd, env, Python interpreter.
 - **Load Script** button reads a `.py` path and `exec`s it in the active session.
 - **Pop-out** button floats a movable + resizable card over the viewport mirroring the active session.
@@ -103,6 +104,15 @@ SAGE-Viewer/
 ### Enter to run
 Every typed field now Enter-submits the same as clicking its action button. Wiring is per-field via `data-enter-click="<button-id>"` on a wrapping `<div>`; a global JS handler (in `sage_viewer/static/sage_viewer.js`) walks up to find the attribute and `.click()`s the button. Works in: Target Halo idx, Target Standoff, Galaxy idx, Environment Halo idx + Standoff, Coords X/Y/Z + Standoff, Box 6 bounds, Console command, Console script path, Pop-out console command, Screenshot label, Movie label.
 
+### Snapshot slider
+- `<` / `>` step buttons on either side of the slider advance one snapshot at a time.
+- The slider `max` is reactive (`state.snap_max`) so it updates when switching models.
+- Switching models via the Launch Mode menu refreshes the slider bounds, current snap, snap label, and the pre-rendered frame cache automatically.
+
+### Environment filter (Environment tab)
+- Five categories: **Field**, **Isolated**, **Pairs**, **Groups**, **Clusters** (mass labels removed).
+- **Pairs** = galaxies in a 2-member FOF group (determined by counting members sharing the same `CentralGalaxyIndex`, matching `member_indices()` in `group_info.py`).
+
 ### Multi-model
 - Auto-scan `<sage_root>/output/` for `model_0.hdf5` subdirs.
 - Hamburger menu (top-left) → Models section to switch primary or toggle overlays.
@@ -111,6 +121,7 @@ Every typed field now Enter-submits the same as clicking its action button. Wiri
 ### Output
 - Screenshots: PNG / JPG / TIFF.
 - Movies: GIF / MOV (ffmpeg) / PNG sequence; 1–60 fps; Native / 2× / 4× supersample.
+- High-res (2×/4×) uses PIL LANCZOS upscaling instead of VTK tiled rendering to eliminate the grid-seam artifact that appeared at the end of supersample movies.
 - One session folder per app launch under `<repo>/sage_outputs/session_*`.
 
 ### Library tab
@@ -166,6 +177,30 @@ Both halo and galaxy layers use `vtkPointGaussianMapper` with a per-point `radiu
 ### Focus mode
 `scene._focus_region` is a dict describing the active focus area (`{"kind": "sphere", "center": ..., "radius": ...}` or `{"kind": "box", "bounds": ...}`). `set_focus_sphere` / `set_focus_box` populate it and immediately `_apply_focus_masks(halos.positions, galaxies.positions)` to filter both layers.
 
+### `_combined_mask()` shape guard (halo_layer.py + galaxy_layer.py)
+`_focus_mask` and `_filter_mask` are updated at different points during a snapshot transition — `_focus_mask` is recomputed first (inside `set_snapshot()`), then `_filter_mask` later (via the `_apply_filters()` callback). If the slider moves between snapshots with different halo/galaxy counts, the two masks are temporarily sized for different populations. Both `HaloLayer._combined_mask()` and `GalaxyLayer._combined_mask()` return `None` when the lengths disagree, which causes `_redraw()` to render everything unmasked for that one intermediate frame rather than raising `ValueError`. Once both masks are refreshed for the new snapshot, the next `_redraw()` call applies them correctly.
+
+### Playback frame-cache invalidation (`toolbar.py`)
+`_frames = {"key": None, "data": {}}` caches the pre-rendered frame sequence for the Play button. The cache key is built by `_cam_key()`:
+```
+(camera_position, camera_focal_point, camera_up, rotate_mode, _scene_hash())
+```
+`_scene_hash()` hashes all values in `_SCENE_FILTER_VARS` (every filter slider + env checkboxes) plus layer visibility, opacity, color-mode, colormap, FoF visibility, and the focus region string. If any of these change between plays, the cache key changes and a fresh pre-render sweep runs. To add a new filter variable, append its trame state name to `_SCENE_FILTER_VARS` at the top of `toolbar.py`.
+
+### Filter-aware FoF links (`fof_layer.py` + `navigation_panel.py`)
+`FofLinkLayer` holds `_visible_halo_positions: np.ndarray | None`. Call:
+- `fl.sync_masks(None)` — all halos visible; `_filter_segments()` passes all segments through
+- `fl.sync_masks(snap.positions[combined_mask])` — only segments whose central halo is in the visible set are drawn
+
+Central membership uses exact float32 byte comparison (`p.tobytes()`) against a set built from `visible_positions` — reliable because FoF central positions come from the same struct array as `halos.positions`.
+
+`_sync_fof_layer()` in `navigation_panel.py` is the single helper that reads `halo_layer._combined_mask()`, extracts visible positions, and calls `fl.sync_masks()`. It must be called:
+- At the end of `_apply_filters()` (covers all snapshot transitions and filter slider changes — this also fires during playback pre-rendering)
+- Inside every focus-changing handler: `on_go_to_halo`, `_go_to_galaxy_at_radius`, `on_go_to_env_halo`, `on_go_to_coords`, `on_zoom_to_box`, `on_reset`, `on_toggle_focus`
+- Inside `on_halo_toggle` and `on_toggle_fof_links` when turning the links on (not needed when turning off, since `fl.visible = False` skips the rebuild)
+
+FoF links are gated on `halos_visible AND fof_links_on` — `fl.visible` is only set `True` when both flags are true.
+
 ---
 
 ## Known quirks worth knowing
@@ -208,6 +243,15 @@ Both halo and galaxy layers use `vtkPointGaussianMapper` with a per-point `radiu
 - All UI-polish requests from the 0.3.0 cycle implemented.
 - Enter-to-run wired everywhere via the global JS handler.
 - Pop-out console is draggable + resizable.
-- Console is a real shell terminal with Python / SAGE modes and multi-session support.
+- Console modes renamed: **terminal** (was shell) and **command** (was sage). Type `command` or `python` from terminal mode to switch; type `terminal` to return.
+- `sage-viewer` launcher script at repo root — run `./sage-viewer --par ...` without needing Python bin in PATH.
+- Snapshot slider now has `<` / `>` step buttons; slider `max` is reactive and updates on model switch.
+- Model switching now also refreshes the slider bounds, snap label, and pre-rendered frame cache.
+- Environment filter has 5 categories: Field / Isolated / **Pairs** / Groups / Clusters (mass labels removed; Pairs detects 2-member FOF groups).
+- WASD/arrow camera drift on key-release reduced: inner-loop re-check + push on final release.
+- High-res screenshots/recordings use PIL LANCZOS upscaling instead of VTK tiling — no more 2×2 / 4×4 grid artifact at the end of videos.
 - Star-scatter + BH-disk render layers removed — Structure mode is back to fast core layers only.
 - Right panel is locked at 300 px and never scrolls.
+- Playback frame cache invalidates correctly on any filter / focus / visibility / color-mode change.
+- `_combined_mask()` shape-mismatch crash fixed in both `halo_layer.py` and `galaxy_layer.py`.
+- FoF links are fully filter-aware: respect focus regions, halo filter masks, and the halos-visible toggle; sync during playback and recording.

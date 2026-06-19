@@ -174,6 +174,7 @@
     var dir = FLY_KEYS[k];
     if (!dir) return;
     e.preventDefault();
+    e.stopPropagation();   // prevent VTK interactor from also handling WASD/arrows
     if (heldKeys[k]) return;        // ignore the OS auto-repeat
     heldKeys[k] = true;
     pressDir(dir);
@@ -181,6 +182,7 @@
   document.addEventListener('keyup', function (e) {
     var k = (e.key || '').toLowerCase();
     if (!heldKeys[k]) return;
+    e.stopPropagation();   // prevent VTK interactor from seeing the release
     delete heldKeys[k];
     var dir = FLY_KEYS[k];
     if (dir) releaseDir(dir);

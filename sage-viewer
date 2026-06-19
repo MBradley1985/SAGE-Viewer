@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Launcher — run from the SAGE-Viewer directory or add this directory to PATH.
+# Works whether sage-viewer is installed into a user Python dir or not, because
+# it calls the module directly rather than relying on a PATH-resolved script.
+exec python3 -m sage_viewer.cli "$@"

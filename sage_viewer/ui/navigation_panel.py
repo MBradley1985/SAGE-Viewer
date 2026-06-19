@@ -254,6 +254,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # When all four are checked the filter is a no-op (= "show all").
     state.env_show_field    = True
     state.env_show_isolated = True
+    state.env_show_pairs    = True
     state.env_show_group    = True
     state.env_show_cluster  = True
     state.fof_links_on      = False           # FoF-link gold lines toggle
@@ -551,9 +552,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
             # Environment categories — checkbox-driven; subset → mask
             show_f = bool(state.env_show_field)
             show_i = bool(state.env_show_isolated)
+            show_p = bool(state.env_show_pairs)
             show_g = bool(state.env_show_group)
             show_c = bool(state.env_show_cluster)
-            all_on = show_f and show_i and show_g and show_c
+            all_on = show_f and show_i and show_p and show_g and show_c
             if not all_on and fields.get("central_mvir", False):
                 cm = galaxies.central_mvir
                 log_cm = np.log10(np.maximum(cm, 1.0))
@@ -562,6 +564,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     cat_mask |= log_cm < 11.0
                 if show_i:
                     cat_mask |= (log_cm >= 11.0) & (log_cm < 12.5)
+                if show_p and fields.get("central_id", False):
+                    # Use central_id (not central_mvir) for accurate FOF group count
+                    _, _inv, _grp_sizes = np.unique(
+                        galaxies.central_id, return_inverse=True, return_counts=True
+                    )
+                    cat_mask |= _grp_sizes[_inv] == 2
                 if show_g:
                     cat_mask |= (log_cm >= 12.5) & (log_cm < 14.0)
                 if show_c:
@@ -594,7 +602,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
         "filter_gal_met_hg", "filter_gal_met_em", "filter_gal_met_ics",
         "filter_gal_met_cgm",
         "filter_gal_ffb", "filter_gal_cgm",
-        "env_show_field", "env_show_isolated", "env_show_group", "env_show_cluster",
+        "env_show_field", "env_show_isolated", "env_show_pairs",
+        "env_show_group", "env_show_cluster",
         "filter_gal_age",
     )
     def on_filter_change(**_):
@@ -654,6 +663,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.filter_gal_cgm      = "any"
         state.env_show_field      = True
         state.env_show_isolated   = True
+        state.env_show_pairs      = True
         state.env_show_group      = True
         state.env_show_cluster    = True
         state.filter_gal_age      = [0.0, 14.0]
@@ -806,9 +816,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
     async def _fly_loop():
         while _held_dirs:
             for d in list(_held_dirs):
-                scene.camera.fly(d, step_frac=0.008)
+                if d in _held_dirs:
+                    scene.camera.fly(d, step_frac=0.008)
             _push()
             await asyncio.sleep(0.033)
+            await asyncio.sleep(0)   # drain pending cam_release before re-checking
         _fly_task[0] = None
 
     @ctrl.set("cam_press")
@@ -822,6 +834,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @ctrl.set("cam_release")
     def on_cam_release(direction=None, **_):
         _held_dirs.discard(str(direction))
+        if not _held_dirs:
+            _push()   # confirm final stopped position to the client
 
     @ctrl.set("go_to_env_halo")
     def on_go_to_env_halo():
@@ -1194,12 +1208,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def _capture_image(scale: int = 1):
         """Capture the current render window as a vtkImageData.
 
-        trame's remote view streams frames via its own FBO, so the
-        standard OpenGL back-buffer is stale (stuck on the initial
-        render).  Switching to off-screen rendering first forces VTK
-        to write to an FBO that vtkWindowToImageFilter can actually
-        read back — identical to the approach used in toolbar.py's
-        _capture_frame / _render_frames."""
+        Always renders at native resolution then PIL-upscales for scale > 1.
+        Using vtkWindowToImageFilter.SetScale produces tiled rendering that
+        leaves a visible grid seam at the tile boundaries in the output."""
         import vtk
         rw = scene.plotter.ren_win
         prev = rw.GetOffScreenRendering()
@@ -1208,11 +1219,35 @@ def build_navigation_panel(server, scene: Scene) -> None:
             rw.Render()
             w2i = vtk.vtkWindowToImageFilter()
             w2i.SetInput(rw)
-            w2i.SetScale(int(scale), int(scale))
             w2i.SetInputBufferTypeToRGB()
             w2i.ReadFrontBufferOff()
             w2i.Update()
-            return w2i.GetOutput()
+            vimg = w2i.GetOutput()
+            if scale <= 1:
+                return vimg
+            from vtkmodules.util.numpy_support import vtk_to_numpy, numpy_to_vtk
+            import numpy as _np2
+            from PIL import Image as _PIL2
+            w, h, _ = vimg.GetDimensions()
+            arr = vtk_to_numpy(
+                vimg.GetPointData().GetScalars()
+            ).reshape(h, w, 3)[::-1]
+            try:
+                _resample = _PIL2.Resampling.LANCZOS
+            except AttributeError:
+                _resample = _PIL2.LANCZOS
+            up = _PIL2.fromarray(arr).resize(
+                (w * scale, h * scale), _resample
+            )
+            up_arr = _np2.asarray(up)[::-1].ravel().astype(_np2.uint8)
+            vtk_data = numpy_to_vtk(
+                up_arr, deep=True, array_type=vtk.VTK_UNSIGNED_CHAR
+            )
+            vtk_data.SetNumberOfComponents(3)
+            out = vtk.vtkImageData()
+            out.SetDimensions(w * scale, h * scale, 1)
+            out.GetPointData().SetScalars(vtk_data)
+            return out
         finally:
             rw.SetOffScreenRendering(prev)
 
@@ -1596,7 +1631,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         return {
             "history":   [],
             "input":     "",
-            "mode":      "shell",   # "shell" | "python" | "sage"
+            "mode":      "terminal",   # "terminal" | "python" | "command"
             "prompt":    "$",
             "cwd":       _os.getcwd(),
             "env":       dict(_os.environ),
@@ -1754,10 +1789,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         # In SHELL/SAGE modes an empty line is a no-op. In Python mode
         # empty lines terminate multi-line blocks, so we keep them.
-        if d["mode"] in ("shell", "sage") and not cmd_raw.strip():
+        if d["mode"] in ("terminal", "command") and not cmd_raw.strip():
             return
 
-        if d["mode"] == "shell":
+        if d["mode"] == "terminal":
             cmd = cmd_raw.rstrip()
             low = cmd.strip().lower()
             if low in ("python", "python3", "py"):
@@ -1768,47 +1803,47 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 _push_history(_shell_prompt(d), cmd,
                     f"Python {_sys.version.split()[0]} (embedded)\n"
                     "Locals: scene, state, ctrl, server, plotter, np.\n"
-                    "Type 'exit' or 'quit' to leave the REPL.")
-            elif low in ("sage", "nl", "natural"):
-                d["mode"]   = "sage"
-                d["prompt"] = "sage>"
-                state.console_mode   = "sage"
-                state.console_prompt = "sage>"
+                    "Type 'exit' or 'terminal' to leave the REPL.")
+            elif low in ("command", "cmd"):
+                d["mode"]   = "command"
+                d["prompt"] = "cmd>"
+                state.console_mode   = "command"
+                state.console_prompt = "cmd>"
                 _push_history(_shell_prompt(d), cmd,
-                    "Natural-language SAGE command mode. "
+                    "SAGE-Viewer command mode. "
                     "Examples: 'show only clusters', 'go to halo 42', "
                     "'snap 30', 'screenshot'. Type 'help' for the full "
-                    "list, 'exit' to return to shell.")
+                    "list, 'exit' or 'terminal' to return to terminal.")
             else:
                 out = _run_shell(d, cmd)
                 _push_history(_shell_prompt(d), cmd, out)
 
-        elif d["mode"] == "sage":
+        elif d["mode"] == "command":
             cmd = cmd_raw.rstrip()
             low = cmd.strip().lower()
-            if low in ("exit", "quit", "shell"):
-                d["mode"]   = "shell"
+            if low in ("exit", "quit", "terminal"):
+                d["mode"]   = "terminal"
                 d["prompt"] = "$"
-                state.console_mode   = "shell"
+                state.console_mode   = "terminal"
                 state.console_prompt = _shell_prompt(d)
-                _push_history("sage>", cmd, "(back to shell)")
+                _push_history("cmd>", cmd, "(back to terminal)")
             else:
                 try:
                     out_text = execute_command(cmd, _cmd_ctx) or "(ok)"
                 except Exception as e:
                     out_text = f"Error: {e}"
-                _push_history("sage>", cmd, out_text)
+                _push_history("cmd>", cmd, out_text)
 
         else:  # python mode
             line = cmd_raw.rstrip()
             low  = line.strip().lower()
-            if low in ("exit", "quit", "exit()", "quit()", "shell"):
+            if low in ("exit", "quit", "exit()", "quit()", "terminal"):
                 d["py_buffer"].clear()
-                d["mode"]   = "shell"
+                d["mode"]   = "terminal"
                 d["prompt"] = "$"
-                state.console_mode   = "shell"
+                state.console_mode   = "terminal"
                 state.console_prompt = _shell_prompt(d)
-                _push_history(">>>", line, "(back to shell)")
+                _push_history(">>>", line, "(back to terminal)")
             else:
                 d["py_buffer"].append(line)
                 source = "\n".join(d["py_buffer"])
@@ -2474,7 +2509,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 v3.VLabel(
-                    "Show galaxies in these classes (host M_FOF)",
+                    "Show galaxies in these environments",
                     style="font-size:0.6rem;color:#9ca3af;padding:0 0 4px;display:block;",
                 )
                 _ENV_CB_STYLE = (
@@ -2483,7 +2518,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VCheckbox(
                     v_model=("env_show_field",),
-                    label="Field        (< 10^11 Msun)",
+                    label="Field",
                     hide_details=True, density="compact",
                     color="#FFD700",
                     disabled=("!model_fields.central_mvir",),
@@ -2491,7 +2526,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VCheckbox(
                     v_model=("env_show_isolated",),
-                    label="Isolated   (10^11 - 10^12.5 Msun)",
+                    label="Isolated",
+                    hide_details=True, density="compact",
+                    color="#FFD700",
+                    disabled=("!model_fields.central_mvir",),
+                    style=_ENV_CB_STYLE,
+                )
+                v3.VCheckbox(
+                    v_model=("env_show_pairs",),
+                    label="Pairs",
                     hide_details=True, density="compact",
                     color="#FFD700",
                     disabled=("!model_fields.central_mvir",),
@@ -2499,7 +2542,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VCheckbox(
                     v_model=("env_show_group",),
-                    label="Group      (10^12.5 - 10^14 Msun)",
+                    label="Groups",
                     hide_details=True, density="compact",
                     color="#FFD700",
                     disabled=("!model_fields.central_mvir",),
@@ -2507,7 +2550,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VCheckbox(
                     v_model=("env_show_cluster",),
-                    label="Cluster    (> 10^14 Msun)",
+                    label="Clusters",
                     hide_details=True, density="compact",
                     color="#FFD700",
                     disabled=("!model_fields.central_mvir",),
@@ -2731,10 +2774,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             label=(
                                 "console_mode === 'python' "
                                 "? 'Python REPL  (Enter to run)' "
-                                ": (console_mode === 'sage' "
-                                "    ? 'SAGE command  (Enter to run)' "
-                                "    : 'Shell  (Enter to run, type python "
-                                "or sage to switch modes)')",
+                                ": (console_mode === 'command' "
+                                "    ? 'Command  (Enter to run)' "
+                                "    : 'Terminal  (type python or command "
+                                "to switch modes)')",
                             ),
                             hide_details=True, variant="outlined",
                             bg_color="#1a1a2e", density="compact",

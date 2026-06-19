@@ -63,7 +63,8 @@ _SCENE_FILTER_VARS: tuple[str, ...] = (
     "filter_gal_met_hg",  "filter_gal_met_em",  "filter_gal_met_ics",
     "filter_gal_met_cgm",
     "filter_gal_ffb", "filter_gal_cgm", "filter_gal_age",
-    "env_show_field", "env_show_isolated", "env_show_group", "env_show_cluster",
+    "env_show_field", "env_show_isolated", "env_show_pairs",
+    "env_show_group", "env_show_cluster",
 )
 
 
@@ -82,7 +83,9 @@ def build_toolbar(server, scene: Scene) -> None:
 
     state.snap_num    = scene.current_snap
     state.snap_label  = scene.snap_label
+    state.snap_max    = snap_count - 1
     state.play_speed  = 1
+    _snap_count = [snap_count]   # mutable so closures stay current after model switch
     state.is_playing  = False
     state.is_reverse  = False
     state.is_repeat   = False
@@ -120,6 +123,21 @@ def build_toolbar(server, scene: Scene) -> None:
     scene.register_snap_change_callback(
         lambda n: _on_snap_change(n)
     )
+
+    def _on_model_change():
+        new_count = scene._snap_table.count
+        _snap_count[0]      = new_count
+        _suppress_snap[0]   = False      # cancel any in-flight prerender
+        _frames["key"]      = None
+        _frames["data"]     = {}
+        _preload_started[0] = False
+        _preload_done[0]    = False
+        state.snap_max      = new_count - 1
+        state.snap_num      = scene.current_snap
+        state.snap_label    = scene.snap_label
+        state.flush()
+
+    scene.register_model_change_callback(_on_model_change)
 
     def _push():
         if hasattr(ctrl, "view_update"):
@@ -325,7 +343,7 @@ def build_toolbar(server, scene: Scene) -> None:
         if _ctl["reverse"]:
             order = list(range(start, -1, -1))
         else:
-            order = list(range(start, snap_count))
+            order = list(range(start, _snap_count[0]))
         # Invalidate the frame cache if the camera, rotation, or start position
         # changed. Start is included because rotation bakes the angle by frame
         # position — the same snapshot lands at a different angle when playback
@@ -439,7 +457,44 @@ def build_toolbar(server, scene: Scene) -> None:
 
     @ctrl.set("stop")
     def on_stop():
-        _end_playback_to(snap_count - 1)
+        _end_playback_to(_snap_count[0] - 1)
+
+    @ctrl.set("snap_prev")
+    def on_snap_prev():
+        if _play_task[0] is not None and not _play_task[0].done():
+            return
+        n = max(0, int(state.snap_num) - 1)
+        scene.set_snapshot(n)
+        state.snap_num   = n
+        state.snap_label = scene.snap_label
+        state.flush()
+        _push()
+
+    @ctrl.set("snap_next")
+    def on_snap_next():
+        if _play_task[0] is not None and not _play_task[0].done():
+            return
+        n = min(_snap_count[0] - 1, int(state.snap_num) + 1)
+        scene.set_snapshot(n)
+        state.snap_num   = n
+        state.snap_label = scene.snap_label
+        state.flush()
+        _push()
+
+    @ctrl.set("refresh_snap_range")
+    def on_refresh_snap_range():
+        """Update slider bounds + current snap after a model switch."""
+        new_count = scene._snap_table.count
+        _snap_count[0]      = new_count
+        state.snap_max      = new_count - 1
+        state.snap_num      = scene.current_snap
+        state.snap_label    = scene.snap_label
+        # Invalidate pre-rendered frame cache; reset preload so it reruns
+        _frames["key"]      = None
+        _frames["data"]     = {}
+        _preload_started[0] = False
+        _preload_done[0]    = False
+        state.flush()
 
     @ctrl.set("toggle_reverse")
     def on_toggle_reverse():
@@ -575,14 +630,30 @@ def build_toolbar(server, scene: Scene) -> None:
             title="Loop",
         )
 
-    # Snapshot slider
-    with v3.VCol(style="max-width:280px;padding:0 12px;"):
+    # Snapshot step-back button + slider + step-forward button
+    v3.VBtn(
+        icon="mdi-skip-previous",
+        click=ctrl.snap_prev,
+        density="compact", variant="text", color="white",
+        title="Previous snapshot",
+        size="small",
+        style="padding:0;min-width:20px;margin-left:10px;",
+    )
+    with v3.VCol(style="max-width:240px;padding:0 4px;"):
         v3.VSlider(
             v_model=("snap_num",),
-            min=0, max=snap_count - 1, step=1,
+            min=0, max=("snap_max",), step=1,
             thumb_label=False, hide_details=True,
             color="cyan", density="compact",
         )
+    v3.VBtn(
+        icon="mdi-skip-next",
+        click=ctrl.snap_next,
+        density="compact", variant="text", color="white",
+        title="Next snapshot",
+        size="small",
+        style="padding:0;min-width:20px;",
+    )
 
     # Snapshot label chip — Mustache interpolation for reactive content
     v3.VChip(

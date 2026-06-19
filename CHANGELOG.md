@@ -135,7 +135,39 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   no `SetDesiredUpdateRate(15.0)` toggling during play / rotate /
   mouse drag)
 
+### Filter-aware FoF links
+- FoF satellite→central line segments now respect the active halo filter
+  mask, focus sphere/box, and the halos-visible toggle — links for hidden
+  or filtered halos are no longer drawn
+- `FofLinkLayer.sync_masks(visible_positions)` is the single update point:
+  pass `None` when all halos are visible (skips the position lookup); pass
+  `snap.positions[combined_mask]` when masking is active
+- Central membership is tested by exact float32 byte comparison against
+  the visible halo position set — reliable because FoF centrals come from
+  the same struct array as `halos.positions`
+- FoF links are gated on both `halos_visible` AND `fof_links_on`, so
+  toggling either off hides them correctly
+- `_sync_fof_layer()` helper in `navigation_panel.py` is called from
+  `_apply_filters()` (covers all snapshot and filter changes) and from
+  every focus-changing handler — so FoF links stay correct throughout
+  playback, recording, and all manual navigation
+
+### Playback frame-cache invalidation
+- Pre-rendered frames are now keyed by a `_scene_hash()` fingerprint that
+  covers all filter sliders, environment-class checkboxes, layer
+  visibility / opacity / color-mode / colormap, FoF visibility, and the
+  active focus region — cached frames are never replayed after any of
+  these change
+- `_SCENE_FILTER_VARS` module constant in `toolbar.py` lists every trame
+  state variable name that affects the rendered output; add entries there
+  when new filter state is introduced
+
 ### Bug fixes
+- Snapshot-slider crash when focus is active and adjacent snapshots have
+  different galaxy / halo counts: `_combined_mask()` now returns `None`
+  on a length mismatch (focus mask vs filter mask sized for different
+  snapshots) so `_redraw()` shows everything unmasked for that one
+  intermediate frame instead of raising `ValueError`
 - Switching to microUchuu used to crash on `BoxSize 100.0 ; Size of the
   simulation box` — par parser now handles `;` comments
 - Tab switches no longer destroy in-progress indicators (box / sphere /
