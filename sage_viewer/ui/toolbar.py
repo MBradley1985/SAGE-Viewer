@@ -42,6 +42,31 @@ _ROTATE_ITEMS = [
 
 _ROT_RATE_FPS = 12   # rotation render rate — lower = less load, larger steps
 
+# All trame state variables that affect what a rendered frame looks like.
+# Checked in _scene_hash() so the frame cache is invalidated when any of these
+# change (filters, environment, box/sphere selection, options, etc.).
+_SCENE_FILTER_VARS: tuple[str, ...] = (
+    "filter_halo_mvir", "filter_halo_rvir", "filter_halo_vvir",
+    "filter_halo_len",  "filter_halo_vmax", "filter_halo_conc", "filter_halo_spin",
+    "filter_gal_smass", "filter_gal_sfr",   "filter_gal_ssfr",
+    "filter_gal_coldgas", "filter_gal_bulge", "filter_gal_bt", "filter_gal_type",
+    "filter_gal_bhmass", "filter_gal_ics",   "filter_gal_h2",
+    "filter_gal_cgmgas", "filter_gal_hotgas",
+    "filter_gal_h1gas",  "filter_gal_ejected",  "filter_gal_outflow",
+    "filter_gal_massload", "filter_gal_cooling", "filter_gal_heating",
+    "filter_gal_diskrad",  "filter_gal_bulgerad",
+    "filter_gal_mb_mass",  "filter_gal_mb_rad",
+    "filter_gal_ib_mass",  "filter_gal_ib_rad",
+    "filter_gal_sfr_bulge",  "filter_gal_sfr_disk",
+    "filter_gal_sfr_blg_z",  "filter_gal_sfr_dsk_z",
+    "filter_gal_met_cg",  "filter_gal_met_sm",  "filter_gal_met_bm",
+    "filter_gal_met_hg",  "filter_gal_met_em",  "filter_gal_met_ics",
+    "filter_gal_met_cgm",
+    "filter_gal_ffb", "filter_gal_cgm", "filter_gal_age",
+    "env_show_field", "env_show_isolated", "env_show_group", "env_show_cluster",
+)
+
+
 def _parse_rotate(mode: str) -> tuple[float, float]:
     """Return (sign, deg_per_second) for a rotate_mode string, or (0, 0) for off."""
     if mode == "off":
@@ -116,8 +141,28 @@ def build_toolbar(server, scene: Scene) -> None:
     # Playback — driven by a single task + asyncio.Event for instant stop
     # ------------------------------------------------------------------
 
-    # Per-snapshot frame cache + the camera/rotation signature it's valid for.
+    # Per-snapshot frame cache + the camera/rotation/scene-state signature it's valid for.
     _frames: dict = {"key": None, "data": {}}
+
+    def _scene_hash() -> int:
+        """Integer fingerprint of all visual-affecting scene state.
+
+        Covers every filter, environment, focus, visibility, opacity, and
+        colour-mode setting so the frame cache is invalidated whenever any of
+        those change — even when the camera hasn't moved."""
+        gl = scene.galaxy_layer
+        hl = scene.halo_layer
+        parts: list = []
+        for v in _SCENE_FILTER_VARS:
+            val = getattr(state, v, None)
+            parts.append(tuple(val) if isinstance(val, list) else val)
+        parts += [
+            gl.visible, round(gl.opacity, 3), gl.color_mode, gl.colormap,
+            hl.visible, round(hl.opacity, 3), hl.color_mode, hl.colormap,
+            scene.fof_links_visible,
+            str(scene._focus_region),
+        ]
+        return hash(tuple(parts))
 
     def _cam_key():
         cam = scene.plotter.camera
@@ -126,6 +171,7 @@ def build_toolbar(server, scene: Scene) -> None:
             tuple(np.round(cam.focal_point, 2)),
             tuple(np.round(cam.up, 3)),
             _ctl["rotate_mode"],
+            _scene_hash(),
         )
 
     def _cancel_rotate():
