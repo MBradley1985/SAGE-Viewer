@@ -304,6 +304,28 @@ def build_navigation_panel(server, scene: Scene) -> None:
         if hasattr(server.controller, "view_update"):
             server.controller.view_update()
 
+    def _sync_fof_layer() -> None:
+        """Rebuild FoF links to match the current combined halo mask.
+
+        Called after any change that alters which halos are visible
+        (filter sliders, focus sphere/box, snapshot change, halo toggle).
+        Passes None when every halo is visible so _filter_segments skips
+        the position lookup entirely."""
+        fl = scene.primary.fof_layer
+        if not fl.visible:
+            return
+        hl = scene.halo_layer
+        snap = hl._snapshot
+        if snap is None:
+            return
+        mask = hl._combined_mask()
+        vis_pos = (
+            snap.positions[mask]
+            if (mask is not None and len(mask) == snap.count)
+            else None
+        )
+        fl.sync_masks(vis_pos)
+
     def _focused() -> bool:
         return bool(state.focus_active)
 
@@ -548,6 +570,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
             scene.galaxy_layer.set_filter_mask(g_mask)
 
+        _sync_fof_layer()
         _push()
 
     # Re-apply on every snapshot change (new data, masks must be rebuilt)
@@ -643,6 +666,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @state.change("halos_visible")
     def on_halo_toggle(halos_visible, **_):
         scene.halo_layer.visible = bool(halos_visible)
+        # FoF links connect halos — hide them whenever halos are hidden.
+        should_show_fof = bool(halos_visible) and bool(state.fof_links_on)
+        if should_show_fof:
+            _sync_fof_layer()   # update masks before the visible setter triggers _rebuild
+        scene.primary.fof_layer.visible = should_show_fof
         _push()
 
     @state.change("galaxies_visible")
@@ -713,6 +741,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             state.focus_active = True
         except Exception:
             pass
+        _sync_fof_layer()
         _push()
 
     def _go_to_galaxy_at_radius(radius: float) -> None:
@@ -724,6 +753,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 state.focus_active = True
         except Exception:
             pass
+        _sync_fof_layer()
         _push()
 
     @ctrl.set("go_to_galaxy_1")
@@ -756,7 +786,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @ctrl.set("toggle_fof_links")
     def on_toggle_fof_links():
         new_state = not bool(state.fof_links_on)
-        scene.set_fof_links_visible(new_state)
+        # Only actually visible when halos are also shown
+        actual_vis = new_state and bool(state.halos_visible)
+        if actual_vis:
+            _sync_fof_layer()   # update masks before enabling so first render is correct
+        scene.set_fof_links_visible(actual_vis)
         state.fof_links_on = new_state
         state.flush()
         _push()
@@ -816,6 +850,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         )
         state.focus_active = True
         state.flush()
+        _sync_fof_layer()
         _push()
 
     @ctrl.set("show_galaxy_info")
@@ -1453,6 +1488,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         # Always engage focus on Go
         scene.set_focus_sphere((x, y, z), d)
         state.focus_active = True
+        _sync_fof_layer()
         _push()
 
     @ctrl.set("populate_coords_from_camera")
@@ -1500,6 +1536,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         # Coords behaviour. User can toggle it off via the focus button.
         scene.set_focus_box(xmin, xmax, ymin, ymax, zmin, zmax)
         state.focus_active = True
+        _sync_fof_layer()
         _push()
 
     @ctrl.set("reset_camera")
@@ -1507,6 +1544,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         scene.camera.reset()
         scene.clear_focus()
         state.focus_active = False
+        _sync_fof_layer()
         _push()
 
     @ctrl.set("center_camera")
@@ -2004,6 +2042,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             # Turning OFF — always just clears focus, regardless of tab.
             state.focus_active = False
             scene.clear_focus()
+            _sync_fof_layer()
             _push()
             return
 
@@ -2062,6 +2101,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 scene._apply_focus_masks(halos.positions, galaxies.positions)
                 state.focus_active = True
 
+        _sync_fof_layer()
         _push()
 
     # ------------------------------------------------------------------
