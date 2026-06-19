@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import h5py
 import numpy as np
 
+if TYPE_CHECKING:
+    from sage_viewer.config import SimConfig
+    from sage_viewer.io.snapshot_table import SnapshotTable
+
 # 2D arrays — included in HDF5 output, skipped for flat (CSV/TXT/FITS) formats
 _2D_KEYS = {"SFHMassDisk", "SFHMassBulge"}
 
-# Unit annotations written to headers — purely informational, no conversion
+# Unit annotations — purely informational, no conversion applied
 _UNITS: dict[str, str] = {
     "Posx": "Mpc/h", "Posy": "Mpc/h", "Posz": "Mpc/h",
     "StellarMass":        "10^10 Msun/h",
@@ -36,8 +41,7 @@ def _read_snap_fields(
 ) -> tuple[dict[str, np.ndarray], dict[str, str]]:
     """Read ALL fields from a SAGE HDF5 snapshot group for the given row indices.
 
-    Data is returned exactly as stored in the HDF5 — no unit conversion.
-    2D arrays (SFH) are keyed separately for format-specific handling.
+    Data is returned exactly as stored — no unit conversion.
     """
     data: dict[str, np.ndarray] = {}
     units: dict[str, str] = {}
@@ -67,6 +71,75 @@ def _scalar_only(data: dict) -> dict[str, np.ndarray]:
     return {k: v for k, v in data.items() if np.ndim(v) == 1}
 
 
+def _build_metadata(
+    snap_num: int,
+    snap_label: str,
+    n_galaxies: int,
+    scope_label: str,
+    scope_bounds: dict | None,
+    cfg: "SimConfig | None",
+    snap_table: "SnapshotTable | None",
+) -> dict[str, str]:
+    """Build an ordered metadata dict covering export info, simulation
+    parameters, cosmology, and selection bounds."""
+    meta: dict[str, str] = {}
+
+    # ── Export info ───────────────────────────────────────────────────────
+    meta["exported"]       = datetime.datetime.now().isoformat(timespec="seconds")
+    meta["scope"]          = scope_label
+    meta["n_galaxies"]     = str(n_galaxies)
+    meta["snapshot"]       = str(snap_num)
+    meta["snap_label"]     = snap_label
+
+    if snap_table is not None:
+        try:
+            z = snap_table.snap_to_z(snap_num)
+            a = snap_table.snap_to_a(snap_num)
+            meta["redshift"]      = np.format_float_positional(z, unique=True, trim="-")
+            meta["scale_factor"]  = np.format_float_positional(a, unique=True, trim="-")
+            meta["n_snapshots"]   = str(snap_table.count)
+        except Exception:
+            pass
+
+    # ── Simulation parameters ─────────────────────────────────────────────
+    if cfg is not None:
+        meta["par_file"]              = str(cfg.par_path)
+        meta["output_dir"]            = str(cfg.output_dir)
+        meta["file_name_galaxies"]    = cfg.file_name_galaxies
+        meta["first_file"]            = str(cfg.first_file)
+        meta["last_file"]             = str(cfg.last_file)
+        meta["tree_type"]             = cfg.tree_type
+        meta["tree_name"]             = cfg.tree_name
+        meta["simulation_dir"]        = str(cfg.simulation_dir)
+        meta["snap_list_path"]        = str(cfg.snap_list_path)
+        meta["last_snapshot_nr"]      = str(cfg.last_snapshot_nr)
+        meta["num_sim_tree_files"]    = str(cfg.num_sim_tree_files)
+
+        # ── Cosmology + box ───────────────────────────────────────────────
+        meta["hubble_h"]              = np.format_float_positional(cfg.hubble_h,      unique=True, trim="-")
+        meta["H0_km_s_Mpc"]          = np.format_float_positional(cfg.hubble_h * 100, unique=True, trim="-")
+        meta["omega_matter"]          = np.format_float_positional(cfg.omega,         unique=True, trim="-")
+        meta["omega_lambda"]          = np.format_float_positional(cfg.omega_lambda,  unique=True, trim="-")
+        meta["box_size_Mpch"]         = np.format_float_positional(cfg.box_size,      unique=True, trim="-")
+        meta["part_mass_1e10Msun_h"]  = np.format_float_positional(cfg.part_mass,     unique=True, trim="-")
+
+        # Extra keys from the par file (anything not in the standard fields)
+        for k, v in sorted(cfg.extra.items()):
+            meta[f"par_{k}"] = str(v)
+
+    meta["units_note"] = (
+        "Raw SAGE26 output — no unit conversion. "
+        "Masses in 10^10 Msun/h, positions in Mpc/h, SFR in Msun/yr."
+    )
+
+    # ── Selection bounds ──────────────────────────────────────────────────
+    if scope_bounds:
+        for k, v in scope_bounds.items():
+            meta[f"selection_{k}"] = str(v)
+
+    return meta
+
+
 def write_catalogue(
     hdf5_path: Path,
     snap_num: int,
@@ -76,6 +149,9 @@ def write_catalogue(
     fmt: str,
     hubble_h: float = 0.73,
     scope_label: str = "",
+    scope_bounds: dict | None = None,
+    cfg: "SimConfig | None" = None,
+    snap_table: "SnapshotTable | None" = None,
 ) -> str:
     """Export raw SAGE HDF5 galaxy rows to *out_path* in format *fmt*.
 
@@ -88,16 +164,15 @@ def write_catalogue(
 
     data, units = _read_snap_fields(hdf5_path, snap_num, sage_indices)
 
-    meta = {
-        "sage_viewer":  "SAGE-Viewer Galaxy Catalogue",
-        "scope":        scope_label,
-        "snapshot":     snap_num,
-        "snap_label":   snap_label,
-        "n_galaxies":   len(sage_indices),
-        "hubble_h":     hubble_h,
-        "note":         "All values are raw SAGE26 output — no unit conversion applied",
-        "exported":     datetime.datetime.now().isoformat(timespec="seconds"),
-    }
+    meta = _build_metadata(
+        snap_num=snap_num,
+        snap_label=snap_label,
+        n_galaxies=len(sage_indices),
+        scope_label=scope_label,
+        scope_bounds=scope_bounds,
+        cfg=cfg,
+        snap_table=snap_table,
+    )
 
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -116,6 +191,20 @@ def write_catalogue(
     return str(out_path)
 
 
+# ── Formatting ────────────────────────────────────────────────────────────────
+
+def _fmt(val, dtype) -> str:
+    """Format a scalar without scientific notation and without truncation.
+
+    Integers → plain int string.
+    Floats → fixed-point with just enough digits to round-trip the stored
+    value (np.format_float_positional with unique=True).
+    """
+    if dtype.kind in ("i", "u"):
+        return str(int(val))
+    return np.format_float_positional(val, unique=True, trim="-")
+
+
 # ── Format writers ────────────────────────────────────────────────────────────
 
 def _write_csv(data: dict, units: dict, meta: dict, out_path: Path) -> None:
@@ -128,15 +217,13 @@ def _write_csv(data: dict, units: dict, meta: dict, out_path: Path) -> None:
             f"{k}[{u}]" for k, u in units.items() if u and k in scalar
         )
         if unit_notes:
-            f.write(f"# units: {unit_notes}\n")
+            f.write(f"# column_units: {unit_notes}\n")
         writer = csv.writer(f)
         writer.writerow(list(scalar.keys()))
-        n = len(next(iter(scalar.values())))
+        arrs = list(scalar.values())
+        n = len(arrs[0])
         for i in range(n):
-            writer.writerow([
-                int(v[i]) if v.dtype.kind in ("i", "u") else float(v[i])
-                for v in scalar.values()
-            ])
+            writer.writerow([_fmt(a[i], a.dtype) for a in arrs])
 
 
 def _write_txt(data: dict, units: dict, meta: dict, out_path: Path) -> None:
@@ -149,13 +236,10 @@ def _write_txt(data: dict, units: dict, meta: dict, out_path: Path) -> None:
         header = "  ".join(
             f"{c}[{units.get(c, '')}]" if units.get(c) else c for c in cols
         )
-        np.savetxt(
-            f,
-            np.column_stack([a.astype(np.float64) for a in arrs]),
-            fmt="%.6e",
-            header=header,
-            comments="# ",
-        )
+        f.write(f"# {header}\n")
+        n = len(arrs[0])
+        for i in range(n):
+            f.write("  ".join(_fmt(a[i], a.dtype) for a in arrs) + "\n")
 
 
 def _write_hdf5(data: dict, units: dict, meta: dict, out_path: Path) -> None:
@@ -186,6 +270,7 @@ def _write_fits(data: dict, units: dict, meta: dict, out_path: Path) -> None:
 
     hdr = fits.Header()
     for k, v in meta.items():
+        # FITS keyword: max 8 chars, uppercase, no spaces
         fits_key = k.upper().replace(" ", "_")[:8]
         hdr[fits_key] = str(v)[:72]
 

@@ -650,7 +650,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.export_status       = ""          # last result path or error
     state.export_busy         = False
 
-    def _resolve_export_indices(scope: str) -> "np.ndarray":
+    def _resolve_export_indices(scope: str) -> "tuple[np.ndarray, dict]":
+        """Return (gal_indices_into_snapshot, scope_bounds_dict)."""
         import numpy as np
         _, galaxies = scene._loader.get(scene.current_snap)
         if galaxies.count == 0:
@@ -660,7 +661,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
             idx = int(state.nav_gal_idx)
             if idx < 0 or idx >= galaxies.count:
                 raise ValueError(f"Target index {idx} out of range.")
-            return np.array([idx], dtype=np.int64)
+            pos = galaxies.positions[idx]
+            bounds = {
+                "galaxy_index_in_snapshot": idx,
+                "position_x_Mpch": np.format_float_positional(float(pos[0]), unique=True, trim="-"),
+                "position_y_Mpch": np.format_float_positional(float(pos[1]), unique=True, trim="-"),
+                "position_z_Mpch": np.format_float_positional(float(pos[2]), unique=True, trim="-"),
+            }
+            return np.array([idx], dtype=np.int64), bounds
 
         if scope == "group":
             from sage_viewer.utils.group_info import member_indices
@@ -668,7 +676,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
             members = member_indices(galaxies, idx)
             if len(members) == 0:
                 raise ValueError("No group members found for target galaxy.")
-            return members.astype(np.int64)
+            central_pos = galaxies.positions[idx]
+            bounds = {
+                "central_galaxy_index_in_snapshot": idx,
+                "n_members": len(members),
+                "central_position_x_Mpch": np.format_float_positional(float(central_pos[0]), unique=True, trim="-"),
+                "central_position_y_Mpch": np.format_float_positional(float(central_pos[1]), unique=True, trim="-"),
+                "central_position_z_Mpch": np.format_float_positional(float(central_pos[2]), unique=True, trim="-"),
+            }
+            return members.astype(np.int64), bounds
 
         if scope == "coords":
             cx, cy, cz = float(state.nav_x), float(state.nav_y), float(state.nav_z)
@@ -677,21 +693,34 @@ def build_navigation_panel(server, scene: Scene) -> None:
             mask = d2 <= r * r
             if not mask.any():
                 raise ValueError(f"No galaxies within {r} Mpc/h of ({cx:.1f},{cy:.1f},{cz:.1f}).")
-            return np.where(mask)[0].astype(np.int64)
+            bounds = {
+                "sphere_center_x_Mpch": cx,
+                "sphere_center_y_Mpch": cy,
+                "sphere_center_z_Mpch": cz,
+                "sphere_radius_Mpch":   r,
+            }
+            return np.where(mask)[0].astype(np.int64), bounds
 
         if scope == "box":
             pos = galaxies.positions
+            xmin, xmax = float(state.nav_box_xmin), float(state.nav_box_xmax)
+            ymin, ymax = float(state.nav_box_ymin), float(state.nav_box_ymax)
+            zmin, zmax = float(state.nav_box_zmin), float(state.nav_box_zmax)
             mask = (
-                (pos[:, 0] >= float(state.nav_box_xmin)) & (pos[:, 0] <= float(state.nav_box_xmax)) &
-                (pos[:, 1] >= float(state.nav_box_ymin)) & (pos[:, 1] <= float(state.nav_box_ymax)) &
-                (pos[:, 2] >= float(state.nav_box_zmin)) & (pos[:, 2] <= float(state.nav_box_zmax))
+                (pos[:, 0] >= xmin) & (pos[:, 0] <= xmax) &
+                (pos[:, 1] >= ymin) & (pos[:, 1] <= ymax) &
+                (pos[:, 2] >= zmin) & (pos[:, 2] <= zmax)
             )
             if not mask.any():
                 raise ValueError("No galaxies within the current box bounds.")
-            return np.where(mask)[0].astype(np.int64)
+            bounds = {
+                "box_xmin_Mpch": xmin, "box_xmax_Mpch": xmax,
+                "box_ymin_Mpch": ymin, "box_ymax_Mpch": ymax,
+                "box_zmin_Mpch": zmin, "box_zmax_Mpch": zmax,
+            }
+            return np.where(mask)[0].astype(np.int64), bounds
 
         # default: "filters" — use the active filter mask on the galaxy layer
-        import numpy as np
         fmask = scene.primary.galaxy_layer._filter_mask
         if fmask is None:
             gal_indices = np.arange(galaxies.count, dtype=np.int64)
@@ -699,7 +728,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
             gal_indices = np.where(fmask)[0].astype(np.int64)
         if len(gal_indices) == 0:
             raise ValueError("Filter mask excludes all galaxies.")
-        return gal_indices
+        bounds = {"filter_description": "Active galaxy filter tab settings"}
+        return gal_indices, bounds
 
     _SCOPE_LABELS = {
         "filters": "Current Filters",
@@ -720,11 +750,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.flush()
 
         try:
-            gal_indices = _resolve_export_indices(scope)
+            gal_indices, scope_bounds = _resolve_export_indices(scope)
             _, galaxies = scene._loader.get(scene.current_snap)
             sage_idx = galaxies.sage_indices[gal_indices]
 
-            hdf5_path = scene.primary.cfg.hdf5_path
+            cfg       = scene.primary.cfg
+            snap_tbl  = scene.primary.snap_table
+            hdf5_path = cfg.hdf5_path
             snap_num  = scene.current_snap
             snap_lbl  = str(state.snap_label) if hasattr(state, "snap_label") else f"snap{snap_num}"
 
@@ -746,8 +778,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     sage_indices=sage_idx,
                     out_path=out_path,
                     fmt=fmt,
-                    hubble_h=scene.primary.cfg.hubble_h,
+                    hubble_h=cfg.hubble_h,
                     scope_label=_SCOPE_LABELS.get(scope, scope),
+                    scope_bounds=scope_bounds,
+                    cfg=cfg,
+                    snap_table=snap_tbl,
                 ),
             )
             n = len(sage_idx)
