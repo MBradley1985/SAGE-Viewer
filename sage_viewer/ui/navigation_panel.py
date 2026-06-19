@@ -247,6 +247,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # Misc
     _snap_max = max(0, scene.primary.snap_table.count - 1)
     # Categoricals
+    state.filter_gal_type    = "both"          # both | central | satellite
     state.filter_gal_ffb     = "any"           # any | yes | no   (FFBRegime)
     state.filter_gal_cgm     = "any"           # any | cold | hot (Regime 0/1)
     # Environment categories — each checkbox toggles inclusion of that class.
@@ -402,6 +403,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
             def _lgr(x): return np.log10(np.maximum(x, 1e-6))   # for rates/radii
             def _apply(lo, hi, arr):
                 g_mask.__iand__((arr >= float(lo)) & (arr <= float(hi)))
+            def _apply_nz(lo, hi, raw):
+                # Zero/negative raw values always pass — they mean "not active",
+                # not "below detection limit". Non-zero values filtered normally.
+                log_v = np.log10(np.maximum(raw, 1e-30))
+                g_mask.__iand__((raw <= 0) | ((log_v >= float(lo)) & (log_v <= float(hi))))
 
             if fields.get("h1_gas", False):
                 lo, hi = state.filter_gal_h1gas
@@ -413,27 +419,27 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
             if fields.get("outflow_rate", False):
                 lo, hi = state.filter_gal_outflow
-                _apply(lo, hi, _lgr(galaxies.outflow_rate))
+                _apply_nz(lo, hi, galaxies.outflow_rate)
 
             if fields.get("mass_loading", False):
                 lo, hi = state.filter_gal_massload
-                _apply(lo, hi, _lgr(galaxies.mass_loading))
+                _apply_nz(lo, hi, galaxies.mass_loading)
 
             if fields.get("cooling", False):
                 lo, hi = state.filter_gal_cooling
-                _apply(lo, hi, _lgr(galaxies.cooling))
+                _apply_nz(lo, hi, galaxies.cooling)
 
             if fields.get("heating", False):
                 lo, hi = state.filter_gal_heating
-                _apply(lo, hi, _lgr(galaxies.heating))
+                _apply_nz(lo, hi, galaxies.heating)
 
             if fields.get("disk_radius", False):
                 lo, hi = state.filter_gal_diskrad
-                _apply(lo, hi, _lgr(galaxies.disk_radius))
+                _apply_nz(lo, hi, galaxies.disk_radius)
 
             if fields.get("bulge_radius", False):
                 lo, hi = state.filter_gal_bulgerad
-                _apply(lo, hi, _lgr(galaxies.bulge_radius))
+                _apply_nz(lo, hi, galaxies.bulge_radius)
 
             if fields.get("merger_bulge_mass", False):
                 lo, hi = state.filter_gal_mb_mass
@@ -441,7 +447,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
             if fields.get("merger_bulge_radius", False):
                 lo, hi = state.filter_gal_mb_rad
-                _apply(lo, hi, _lgr(galaxies.merger_bulge_radius))
+                _apply_nz(lo, hi, galaxies.merger_bulge_radius)
 
             if fields.get("instability_bulge_mass", False):
                 lo, hi = state.filter_gal_ib_mass
@@ -449,7 +455,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
             if fields.get("instability_bulge_radius", False):
                 lo, hi = state.filter_gal_ib_rad
-                _apply(lo, hi, _lgr(galaxies.instability_bulge_radius))
+                _apply_nz(lo, hi, galaxies.instability_bulge_radius)
 
             if fields.get("sfr_bulge", False):
                 lo, hi = state.filter_gal_sfr_bulge
