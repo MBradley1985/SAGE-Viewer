@@ -142,11 +142,20 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.filter_halo_rvir   = [0.0, 3.0]     # Mpc/h (raw)
     state.filter_halo_vvir   = [0.0, 1000.0]  # km/s   (raw)
     state.filter_gal_smass   = [8.0, 12.5]    # log10 Msun
+    state.filter_gal_sfr     = [-6.0, 3.0]    # log10 Msun/yr (-6 incl. quenched)
     state.filter_gal_ssfr    = [-14.0, -8.0]  # log10 yr^-1
+    state.filter_gal_coldgas = [0.0, 12.0]    # log10 Msun  (0 incl. zero cold gas)
+    state.filter_gal_bulge   = [0.0, 12.0]    # log10 Msun  (0 incl. bulgeless)
     state.filter_gal_bt      = [0.0, 1.0]     # bulge/total
     state.filter_gal_type    = "both"         # both | central | satellite
     state.filter_gal_bhmass  = [0.0, 10.0]    # log10 Msun (0 includes zero-BH gals)
     state.filter_gal_ics     = [0.0, 12.0]    # log10 Msun (0 includes zero-ICS gals)
+    state.filter_gal_h2      = [0.0, 12.0]    # log10 Msun (0 includes zero-H2 gals)
+    state.filter_gal_cgmgas  = [0.0, 12.0]    # log10 Msun (CGMgas field)
+    state.filter_gal_hotgas  = [0.0, 12.0]    # log10 Msun (HotGas field)
+    _snap_max = max(0, scene.primary.snap_table.count - 1)
+    state.filter_gal_tinfall = [0, _snap_max] # snapshot index (time of infall)
+    state.filter_gal_cmvir   = [0.0, 15.0]   # log10 Msun (host halo Mvir)
     state.filter_gal_ffb     = "any"          # any | yes | no   (FFBRegime)
     state.filter_gal_cgm     = "any"          # any | cold | hot (Regime 0/1)
     # Environment categories — each checkbox toggles inclusion of that class.
@@ -246,9 +255,21 @@ def build_navigation_panel(server, scene: Scene) -> None:
             sm_log = np.log10(np.maximum(galaxies.stellar_mass, 1.0))
             g_mask &= (sm_log >= float(sm_lo)) & (sm_log <= float(sm_hi))
 
+            sfr_lo, sfr_hi = state.filter_gal_sfr
+            sfr_log = np.log10(np.maximum(galaxies.sfr, 1e-6))
+            g_mask &= (sfr_log >= float(sfr_lo)) & (sfr_log <= float(sfr_hi))
+
             ss_lo, ss_hi = state.filter_gal_ssfr
             ssfr_log = np.log10(np.maximum(galaxies.ssfr, 1e-30))
             g_mask &= (ssfr_log >= float(ss_lo)) & (ssfr_log <= float(ss_hi))
+
+            cg_lo, cg_hi = state.filter_gal_coldgas
+            cg_log = np.log10(np.maximum(galaxies.cold_gas, 1.0))
+            g_mask &= (cg_log >= float(cg_lo)) & (cg_log <= float(cg_hi))
+
+            bm_lo, bm_hi = state.filter_gal_bulge
+            bm_log = np.log10(np.maximum(galaxies.bulge_mass, 1.0))
+            g_mask &= (bm_log >= float(bm_lo)) & (bm_log <= float(bm_hi))
 
             bt_lo, bt_hi = state.filter_gal_bt
             sm_safe = np.maximum(galaxies.stellar_mass, 1.0)
@@ -272,6 +293,33 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 ics_lo, ics_hi = state.filter_gal_ics
                 ics_log = np.log10(np.maximum(galaxies.ics_mass, 1.0))
                 g_mask &= (ics_log >= float(ics_lo)) & (ics_log <= float(ics_hi))
+
+            if fields.get("h2_mass", False):
+                h2_lo, h2_hi = state.filter_gal_h2
+                h2_log = np.log10(np.maximum(galaxies.h2_mass, 1.0))
+                g_mask &= (h2_log >= float(h2_lo)) & (h2_log <= float(h2_hi))
+
+            if fields.get("cgm_gas", False):
+                cgmgas_lo, cgmgas_hi = state.filter_gal_cgmgas
+                cgmgas_log = np.log10(np.maximum(galaxies.cgm_gas, 1.0))
+                g_mask &= (cgmgas_log >= float(cgmgas_lo)) & (cgmgas_log <= float(cgmgas_hi))
+
+            if fields.get("hot_gas", False):
+                hotgas_lo, hotgas_hi = state.filter_gal_hotgas
+                hotgas_log = np.log10(np.maximum(galaxies.hot_gas, 1.0))
+                g_mask &= (hotgas_log >= float(hotgas_lo)) & (hotgas_log <= float(hotgas_hi))
+
+            if fields.get("time_of_infall", False):
+                ti_lo, ti_hi = state.filter_gal_tinfall
+                g_mask &= (
+                    (galaxies.time_of_infall >= int(ti_lo)) &
+                    (galaxies.time_of_infall <= int(ti_hi))
+                )
+
+            if fields.get("central_mvir", False):
+                cm_lo, cm_hi = state.filter_gal_cmvir
+                cm_log = np.log10(np.maximum(galaxies.central_mvir, 1.0))
+                g_mask &= (cm_log >= float(cm_lo)) & (cm_log <= float(cm_hi))
 
             if fields.get("ffb_regime", False):
                 ffb = str(state.filter_gal_ffb)
@@ -327,9 +375,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     @state.change(
         "filter_halo_mvir", "filter_halo_rvir", "filter_halo_vvir",
-        "filter_gal_smass", "filter_gal_ssfr",
+        "filter_gal_smass", "filter_gal_sfr", "filter_gal_ssfr",
+        "filter_gal_coldgas", "filter_gal_bulge",
         "filter_gal_bt", "filter_gal_type",
         "filter_gal_bhmass", "filter_gal_ics",
+        "filter_gal_h2", "filter_gal_cgmgas", "filter_gal_hotgas",
+        "filter_gal_tinfall", "filter_gal_cmvir",
         "filter_gal_ffb", "filter_gal_cgm",
         "env_show_field", "env_show_isolated",
         "env_show_group", "env_show_cluster",
@@ -346,22 +397,30 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     @ctrl.set("reset_filters")
     def on_reset_filters():
-        state.filter_halo_mvir  = [10.0, 15.0]
-        state.filter_halo_rvir  = [0.0, 3.0]
-        state.filter_halo_vvir  = [0.0, 1000.0]
-        state.filter_gal_smass  = [8.0, 12.5]
-        state.filter_gal_ssfr   = [-14.0, -8.0]
-        state.filter_gal_bt     = [0.0, 1.0]
-        state.filter_gal_type   = "both"
-        state.filter_gal_bhmass = [0.0, 10.0]
-        state.filter_gal_ics    = [0.0, 12.0]
-        state.filter_gal_ffb    = "any"
-        state.filter_gal_cgm    = "any"
-        state.env_show_field    = True
-        state.env_show_isolated = True
-        state.env_show_group    = True
-        state.env_show_cluster  = True
-        state.filter_gal_age    = [0.0, 14.0]
+        state.filter_halo_mvir   = [10.0, 15.0]
+        state.filter_halo_rvir   = [0.0, 3.0]
+        state.filter_halo_vvir   = [0.0, 1000.0]
+        state.filter_gal_smass   = [8.0, 12.5]
+        state.filter_gal_sfr     = [-6.0, 3.0]
+        state.filter_gal_ssfr    = [-14.0, -8.0]
+        state.filter_gal_coldgas = [0.0, 12.0]
+        state.filter_gal_bulge   = [0.0, 12.0]
+        state.filter_gal_bt      = [0.0, 1.0]
+        state.filter_gal_type    = "both"
+        state.filter_gal_bhmass  = [0.0, 10.0]
+        state.filter_gal_ics     = [0.0, 12.0]
+        state.filter_gal_h2      = [0.0, 12.0]
+        state.filter_gal_cgmgas  = [0.0, 12.0]
+        state.filter_gal_hotgas  = [0.0, 12.0]
+        state.filter_gal_tinfall = [0, _snap_max]
+        state.filter_gal_cmvir   = [0.0, 15.0]
+        state.filter_gal_ffb     = "any"
+        state.filter_gal_cgm     = "any"
+        state.env_show_field     = True
+        state.env_show_isolated  = True
+        state.env_show_group     = True
+        state.env_show_cluster   = True
+        state.filter_gal_age     = [0.0, 14.0]
         state.flush()
 
     # ------------------------------------------------------------------
@@ -2503,17 +2562,19 @@ def build_navigation_panel(server, scene: Scene) -> None:
             with v3.VSheet(
                 color="transparent",
                 v_show=("nav_active_tab === 'filters'",),
+                style=(
+                    "display:flex;flex-direction:column;"
+                    "height:100%;min-height:0;width:100%;"
+                ),
             ):
                 _FSEC = (
                     "font-size:0.78rem;font-weight:700;letter-spacing:0.08em;"
-                    "color:#06b6d4;padding:2px 0 2px;display:block;"
+                    "color:#06b6d4;padding:2px 0 2px;display:block;flex-shrink:0;"
                 )
                 _FLBL = (
                     "font-size:0.6rem;color:#9ca3af;display:block;"
                     "padding:2px 0 0;"
                 )
-                # Compact filter sliders — narrower AND shorter than the
-                # default Vuetify range slider so they don't dominate.
                 _FSLD = (
                     "padding:0;margin-top:-12px;margin-bottom:-12px;"
                     "transform:scale(0.7);transform-origin:left center;"
@@ -2523,139 +2584,227 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "--v-input-control-height:30px;"
                     "font-size:0.7rem;margin-top:1px;"
                 )
+                _SCROLL = (
+                    "min-height:0;overflow-y:auto;overflow-x:hidden;"
+                    "padding-right:2px;"
+                )
 
+                # ── Halo section ──────────────────────────────
                 v3.VLabel("DARK MATTER HALOES", style=_FSEC)
-                v3.VLabel("Mvir  (log10 Msun)", style=_FLBL)
-                v3.VRangeSlider(
-                    v_model=("filter_halo_mvir",),
-                    min=10.0, max=15.0, step=0.1,
-                    thumb_label=True, color="cyan",
-                    density="compact", hide_details=True,
-                    classes="sage-fslider",
-                    style=_FSLD,
-                )
-                v3.VLabel("Rvir  (Mpc/h)", style=_FLBL)
-                v3.VRangeSlider(
-                    v_model=("filter_halo_rvir",),
-                    min=0.0, max=3.0, step=0.05,
-                    thumb_label=True, color="cyan",
-                    density="compact", hide_details=True,
-                    classes="sage-fslider",
-                    style=_FSLD,
-                )
-                v3.VLabel("Vvir  (km/s)", style=_FLBL)
-                v3.VRangeSlider(
-                    v_model=("filter_halo_vvir",),
-                    min=0.0, max=1000.0, step=10.0,
-                    thumb_label=True, color="cyan",
-                    density="compact", hide_details=True,
-                    classes="sage-fslider",
-                    style=_FSLD,
-                )
+                with html.Div(style=_SCROLL + "flex:2;"):
+                    v3.VLabel("Mvir  (log10 Msun)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_halo_mvir",),
+                        min=10.0, max=15.0, step=0.1,
+                        thumb_label=True, color="cyan",
+                        density="compact", hide_details=True,
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("Rvir  (Mpc/h)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_halo_rvir",),
+                        min=0.0, max=3.0, step=0.05,
+                        thumb_label=True, color="cyan",
+                        density="compact", hide_details=True,
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("Vvir  (km/s)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_halo_vvir",),
+                        min=0.0, max=1000.0, step=10.0,
+                        thumb_label=True, color="cyan",
+                        density="compact", hide_details=True,
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
 
-                v3.VDivider(style="margin:4px 0 2px;")
+                v3.VDivider(style="margin:2px 0;flex-shrink:0;")
 
+                # ── Galaxy section ────────────────────────────
                 v3.VLabel("GALAXIES", style=_FSEC)
-                v3.VLabel("Stellar mass  (log10 Msun)", style=_FLBL)
-                v3.VRangeSlider(
-                    v_model=("filter_gal_smass",),
-                    min=8.0, max=12.5, step=0.1,
-                    thumb_label=True, color="#FFD700",
-                    density="compact", hide_details=True,
-                    classes="sage-fslider",
-                    style=_FSLD,
-                )
-                v3.VLabel("sSFR  (log10 yr^-1)", style=_FLBL)
-                v3.VRangeSlider(
-                    v_model=("filter_gal_ssfr",),
-                    min=-14.0, max=-8.0, step=0.1,
-                    thumb_label=True, color="#FFD700",
-                    density="compact", hide_details=True,
-                    classes="sage-fslider",
-                    style=_FSLD,
-                )
-                v3.VLabel("B / T  (bulge / stellar)", style=_FLBL)
-                v3.VRangeSlider(
-                    v_model=("filter_gal_bt",),
-                    min=0.0, max=1.0, step=0.02,
-                    thumb_label=True, color="#FFD700",
-                    density="compact", hide_details=True,
-                    classes="sage-fslider",
-                    style=_FSLD,
-                )
-                v3.VLabel("Stellar age  (Gyr, mass-weighted)", style=_FLBL)
-                v3.VRangeSlider(
-                    v_model=("filter_gal_age",),
-                    min=0.0, max=14.0, step=0.1,
-                    thumb_label=True, color="#FFD700",
-                    density="compact", hide_details=True,
-                    disabled=("!model_fields.mean_age",),
-                    classes="sage-fslider",
-                    style=_FSLD,
-                )
-                v3.VLabel("BH mass  (log10 Msun)", style=_FLBL)
-                v3.VRangeSlider(
-                    v_model=("filter_gal_bhmass",),
-                    min=0.0, max=10.0, step=0.1,
-                    thumb_label=True, color="#FFD700",
-                    density="compact", hide_details=True,
-                    disabled=("!model_fields.bh_mass",),
-                    classes="sage-fslider",
-                    style=_FSLD,
-                )
-                v3.VLabel("ICS mass  (log10 Msun)", style=_FLBL)
-                v3.VRangeSlider(
-                    v_model=("filter_gal_ics",),
-                    min=0.0, max=12.0, step=0.1,
-                    thumb_label=True, color="#FFD700",
-                    density="compact", hide_details=True,
-                    disabled=("!model_fields.ics_mass",),
-                    classes="sage-fslider",
-                    style=_FSLD,
-                )
+                with html.Div(style=_SCROLL + "flex:5;"):
+                    v3.VLabel("Stellar mass  (log10 Msun)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_smass",),
+                        min=8.0, max=12.5, step=0.1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("SFR  (log10 Msun/yr,  -6 = quenched)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_sfr",),
+                        min=-6.0, max=3.0, step=0.1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("sSFR  (log10 yr^-1)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_ssfr",),
+                        min=-14.0, max=-8.0, step=0.1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("Cold gas  (log10 Msun,  0 = gas-poor)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_coldgas",),
+                        min=0.0, max=12.0, step=0.1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("Bulge mass  (log10 Msun,  0 = bulgeless)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_bulge",),
+                        min=0.0, max=12.0, step=0.1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("B / T  (bulge / stellar)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_bt",),
+                        min=0.0, max=1.0, step=0.02,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("BH mass  (log10 Msun)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_bhmass",),
+                        min=0.0, max=10.0, step=0.1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        disabled=("!model_fields.bh_mass",),
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("ICS mass  (log10 Msun)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_ics",),
+                        min=0.0, max=12.0, step=0.1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        disabled=("!model_fields.ics_mass",),
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("H2 gas  (log10 Msun)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_h2",),
+                        min=0.0, max=12.0, step=0.1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        disabled=("!model_fields.h2_mass",),
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("CGM gas  (log10 Msun)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_cgmgas",),
+                        min=0.0, max=12.0, step=0.1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        disabled=("!model_fields.cgm_gas",),
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("Hot gas  (log10 Msun)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_hotgas",),
+                        min=0.0, max=12.0, step=0.1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        disabled=("!model_fields.hot_gas",),
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("Stellar age  (Gyr, mass-weighted)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_age",),
+                        min=0.0, max=14.0, step=0.1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        disabled=("!model_fields.mean_age",),
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("Time of infall  (snapshot #)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_tinfall",),
+                        min=0, max=_snap_max, step=1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        disabled=("!model_fields.time_of_infall",),
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
+                    v3.VLabel("Host halo Mvir  (log10 Msun)", style=_FLBL)
+                    v3.VRangeSlider(
+                        v_model=("filter_gal_cmvir",),
+                        min=0.0, max=15.0, step=0.1,
+                        thumb_label=True, color="#FFD700",
+                        density="compact", hide_details=True,
+                        disabled=("!model_fields.central_mvir",),
+                        classes="sage-fslider",
+                        style=_FSLD,
+                    )
 
-                v3.VLabel("Type", style=_FLBL)
-                v3.VSelect(
-                    v_model=("filter_gal_type",),
-                    items=([
-                        {"title": "All",         "value": "both"},
-                        {"title": "Centrals",    "value": "central"},
-                        {"title": "Satellites",  "value": "satellite"},
-                    ],),
-                    hide_details=True, variant="outlined",
-                    color="#FFD700", density="compact",
-                    style=_FSEL,
-                )
+                v3.VDivider(style="margin:2px 0;flex-shrink:0;")
 
-                v3.VLabel("FFB regime", style=_FLBL)
-                v3.VSelect(
-                    v_model=("filter_gal_ffb",),
-                    items=([
-                        {"title": "Any",          "value": "any"},
-                        {"title": "FFB only",     "value": "yes"},
-                        {"title": "Non-FFB only", "value": "no"},
-                    ],),
-                    hide_details=True, variant="outlined",
-                    color="#FFD700", density="compact",
-                    disabled=("!model_fields.ffb_regime",),
-                    style=_FSEL,
-                )
+                # ── Categorical section ───────────────────────
+                v3.VLabel("CATEGORICAL", style=_FSEC)
+                with html.Div(style=_SCROLL + "flex:2;"):
+                    v3.VLabel("Type", style=_FLBL)
+                    v3.VSelect(
+                        v_model=("filter_gal_type",),
+                        items=([
+                            {"title": "All",         "value": "both"},
+                            {"title": "Centrals",    "value": "central"},
+                            {"title": "Satellites",  "value": "satellite"},
+                        ],),
+                        hide_details=True, variant="outlined",
+                        color="#FFD700", density="compact",
+                        style=_FSEL,
+                    )
+                    v3.VLabel("FFB regime", style=_FLBL)
+                    v3.VSelect(
+                        v_model=("filter_gal_ffb",),
+                        items=([
+                            {"title": "Any",          "value": "any"},
+                            {"title": "FFB only",     "value": "yes"},
+                            {"title": "Non-FFB only", "value": "no"},
+                        ],),
+                        hide_details=True, variant="outlined",
+                        color="#FFD700", density="compact",
+                        disabled=("!model_fields.ffb_regime",),
+                        style=_FSEL,
+                    )
+                    v3.VLabel("CGM / Hot regime", style=_FLBL)
+                    v3.VSelect(
+                        v_model=("filter_gal_cgm",),
+                        items=([
+                            {"title": "Any",                     "value": "any"},
+                            {"title": "CGM galaxies",            "value": "cold"},
+                            {"title": "Hot atmosphere galaxies", "value": "hot"},
+                        ],),
+                        hide_details=True, variant="outlined",
+                        color="#FFD700", density="compact",
+                        disabled=("!model_fields.cgm_regime",),
+                        style=_FSEL,
+                    )
 
-                v3.VLabel("CGM / Hot regime", style=_FLBL)
-                v3.VSelect(
-                    v_model=("filter_gal_cgm",),
-                    items=([
-                        {"title": "Any",                     "value": "any"},
-                        {"title": "CGM galaxies",            "value": "cold"},
-                        {"title": "Hot atmosphere galaxies", "value": "hot"},
-                    ],),
-                    hide_details=True, variant="outlined",
-                    color="#FFD700", density="compact",
-                    disabled=("!model_fields.cgm_regime",),
-                    style=_FSEL,
-                )
-
-                v3.VDivider(style="margin:6px 0 4px;")
+                v3.VDivider(style="margin:3px 0;flex-shrink:0;")
 
                 v3.VBtn(
                     "Reset Filters",
@@ -2664,6 +2813,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     size="small",
                     prepend_icon="mdi-restore",
                     click=ctrl.reset_filters,
+                    style="flex-shrink:0;",
                 )
 
             # ── RECORD tab ─────────────────────────────────────
