@@ -195,6 +195,11 @@ class GalaxyLayer:
             return self._filter_mask
         if self._filter_mask is None:
             return self._focus_mask
+        if len(self._focus_mask) != len(self._filter_mask):
+            # Masks are from different snapshots mid-transition; can't safely
+            # combine them.  Return None so _redraw() shows everything until
+            # both masks are refreshed for the new snapshot.
+            return None
         return self._focus_mask & self._filter_mask
 
     # ------------------------------------------------------------------

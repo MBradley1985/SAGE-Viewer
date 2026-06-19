@@ -106,6 +106,8 @@ class HaloLayer:
             return self._filter_mask
         if self._filter_mask is None:
             return self._focus_mask
+        if len(self._focus_mask) != len(self._filter_mask):
+            return None
         return self._focus_mask & self._filter_mask
 
     # ------------------------------------------------------------------
