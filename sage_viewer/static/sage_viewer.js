@@ -151,6 +151,19 @@
   }, true);
   window.addEventListener('blur', releaseAll);   // stop if focus leaves
 
+  // ─── Wizard terminal auto-scroll ─────────────────────────────────────
+  // The wizard terminal always follows new output — no manual-scroll
+  // preservation (unlike the general sage-console-scroll logic).
+  // Poll until the element is in the DOM, then attach a MutationObserver
+  // directly on it so every child addition scrolls to the bottom.
+  (function watchWizTerminal() {
+    var term = document.querySelector('.wiz-console-scroll');
+    if (!term) { setTimeout(watchWizTerminal, 300); return; }
+    new MutationObserver(function () {
+      term.scrollTop = term.scrollHeight;
+    }).observe(term, { childList: true, subtree: true });
+  })();
+
   // Grab keyboard focus as soon as the page is up so WASD / arrow keys work
   // immediately, without the user having to click the viewport first.
   function grabKeyboardFocus() {
@@ -165,31 +178,4 @@
     setTimeout(grabKeyboardFocus, 1500);
   });
 
-  // ─── Page-reload trigger ──────────────────────────────────────────────
-  // When the Python server sets page_reload=True (e.g. after the wizard
-  // loads a model), the Vue reactive state updates. We poll lightly for
-  // that flag and reload when it appears, then clear it so the next
-  // reload of the page starts fresh.
-  (function watchReload() {
-    var app = document.getElementById('app');
-    if (app && app.__vue_app__) {
-      var globals = app.__vue_app__.config.globalProperties;
-      if (globals && globals.$data && globals.$data.page_reload) {
-        window.location.reload();
-        return;
-      }
-      // Use Vue's watch if accessible
-      try {
-        var Vue = app.__vue_app__;
-        var { watch } = Vue;
-        if (watch && globals.$data) {
-          watch(function () { return globals.$data.page_reload; }, function (v) {
-            if (v) window.location.reload();
-          });
-          return;
-        }
-      } catch (e) {}
-    }
-    setTimeout(watchReload, 600);
-  })();
 })();

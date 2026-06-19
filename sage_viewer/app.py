@@ -330,32 +330,12 @@ def create_app(
     from sage_viewer.wizard.controller import WizardController
     from sage_viewer.wizard.ui import build_wizard_ui
 
-    server.state.wiz_active  = False
-    server.state.page_reload = False
-
-    def _on_wizard_model(par_path, model_name: str):
-        """Called by the wizard when a model is ready; loads it into the scene."""
-        from pathlib import Path as _P
-        par_path = _P(par_path)
-        server.state.model_loading = True
-        server.state.flush()
-        try:
-            if not scene.has_model(model_name):
-                scene.add_model(par_path)
-            scene.switch_primary(model_name)
-            _refresh_models_state()
-            server.state.snap_num   = scene.current_snap
-            server.state.snap_label = scene.snap_label
-            server.state.flush()
-        finally:
-            server.state.model_loading = False
-            server.state.flush()
+    server.state.wiz_active = False
 
     _wiz_ctrl = WizardController(
         server,
         port=port,
         scene=scene,
-        on_model_loaded=_on_wizard_model,
         auto_start=False,
     )
 
@@ -363,15 +343,6 @@ def create_app(
     def _on_wiz_active(wiz_active, **_):
         if wiz_active:
             _wiz_ctrl.reset_and_start()
-        else:
-            # Overlay closed — trigger a browser reload so the VTK stream
-            # re-establishes cleanly with the new model.
-            import asyncio as _aio
-            async def _trigger_reload():
-                await _aio.sleep(0.3)
-                server.state.page_reload = True
-                server.state.flush()
-            _aio.ensure_future(_trigger_reload())
 
     # `theme=("ui_theme",)` reactively binds the active Vuetify theme to
     # our state variable — Vuetify swaps the entire palette plus the root
@@ -393,26 +364,6 @@ def create_app(
             tb.density = "compact"
             tb.color = "#1a1a2e"
 
-            # ── Explore Mode menu (hamburger) — tabs only ──────────────────
-            with v3.VMenu(close_on_content_click=False):
-                with v3.Template(v_slot_activator="{ props }"):
-                    v3.VBtn(
-                        icon="mdi-menu",
-                        variant="text",
-                        density="compact",
-                        v_bind="props",
-                        title="Explore Mode",
-                    )
-                with v3.VList(density="compact", bg_color="#1a1a2e"):
-                    for label, value in _NAV_TABS:
-                        v3.VListItem(
-                            title=label,
-                            value=value,
-                            click=f"nav_active_tab = '{value}'",
-                            active=(f"nav_active_tab === '{value}'",),
-                            color="cyan",
-                        )
-
             # ── Launch Mode button — wizard + models ───────────────────────
             with v3.VMenu(close_on_content_click=False):
                 with v3.Template(v_slot_activator="{ props }"):
@@ -427,20 +378,20 @@ def create_app(
                     # ── Launch Mode at the top ─────────────────────────────
                     v3.VListSubheader(
                         "LAUNCH MODE",
-                        style="color:#FFD700;font-size:0.65rem;",
+                        style="color:#06b6d4;font-size:0.65rem;",
                     )
                     v3.VListItem(
                         title="Setup Wizard",
                         subtitle="Add a model or run SAGE26",
                         prepend_icon="mdi-console",
                         click="wiz_active = true",
-                        color="#FFD700",
+                        color="cyan",
                     )
                     v3.VDivider(style="margin:4px 0;")
                     # ── Models (switch rows) ───────────────────────────────
                     v3.VListSubheader(
                         "MODELS",
-                        style="color:#9ca3af;font-size:0.65rem;",
+                        style="color:#06b6d4;font-size:0.65rem;",
                         v_show=("models_list && models_list.length > 0",),
                     )
                     with html.Div(
@@ -493,6 +444,30 @@ def create_app(
                             active=("m.overlay",),
                             color="cyan",
                             density="compact",
+                        )
+
+            # ── Explore Mode menu (hamburger) — tabs only ──────────────────
+            with v3.VMenu(close_on_content_click=False):
+                with v3.Template(v_slot_activator="{ props }"):
+                    v3.VBtn(
+                        icon="mdi-menu",
+                        variant="text",
+                        density="compact",
+                        v_bind="props",
+                        title="Explore Mode",
+                    )
+                with v3.VList(density="compact", bg_color="#1a1a2e"):
+                    v3.VListSubheader(
+                        "EXPLORE MODE",
+                        style="color:#06b6d4;font-size:0.65rem;",
+                    )
+                    for label, value in _NAV_TABS:
+                        v3.VListItem(
+                            title=label,
+                            value=value,
+                            click=f"nav_active_tab = '{value}'",
+                            active=(f"nav_active_tab === '{value}'",),
+                            color="cyan",
                         )
 
             # Title
@@ -697,17 +672,6 @@ def create_app(
                         location="top",
                         contained=True,
                         style="margin-top:16px;",
-                    )
-
-                    # Reload trigger — when page_reload becomes True this div
-                    # is mounted and immediately reloads the browser, giving
-                    # the VTK stream a clean reconnect with the new model.
-                    html.Div(
-                        v_if=("page_reload",),
-                        style="display:none;",
-                        raw_attrs=[
-                            '@vue:mounted="() => window.location.reload()"',
-                        ],
                     )
 
                     # Galaxy info panel — semi-transparent card pinned to

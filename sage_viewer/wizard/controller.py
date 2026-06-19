@@ -8,6 +8,65 @@ from pathlib import Path
 
 _SAGE26_REPO = "https://github.com/MBradley1985/SAGE26.git"
 
+import html as _html_mod
+import re as _re
+
+# ── ANSI → HTML converter ─────────────────────────────────────────────────────
+# Converts ANSI SGR color codes to inline <span> tags so colored output
+# (e.g. SAGE26's progress bar) renders correctly in the wizard terminal.
+_ANSI_CSI   = _re.compile(r'\x1b\[([0-9;]*)([A-Za-z])')   # all CSI sequences
+_ANSI_OTHER = _re.compile(r'\x1b[^[]')                      # ESC + non-[
+
+_ANSI_FG = {
+    '30': '#4a4a4a', '31': '#ef4444', '32': '#22c55e',
+    '33': '#f59e0b', '34': '#60a5fa', '35': '#a855f7',
+    '36': '#06b6d4', '37': '#e2e8f0',
+    '90': '#6b7280', '91': '#f87171', '92': '#4ade80',
+    '93': '#fbbf24', '94': '#93c5fd', '95': '#c084fc',
+    '96': '#67e8f9', '97': '#f9fafb',
+}
+
+
+def _ansi_to_html(text: str) -> str:
+    """Convert ANSI SGR codes to HTML spans; escape all other HTML."""
+    # Strip non-SGR control sequences (cursor movement, clear, etc.)
+    text = _ANSI_OTHER.sub('', text)
+
+    out: list[str] = []
+    in_span = False
+    pos = 0
+
+    for m in _ANSI_CSI.finditer(text):
+        # Emit plain text before this escape sequence (HTML-escaped)
+        out.append(_html_mod.escape(text[pos:m.start()]))
+        pos = m.end()
+
+        cmd = m.group(2)
+        if cmd != 'm':
+            continue  # not a colour code — skip
+
+        codes = m.group(1).split(';') if m.group(1) else ['0']
+        if in_span:
+            out.append('</span>')
+            in_span = False
+
+        bold = '1' in codes
+        color = next((c for c in codes if c in _ANSI_FG), None)
+        reset = '0' in codes or '' in codes
+
+        if not reset and color:
+            style = f'color:{_ANSI_FG[color]}'
+            if bold:
+                style += ';font-weight:700'
+            out.append(f'<span style="{style}">')
+            in_span = True
+
+    out.append(_html_mod.escape(text[pos:]))
+    if in_span:
+        out.append('</span>')
+    return ''.join(out)
+
+
 _STEPS = [
     "Scan Environment",
     "Choose Action",
@@ -85,7 +144,22 @@ class WizardController:
 
     def _emit(self, text: str, kind: str = "info") -> None:
         lines = list(self._st.wiz_lines)
-        lines.append({"text": text, "kind": kind})
+        lines.append({"text": text, "html": _ansi_to_html(text), "kind": kind})
+        self._st.wiz_lines = lines
+        self._st.flush()
+
+    def _emit_progress(self, text: str) -> None:
+        """Overwrite the last line if it was also a progress update, else append.
+
+        Used for \\r-terminated progress bars so they animate in place rather
+        than flooding the terminal with a new line per tick.
+        """
+        lines = list(self._st.wiz_lines)
+        entry = {"text": text, "html": _ansi_to_html(text), "kind": "out", "prog": True}
+        if lines and lines[-1].get("prog"):
+            lines[-1] = entry
+        else:
+            lines.append(entry)
         self._st.wiz_lines = lines
         self._st.flush()
 
@@ -95,8 +169,9 @@ class WizardController:
         self._st.flush()
 
     def _busy(self) -> None:
-        self._st.wiz_choices = []
-        self._st.wiz_busy    = True
+        self._st.wiz_choices  = []
+        self._st.wiz_busy     = True
+        self._st.wiz_par_show = False
         self._st.flush()
 
     async def _run_cmd(self, cmd: list[str], cwd: Path | None = None) -> int:
@@ -109,9 +184,46 @@ class WizardController:
                 stderr=asyncio.subprocess.STDOUT,
                 cwd=str(cwd) if cwd else None,
             )
-            async for raw in proc.stdout:
-                self._emit(raw.decode(errors="replace").rstrip(), "out")
-                self._st.flush()
+            buf = b""
+            while True:
+                chunk = await proc.stdout.read(512)
+                if not chunk:
+                    if buf.strip():
+                        self._emit(buf.decode(errors="replace").rstrip(), "out")
+                    break
+                buf += chunk
+                # Drain all complete segments from the buffer.
+                # \r\n  → regular newline  (normal emit)
+                # \n    → regular newline  (normal emit)
+                # \r    → carriage return  (progress overwrite, in-place)
+                # Lone \r at end of buffer: wait for next chunk — it might
+                # be the \n of a \r\n pair.
+                while True:
+                    ri = buf.find(b'\r')
+                    ni = buf.find(b'\n')
+                    if ri == -1 and ni == -1:
+                        break
+                    # \r\n together: regular line
+                    if ri != -1 and ni == ri + 1:
+                        text = buf[:ri].decode(errors="replace").rstrip()
+                        buf = buf[ri + 2:]
+                        if text.strip():
+                            self._emit(text, "out")
+                    # \n before any \r: regular line
+                    elif ni != -1 and (ri == -1 or ni < ri):
+                        text = buf[:ni].decode(errors="replace").rstrip()
+                        buf = buf[ni + 1:]
+                        if text.strip():
+                            self._emit(text, "out")
+                    # \r alone, not the very last byte: progress overwrite
+                    elif ri != -1 and ri < len(buf) - 1:
+                        text = buf[:ri].decode(errors="replace").rstrip()
+                        buf = buf[ri + 1:]
+                        if text.strip():
+                            self._emit_progress(text)
+                    else:
+                        # \r is the last byte — wait for the next chunk
+                        break
             await proc.wait()
             return proc.returncode
         except Exception as exc:
@@ -225,8 +337,11 @@ class WizardController:
         if self._models:
             choices.append({"label": "Load Existing Model", "value": "load",
                             "icon": "mdi-folder-open", "disabled": False})
+        if self._sage26_dir:
+            choices.append({"label": "Run SAGE26", "value": "run_sage26",
+                            "icon": "mdi-play-circle-outline", "disabled": False})
         choices.append({"label": "Start Fresh", "value": "fresh",
-                        "icon": "mdi-plus-circle-outline", "disabled": False})
+                        "icon": "mdi-git", "disabled": False})
         self._set_choices(choices)
 
     def _on_choice(self, value: str, **_) -> None:
@@ -237,6 +352,9 @@ class WizardController:
 
         if value == "load":
             await self._step_select_model()
+
+        elif value == "run_sage26":
+            await self._step_run_sage26_existing()
 
         elif value == "fresh":
             await self._step_fresh_choice()
@@ -271,6 +389,32 @@ class WizardController:
             self._emit("", "info")
             await self._step_fresh_choice()
 
+    async def _step_run_sage26_existing(self) -> None:
+        """Run SAGE26 with the existing local installation — no clone step."""
+        self._st.wiz_step = 2
+        if not self._sage26_dir:
+            self._emit("SAGE26 not found locally.", "err")
+            self._emit("Use 'Start Fresh' to clone it from GitHub first.", "info")
+            self._set_choices([{"label": "Back", "value": "back_main",
+                                "icon": "mdi-arrow-left", "disabled": False}])
+            return
+
+        compiled, n_obj = self._sage26_compiled(self._sage26_dir)
+        if compiled:
+            self._emit(f"SAGE26 found at {self._sage26_dir}  ({n_obj} object files)", "ok")
+            self._emit("Select a parameter file to run:", "info")
+            self._emit("", "info")
+            await self._step_pick_par()
+        else:
+            self._emit(f"SAGE26 found at {self._sage26_dir}", "ok")
+            self._emit("Not yet compiled — compile it first, then select a par file.", "warn")
+            self._set_choices([
+                {"label": "Compile SAGE26", "value": "compile_sage26",
+                 "icon": "mdi-cog-outline", "disabled": False},
+                {"label": "Back", "value": "back_main",
+                 "icon": "mdi-arrow-left", "disabled": False},
+            ])
+
     async def _step_select_model(self) -> None:
         self._st.wiz_step = 1
         self._emit("Select a model to load:", "info")
@@ -288,6 +432,10 @@ class WizardController:
         self._st.wiz_step = 2
         choices: list[dict] = []
 
+        # Clone is always the first option — full fresh start from GitHub
+        choices.append({"label": "Clone SAGE26", "value": "clone_sage26",
+                        "icon": "mdi-git", "disabled": False})
+
         if self._sage26_dir:
             compiled, _ = self._sage26_compiled(self._sage26_dir)
             if compiled:
@@ -299,12 +447,7 @@ class WizardController:
                 choices.append({"label": "Run New Model (after compile)", "value": "new_model",
                                 "icon": "mdi-play", "disabled": True})
         else:
-            self._emit("SAGE26 not found. Clone it from GitHub to get started.", "info")
-            choices.append({"label": "Clone SAGE26 from GitHub", "value": "clone_sage26",
-                            "icon": "mdi-git", "disabled": False})
-
-        if self._sage26_dir:
-            self._emit("How would you like to proceed?", "info")
+            self._emit("SAGE26 not found locally — clone it first.", "info")
 
         choices.append({"label": "Back", "value": "back_main",
                         "icon": "mdi-arrow-left", "disabled": False})
@@ -454,36 +597,17 @@ class WizardController:
         self._st.wiz_step = 5
         self._emit("", "info")
         self._emit(f"Loading model: {name}", "title")
+        self._emit("Starting Explore Mode — refresh your browser when ready.", "info")
+        self._st.flush()
+        await asyncio.sleep(1.0)
 
-        if self._on_model_loaded is not None:
-            # Embedded in Explore Mode — load into the existing scene
-            self._emit("Adding model to current session...", "info")
-            self._st.flush()
-            await asyncio.sleep(0.3)
-            try:
-                self._on_model_loaded(par_path, name)
-                self._emit("Done! Closing wizard.", "ok")
-                self._st.flush()
-                await asyncio.sleep(0.8)
-                self._st.wiz_active = False
-                self._st.flush()
-            except Exception as exc:
-                self._emit(f"Error loading model: {exc}", "err")
-                self._st.wiz_busy = False
-                self._st.flush()
+        sage_cmd = shutil.which("sage-viewer")
+        if sage_cmd:
+            os.execv(sage_cmd, [
+                sage_cmd, "--par", str(par_path), "--port", str(self._port),
+            ])
         else:
-            # Standalone Launch Mode — restart as Explore Mode via execv
-            self._emit("Starting Explore Mode...", "info")
-            self._emit("Your browser will reconnect in a few seconds.", "info")
-            self._st.flush()
-            await asyncio.sleep(1.5)
-            sage_cmd = shutil.which("sage-viewer")
-            if sage_cmd:
-                os.execv(sage_cmd, [
-                    sage_cmd, "--par", str(par_path), "--port", str(self._port),
-                ])
-            else:
-                os.execv(sys.executable, [
-                    sys.executable, "-m", "sage_viewer",
-                    "--par", str(par_path), "--port", str(self._port),
-                ])
+            os.execv(sys.executable, [
+                sys.executable, "-m", "sage_viewer",
+                "--par", str(par_path), "--port", str(self._port),
+            ])

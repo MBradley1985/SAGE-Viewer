@@ -15,6 +15,9 @@ _WIZ_CSS = """
 .wiz-out   { color: #9ca3af; }
 .wiz-sep   { color: #374151; }
 .wiz-info  { color: #e2e8f0; }
+/* Par-file textarea: match terminal font size, override DOS-blue theme */
+.wiz-par-area .v-field__input,
+.wiz-par-area textarea { font-size: 0.75rem !important; line-height: 1.45 !important; }
 """
 
 
@@ -100,7 +103,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
             ):
                 # Terminal output
                 with v3.VSheet(
-                    classes="sage-console-scroll",
+                    classes="sage-console-scroll wiz-console-scroll",
                     color="#0a0a0f",
                     style=(
                         "flex:1;min-height:0;overflow-y:auto;"
@@ -113,7 +116,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                         key="idx",
                     ):
                         html.Div(
-                            "{{ line.text || ' ' }}",
+                            v_html=("line.html || '&nbsp;'",),
                             classes=("'wiz-' + line.kind",),
                             style="white-space:pre-wrap;",
                         )
@@ -134,10 +137,8 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                         variant="outlined",
                         bg_color="#0a0a0f",
                         hide_details=True,
-                        style=(
-                            "font-family:monospace;font-size:0.75rem;"
-                            "color:#e2e8f0;"
-                        ),
+                        classes="wiz-par-area",
+                        style="font-family:monospace;color:#e2e8f0;",
                         label="Parameter file (edit freely, format is preserved)",
                     )
 
