@@ -349,7 +349,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             g_mask &= (sfr_log >= float(sfr_lo)) & (sfr_log <= float(sfr_hi))
 
             ss_lo, ss_hi = state.filter_gal_ssfr
-            ssfr_log = np.log10(np.maximum(galaxies.ssfr, 1e-30))
+            ssfr_log = np.log10(np.maximum(galaxies.ssfr, 1e-14))
             g_mask &= (ssfr_log >= float(ss_lo)) & (ssfr_log <= float(ss_hi))
 
             cg_lo, cg_hi = state.filter_gal_coldgas
