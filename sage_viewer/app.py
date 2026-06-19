@@ -676,7 +676,8 @@ def create_app(
                 style=(
                     "position:relative;"
                     "display:flex;flex-direction:row;"
-                    "height:100%;width:100%;overflow:hidden;"
+                    "width:100%;overflow:hidden;"
+                    "height:calc(100vh - 84px);"
                 ),
                 rounded=False,
                 elevation=0,
