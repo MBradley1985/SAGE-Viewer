@@ -6,35 +6,44 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-# Mass fields stored as 10^10 Msun/h in SAGE HDF5 — converted to Msun on export
-_MASS_FIELDS = {
-    "StellarMass", "BulgeMass", "ColdGas", "Mvir", "CentralMvir",
-    "BlackHoleMass", "IntraClusterStars", "H2gas", "CGMgas", "HotGas",
-}
-_POS_FIELDS = {"Posx", "Posy", "Posz"}
-_SFR_FIELDS = {"SfrDisk", "SfrBulge"}
-# 2D arrays — included in HDF5 output only
+# 2D arrays — included in HDF5 output, skipped for flat (CSV/TXT/FITS) formats
 _2D_KEYS = {"SFHMassDisk", "SFHMassBulge"}
+
+# Unit annotations written to headers — purely informational, no conversion
+_UNITS: dict[str, str] = {
+    "Posx": "Mpc/h", "Posy": "Mpc/h", "Posz": "Mpc/h",
+    "StellarMass":        "10^10 Msun/h",
+    "BulgeMass":          "10^10 Msun/h",
+    "ColdGas":            "10^10 Msun/h",
+    "Mvir":               "10^10 Msun/h",
+    "CentralMvir":        "10^10 Msun/h",
+    "BlackHoleMass":      "10^10 Msun/h",
+    "IntraClusterStars":  "10^10 Msun/h",
+    "H2gas":              "10^10 Msun/h",
+    "CGMgas":             "10^10 Msun/h",
+    "HotGas":             "10^10 Msun/h",
+    "SfrDisk":            "Msun/yr",
+    "SfrBulge":           "Msun/yr",
+    "SFHMassDisk":        "10^10 Msun/h",
+    "SFHMassBulge":       "10^10 Msun/h",
+}
 
 
 def _read_snap_fields(
     hdf5_path: Path,
     snap_num: int,
     sage_indices: np.ndarray,
-    hubble_h: float,
 ) -> tuple[dict[str, np.ndarray], dict[str, str]]:
-    """Read ALL dataset fields from a SAGE HDF5 snapshot group for the given rows.
+    """Read ALL fields from a SAGE HDF5 snapshot group for the given row indices.
 
-    Returns (data, units) where mass fields are already converted to Msun.
-    2D arrays (SFH) are included with key preserved for HDF5-only formats.
+    Data is returned exactly as stored in the HDF5 — no unit conversion.
+    2D arrays (SFH) are keyed separately for format-specific handling.
     """
     data: dict[str, np.ndarray] = {}
     units: dict[str, str] = {}
-    f_mass = 1.0e10 / max(float(hubble_h), 1e-6)
 
     with h5py.File(str(hdf5_path), "r") as hf:
         grp = hf[f"Snap_{snap_num}"]
-        # Determine N from Posx (always present)
         n_total = len(grp["Posx"]) if "Posx" in grp else None
 
         for key in sorted(grp.keys()):
@@ -43,35 +52,13 @@ def _read_snap_fields(
             if raw.ndim == 1:
                 if n_total is not None and len(raw) != n_total:
                     continue
-                arr = raw[sage_indices]
-                if key in _MASS_FIELDS:
-                    arr = (arr.astype(np.float64) * f_mass).astype(np.float32)
-                    units[key] = "Msun"
-                elif key in _POS_FIELDS:
-                    units[key] = "Mpc/h"
-                elif key in _SFR_FIELDS:
-                    units[key] = "Msun/yr"
-                else:
-                    units[key] = ""
-                data[key] = arr
+                data[key] = raw[sage_indices]
+                units[key] = _UNITS.get(key, "")
 
             elif raw.ndim == 2 and key in _2D_KEYS:
                 if n_total is None or raw.shape[0] == n_total:
                     data[key] = raw[sage_indices]
-                    units[key] = "10^10 Msun/h"
-
-    # Derived: total SFR and sSFR
-    if "SfrDisk" in data and "SfrBulge" in data:
-        data["SFR"] = (data["SfrDisk"] + data["SfrBulge"]).astype(np.float32)
-        units["SFR"] = "Msun/yr"
-    if "SFR" in data and "StellarMass" in data:
-        with np.errstate(divide="ignore", invalid="ignore"):
-            data["sSFR"] = np.where(
-                data["StellarMass"] > 0,
-                data["SFR"] / data["StellarMass"],
-                0.0,
-            ).astype(np.float32)
-        units["sSFR"] = "yr^-1"
+                    units[key] = _UNITS.get(key, "")
 
     return data, units
 
@@ -90,24 +77,26 @@ def write_catalogue(
     hubble_h: float = 0.73,
     scope_label: str = "",
 ) -> str:
-    """Export galaxy rows to *out_path* in format *fmt* (csv/hdf5/fits/txt).
+    """Export raw SAGE HDF5 galaxy rows to *out_path* in format *fmt*.
 
+    No unit conversion is applied — values are exactly as stored by SAGE26.
     Returns the resolved output path string.
     """
     sage_indices = np.asarray(sage_indices, dtype=np.int64)
     if len(sage_indices) == 0:
         raise ValueError("No galaxies match the selected scope.")
 
-    data, units = _read_snap_fields(hdf5_path, snap_num, sage_indices, hubble_h)
+    data, units = _read_snap_fields(hdf5_path, snap_num, sage_indices)
 
     meta = {
-        "sage_viewer": "SAGE-Viewer Galaxy Catalogue",
-        "scope": scope_label,
-        "snapshot": snap_num,
-        "snap_label": snap_label,
-        "n_galaxies": len(sage_indices),
-        "hubble_h": hubble_h,
-        "exported": datetime.datetime.now().isoformat(timespec="seconds"),
+        "sage_viewer":  "SAGE-Viewer Galaxy Catalogue",
+        "scope":        scope_label,
+        "snapshot":     snap_num,
+        "snap_label":   snap_label,
+        "n_galaxies":   len(sage_indices),
+        "hubble_h":     hubble_h,
+        "note":         "All values are raw SAGE26 output — no unit conversion applied",
+        "exported":     datetime.datetime.now().isoformat(timespec="seconds"),
     }
 
     out_path = Path(out_path)
@@ -136,7 +125,7 @@ def _write_csv(data: dict, units: dict, meta: dict, out_path: Path) -> None:
         for k, v in meta.items():
             f.write(f"# {k}: {v}\n")
         unit_notes = ", ".join(
-            f"{k}={u}" for k, u in units.items() if u and k in scalar
+            f"{k}[{u}]" for k, u in units.items() if u and k in scalar
         )
         if unit_notes:
             f.write(f"# units: {unit_notes}\n")
@@ -157,15 +146,14 @@ def _write_txt(data: dict, units: dict, meta: dict, out_path: Path) -> None:
     with open(out_path, "w") as f:
         for k, v in meta.items():
             f.write(f"# {k}: {v}\n")
-        unit_notes = "  ".join(
-            f"{c}[{units.get(c, '')}]" for c in cols
+        header = "  ".join(
+            f"{c}[{units.get(c, '')}]" if units.get(c) else c for c in cols
         )
-        f.write(f"# columns: {unit_notes}\n")
         np.savetxt(
             f,
             np.column_stack([a.astype(np.float64) for a in arrs]),
             fmt="%.6e",
-            header="  ".join(cols),
+            header=header,
             comments="# ",
         )
 

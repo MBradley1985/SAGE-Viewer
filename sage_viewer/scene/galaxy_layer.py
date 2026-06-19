@@ -166,6 +166,7 @@ class GalaxyLayer:
                 central_id=snap.central_id[mask],
                 time_of_infall=snap.time_of_infall[mask],
                 mean_age=snap.mean_age[mask],
+                sage_indices=snap.sage_indices[mask],
                 snap_num=snap.snap_num,
             )
             if snap.count == 0:
