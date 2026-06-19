@@ -2,19 +2,42 @@
 // Vue 3 silently strips <script> tags from templates, so any client JS
 // has to come in via a real .js file the browser can load.
 (function () {
-  // ─── Viewport lockdown ────────────────────────────────────────────
-  // Vuetify's normalize CSS sets `overflow-y:scroll` on the html element
-  // (forces a persistent scrollbar).  Counter it immediately here, before
-  // Vue mounts, so no document-level scroll is ever possible.  The
-  // <style> tag injected into <head> wins the cascade because this script
-  // runs from the module's <script> block in <head>, before any <body>
-  // content is processed.
-  (function injectScrollLock() {
-    var s = document.createElement('style');
-    s.id = 'sage-scroll-lock';
-    s.textContent = 'html,body{overflow:hidden!important;height:100%!important}';
-    (document.head || document.documentElement).appendChild(s);
-  }());
+  // ─── Viewport fit ─────────────────────────────────────────────────
+  // Fit the .sage-content panel to fill exactly the space between the
+  // toolbar and footer, measured from actual DOM positions.  Pure CSS
+  // chains through Vuetify's flex layout are unreliable across screen
+  // sizes — direct JS measurement is the only thing that always works.
+  //
+  // trame loads module scripts dynamically after Vue mounts, so the DOM
+  // is ready by the time this runs.  We also poll with setTimeout to
+  // handle any delay between script load and element availability.
+  function sageFitViewport() {
+    var el = document.querySelector('.sage-content');
+    if (!el) { setTimeout(sageFitViewport, 100); return; }
+
+    // Measure actual rendered bar/footer heights so any density or
+    // border tweaks are accounted for automatically.
+    var bar  = document.querySelector('.v-app-bar');
+    var foot = document.querySelector('.v-footer');
+    var barH  = bar  ? bar.getBoundingClientRect().height  : 48;
+    var footH = foot ? foot.getBoundingClientRect().height : 36;
+
+    // Clamp to at least 200 px so the view never collapses on tiny screens.
+    var h = Math.max(window.innerHeight - barH - footH, 200);
+
+    // Override both the position:fixed CSS vars and a direct height in case
+    // the fixed approach didn't fire (e.g. Safari backface-visibility quirk).
+    el.style.top    = barH  + 'px';
+    el.style.bottom = footH + 'px';
+    el.style.height = h + 'px';
+
+    // Hard-stop document scroll at every level.
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow            = 'hidden';
+  }
+
+  window.addEventListener('resize', sageFitViewport);
+  sageFitViewport();
   // ─── Pop-out console drag handler ─────────────────────────────────
   // Mousedown on `.sage-popout-handle` starts a drag of the nearest
   // `.sage-popout` ancestor. Repositions via left/top, clearing the

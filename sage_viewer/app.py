@@ -636,6 +636,7 @@ def create_app(
                         )
 
             with v3.VSheet(
+                classes="sage-content",
                 style=(
                     "position:fixed;"
                     "top:var(--v-layout-top,48px);"
