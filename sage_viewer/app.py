@@ -674,11 +674,11 @@ def create_app(
                         style="margin-top:16px;",
                     )
 
-                    # Galaxy info panel — semi-transparent card pinned to
-                    # the right of the render area; only relevant in target
-                    # mode but the v_model controls visibility.
+                    # Galaxy info panel — draggable card; drag handle is
+                    # the title bar (sage-popout-handle picked up by JS).
                     with v3.VCard(
                         v_show=("galinfo_show && nav_active_tab === 'target'",),
+                        classes="sage-popout",
                         style=(
                             "position:absolute;top:32px;right:24px;"
                             "min-width:260px;max-width:320px;"
@@ -690,11 +690,14 @@ def create_app(
                         ),
                         elevation=8,
                     ):
-                        with v3.VCardTitle(
+                        with html.Div(
+                            classes="sage-popout-handle",
                             style=(
                                 "display:flex;align-items:center;"
                                 "font-size:0.85rem;letter-spacing:0.06em;"
                                 "padding:10px 12px 6px;"
+                                "cursor:move;user-select:none;"
+                                "border-bottom:1px solid #1f2937;"
                             ),
                         ):
                             v3.VIcon("mdi-information-outline",
@@ -708,7 +711,6 @@ def create_app(
                                 variant="text",
                                 click=server.controller.hide_galaxy_info,
                             )
-                        v3.VDivider()
                         with v3.VCardText(
                             style="padding:8px 12px;font-size:0.72rem;",
                         ):
@@ -729,11 +731,11 @@ def create_app(
                                     style="font-family:monospace;text-align:right;color:#e2e8f0;",
                                 )
 
-                    # Group / cluster info panel — same right-hand position
-                    # as the Galaxy info card; the two are mutually exclusive
-                    # (opening one closes the other) so they never overlap.
+                    # Group / cluster info panel — draggable, same initial
+                    # position as the Galaxy info card (mutually exclusive).
                     with v3.VCard(
                         v_show=("groupinfo_show && nav_active_tab === 'environment'",),
+                        classes="sage-popout",
                         style=(
                             "position:absolute;top:32px;right:24px;"
                             "min-width:260px;max-width:320px;"
@@ -745,11 +747,14 @@ def create_app(
                         ),
                         elevation=8,
                     ):
-                        with v3.VCardTitle(
+                        with html.Div(
+                            classes="sage-popout-handle",
                             style=(
                                 "display:flex;align-items:center;"
                                 "font-size:0.85rem;letter-spacing:0.06em;"
                                 "padding:10px 12px 6px;"
+                                "cursor:move;user-select:none;"
+                                "border-bottom:1px solid #1f2937;"
                             ),
                         ):
                             v3.VIcon("mdi-account-group-outline",
@@ -763,7 +768,6 @@ def create_app(
                                 variant="text",
                                 click=server.controller.hide_group_info,
                             )
-                        v3.VDivider()
                         with v3.VCardText(
                             style="padding:8px 12px;font-size:0.72rem;",
                         ):

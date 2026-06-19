@@ -74,35 +74,15 @@ def build_info_panel(server, scene: Scene) -> None:
                 (float(gpos[0]), float(gpos[1]), float(gpos[2])), 0.0
             )
 
-            # If the user is already zoomed/focused on a region, carry
-            # the camera to the new selection within that region (using
-            # the last-used target radius). Without an active focus,
-            # picking is purely declarative — no camera move.
-            if bool(state.focus_active):
-                try:
-                    radius = float(state.nav_gal_last_radius)
-                except (TypeError, ValueError):
-                    radius = 10.0
-                scene.camera.go_to_galaxy(int(gidx), radius)
-                scene.set_focus_sphere(
-                    (float(gpos[0]), float(gpos[1]), float(gpos[2])), radius
-                )
-
-        # Double-click is an "I want to look at this" signal: jump to
-        # the Target tab so the user sees the populated galaxy / halo
-        # IDs ready to act on.
-        state.nav_active_tab = "target"
         state.flush()
         _push()
 
         state.pick_info = "   |   ".join(lines)
 
-    # Picker is on globally: a double-click anywhere is the "I want to
-    # inspect this object" gesture — it populates the Target tab's
-    # galaxy + halo IDs and switches to that tab. Switching tabs must
-    # NOT clear indicators (box / sphere / member dots) — exploring
-    # panels is non-destructive; clearing is explicit (Reset / Go /
-    # Clear / focus toggle).
+    # Picker is on globally: a double-click anywhere selects the nearest
+    # galaxy and halo, placing a circle indicator but NOT moving the
+    # camera or switching tabs. The user flies/navigates independently
+    # and can press Go in the Target tab when ready.
     scene.plotter.enable_point_picking(
         callback=_on_pick,
         show_message=False,

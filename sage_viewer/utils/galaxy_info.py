@@ -140,7 +140,26 @@ def build_galaxy_info(
         info["H2 Mass"] = f"{h2:.2e} Msun" if h2 > 0 else "0  (no H2)"
 
     if fields_available.get("cgm_regime", False):
-        info["Gas Regime"] = _cgm_label(int(galaxies.cgm_regime[idx]))
+        regime = int(galaxies.cgm_regime[idx])
+        info["Gas Regime"] = _cgm_label(regime)
+        # Show whichever gas-mass fields are non-zero for this galaxy;
+        # if both are present (shouldn't happen often) show both.
+        has_cgm = fields_available.get("cgm_gas", False)
+        has_hot = fields_available.get("hot_gas", False)
+        if has_cgm:
+            cgm_m = float(galaxies.cgm_gas[idx])
+            if cgm_m > 0:
+                info["CGM Gas"] = f"{cgm_m:.2e} Msun"
+        if has_hot:
+            hot_m = float(galaxies.hot_gas[idx])
+            if hot_m > 0:
+                info["Hot Gas"] = f"{hot_m:.2e} Msun"
+        # If the regime flag says CGM/Hot but neither mass is non-zero, say so.
+        if has_cgm and has_hot:
+            if regime == 0 and float(galaxies.cgm_gas[idx]) <= 0:
+                info["CGM Gas"] = "0"
+            elif regime == 1 and float(galaxies.hot_gas[idx]) <= 0:
+                info["Hot Gas"] = "0"
 
     if fields_available.get("ffb_regime", False):
         info["FFB Regime"] = _ffb_label(int(galaxies.ffb_regime[idx]))
