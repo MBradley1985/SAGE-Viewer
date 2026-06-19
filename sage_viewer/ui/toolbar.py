@@ -491,17 +491,17 @@ def build_toolbar(server, scene: Scene) -> None:
         v3.VBtn(
             icon="mdi-swap-horizontal",
             click=ctrl.toggle_reverse,
-            color=("is_reverse ? 'cyan' : '#6b7280'",),
+            color=("is_reverse ? 'cyan' : 'white'",),
             title="Reverse direction",
         )
-        v3.VBtn(icon="mdi-play",  click=ctrl.play,  color="#6b7280")
-        v3.VBtn(icon="mdi-pause", click=ctrl.pause, color="#6b7280")
-        v3.VBtn(icon="mdi-stop",  click=ctrl.stop,  color="#6b7280",
+        v3.VBtn(icon="mdi-play",  click=ctrl.play,  color="white")
+        v3.VBtn(icon="mdi-pause", click=ctrl.pause, color="white")
+        v3.VBtn(icon="mdi-stop",  click=ctrl.stop,  color="white",
                 title="Stop and return to z=0")
         v3.VBtn(
             icon="mdi-repeat",
             click=ctrl.toggle_repeat,
-            color=("is_repeat ? 'cyan' : '#6b7280'",),
+            color=("is_repeat ? 'cyan' : 'white'",),
             title="Loop",
         )
 

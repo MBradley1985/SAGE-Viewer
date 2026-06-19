@@ -703,7 +703,7 @@ def create_app(
                             v3.VIcon("mdi-information-outline",
                                      size="small", color="cyan",
                                      style="margin-right:6px;")
-                            html.Span("Galaxy info")
+                            html.Span("Galaxy Information", style="color:#06b6d4;")
                             v3.VSpacer()
                             v3.VBtn(
                                 icon="mdi-close",
@@ -760,7 +760,7 @@ def create_app(
                             v3.VIcon("mdi-account-group-outline",
                                      size="small", color="cyan",
                                      style="margin-right:6px;")
-                            html.Span("Group info")
+                            html.Span("Group Information", style="color:#06b6d4;")
                             v3.VSpacer()
                             v3.VBtn(
                                 icon="mdi-close",

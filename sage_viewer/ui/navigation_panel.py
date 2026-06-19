@@ -1643,7 +1643,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VBtn(
                         icon="mdi-target", variant="outlined",
                         density="compact", click=ctrl.toggle_focus,
-                        color=("focus_active ? 'cyan' : '#6b7280'",),
+                        color=("focus_active ? 'cyan' : 'white'",),
                         title="Focus",
                     )
                 with v3.VCol(cols="auto", style="padding:0;"):
@@ -1651,7 +1651,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         icon="mdi-image-filter-center-focus",
                         variant="outlined",
                         density="compact", click=ctrl.center_camera,
-                        color="#6b7280",
+                        color="white",
                         title="Place camera at box centre",
                     )
 
