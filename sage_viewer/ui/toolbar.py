@@ -273,11 +273,6 @@ def build_toolbar(server, scene: Scene) -> None:
         await _await_preload()
         if stop_evt.is_set():
             return
-        # Invalidate the frame cache if the camera / rotation changed.
-        key = _cam_key()
-        if _frames["key"] != key:
-            _frames["key"]  = key
-            _frames["data"] = {}
         # Play from the current slider position toward z=0 (forward) or toward
         # high-z (reverse). Only that range is rendered.
         start = int(state.snap_num)
@@ -285,6 +280,16 @@ def build_toolbar(server, scene: Scene) -> None:
             order = list(range(start, -1, -1))
         else:
             order = list(range(start, snap_count))
+        # Invalidate the frame cache if the camera, rotation, or start position
+        # changed. Start is included because rotation bakes the angle by frame
+        # position — the same snapshot lands at a different angle when playback
+        # begins from a different snapshot, so cached frames from a prior run
+        # would be wrong.
+        rot_start = start if _ctl["rotate_mode"] != "off" else 0
+        key = _cam_key() + (rot_start,)
+        if _frames["key"] != key:
+            _frames["key"]  = key
+            _frames["data"] = {}
         # Freeze the slider + redshift readout while rendering — the snapshot
         # sweep below shouldn't drag them around.
         _suppress_snap[0] = True
@@ -294,6 +299,24 @@ def build_toolbar(server, scene: Scene) -> None:
             state.playback_active = False
             state.flush()
             return
+        # _render_frames restores the camera to pos0/focal0 when it exits.
+        # If rotation was baked into the pre-rendered frames, advance the live
+        # camera to the final frame's rotation angle now, while the overlay is
+        # still covering the VTK canvas.  The reveal will then be seamless —
+        # the live scene matches the last overlay frame, and _ensure_rotate_loop
+        # continues rotating from exactly where the animation left off.
+        _rots, _rotd = _parse_rotate(_ctl["rotate_mode"])
+        _per_snap = np.deg2rad(_rots * _rotd / 3.0)
+        if _per_snap:
+            _cam    = scene.plotter.camera
+            _pos0   = np.array(_cam.position,    dtype=np.float64)
+            _focal0 = np.array(_cam.focal_point, dtype=np.float64)
+            _ang    = _per_snap * (len(order) - 1)
+            _c, _sn = np.cos(_ang), np.sin(_ang)
+            _rm     = np.array([[_c, 0, _sn], [0, 1, 0], [-_sn, 0, _c]])
+            _cam.position    = tuple(_focal0 + _rm @ (_pos0 - _focal0))
+            _cam.focal_point = tuple(_focal0)
+            _cam.up          = (0.0, 1.0, 0.0)
         # Park the live scene on the final snapshot now, while the overlay is
         # still covering it, so revealing it at the end is a seamless match —
         # no flash of the selected snapshot, no jump.
@@ -301,15 +324,16 @@ def build_toolbar(server, scene: Scene) -> None:
         _push()
         _suppress_snap[0] = False   # playback drives the slider from here
         await _image_playback(order)
-        # Ended naturally — the live view is already on the final snapshot, so
-        # just drop the overlay (after giving the live frame a moment to land).
+        # Ended naturally.  Push a fresh live render so the VTK canvas is
+        # up-to-date when the overlay drops — the earlier _push() may have
+        # been many seconds ago.
         last = int(state.snap_num)
         if scene.current_snap != last:
             scene.set_snapshot(last)
-            _push()
+        _push()
         state.snap_label = scene.snap_label
         state.flush()
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.2)    # let the render stream before revealing
         state.playback_active = False
         state.flush()
         _ensure_rotate_loop()
