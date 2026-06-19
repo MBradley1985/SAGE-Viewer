@@ -187,11 +187,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.console_popout_show  = False
 
     # Library
-    state.library_show     = False
-    state.library_files    = []        # list of {"name", "path", "kind", "size_kb"}
-    state.library_data_url = ""
-    state.library_kind     = ""        # "image" | "video"
-    state.library_name     = ""
+    state.library_files = []   # list of {"name", "path", "kind", "size_kb"}
+    state.library_items = []   # open pop-outs: [{id, name, kind, data_url, top_px}]
 
     # Group info panel state (mirrors galinfo_*)
     state.groupinfo_show  = False
@@ -903,7 +900,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.galinfo_show  = True
         # Close any other right-side overlay
         state.groupinfo_show = False
-        state.library_show   = False
         state.flush()
         _push()
 
@@ -954,7 +950,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.groupinfo_show  = True
         # Mutually exclusive with the other right-side overlays
         state.galinfo_show    = False
-        state.library_show    = False
 
         # Place the standard small red circle on the FOF central — same
         # indicator style used by the Galaxy info action.
@@ -1137,7 +1132,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     # Cache the last-highlighted set so re-toggling re-shows the SAME
     # positions even if the snapshot or nav_gal_idx have drifted in between.
-    _highlight_cache: dict = {"positions": None, "gidx": -1, "snap": -1}
+    _highlight_cache: dict = {"positions": None, "regimes": None, "gidx": -1, "snap": -1}
 
     @ctrl.set("highlight_group_members")
     def on_highlight_group_members():
@@ -1163,10 +1158,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
             and _highlight_cache["gidx"] == gidx
             and _highlight_cache["snap"] == cur_snap
         )
-        if cached:
-            cam._add_member_indicators(_highlight_cache["positions"])
-        else:
-            _, galaxies = scene._loader.get(cur_snap)
+        _, galaxies = scene._loader.get(cur_snap)
+        if not cached:
             if gidx < 0 or gidx >= galaxies.count:
                 return
             members = member_indices(galaxies, gidx)
@@ -1174,14 +1167,21 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 return
             others = members[members != gidx]
             positions = galaxies.positions[others].copy()
-            cam._add_member_indicators(positions)
+            has_regime = scene.primary.fields_available.get("cgm_regime", False)
+            regimes = galaxies.cgm_regime[others].copy() if has_regime else None
             _highlight_cache["positions"] = positions
+            _highlight_cache["regimes"]   = regimes
             _highlight_cache["gidx"]      = gidx
             _highlight_cache["snap"]      = cur_snap
-        # Always re-add the green selected-galaxy marker regardless of cache
-        _, galaxies = scene._loader.get(cur_snap)
+        cam._add_member_indicators(
+            _highlight_cache["positions"],
+            _highlight_cache["regimes"],
+        )
+        # Selected galaxy: white border + regime fill
         if 0 <= gidx < galaxies.count:
-            cam._add_selected_indicator(galaxies.positions[gidx])
+            has_regime = scene.primary.fields_available.get("cgm_regime", False)
+            regime = int(galaxies.cgm_regime[gidx]) if has_regime else None
+            cam._add_selected_indicator(galaxies.positions[gidx], regime)
         _push()
 
     # ------------------------------------------------------------------
@@ -2022,6 +2022,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.library_files = _scan_library()
         state.flush()
 
+    _lib_id = [0]
+
     @ctrl.set("library_open")
     def on_library_open(path: str):
         import base64
@@ -2035,26 +2037,29 @@ def build_navigation_panel(server, scene: Scene) -> None:
         try:
             data = p.read_bytes()
         except OSError as e:
-            state.library_data_url = ""
-            state.library_name     = f"ERROR reading {p.name}: {e}"
-            state.library_show     = True
-            state.flush()
             return
         b64 = base64.b64encode(data).decode("ascii")
-        state.library_data_url = f"data:{mime};base64,{b64}"
-        state.library_kind     = kind
-        state.library_name     = p.name
-        state.library_show     = True
-        # Mutually exclusive with other right-side overlays
-        state.galinfo_show     = False
-        state.groupinfo_show   = False
+        _lib_id[0] += 1
+        new_id = _lib_id[0]
+        new_item = {
+            "id":       new_id,
+            "name":     p.name,
+            "kind":     kind,
+            "data_url": f"data:{mime};base64,{b64}",
+            "top_px":   32 + ((new_id - 1) % 8) * 40,
+        }
+        state.library_items = [*state.library_items, new_item]
         state.flush()
         _push()
 
     @ctrl.set("library_close")
     def on_library_close():
-        state.library_show     = False
-        state.library_data_url = ""
+        state.library_items = []
+        state.flush()
+
+    @ctrl.set("library_close_item")
+    def on_library_close_item(item_id: int):
+        state.library_items = [x for x in state.library_items if x["id"] != int(item_id)]
         state.flush()
 
     # Populate the file list at startup
@@ -2068,7 +2073,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     @ctrl.set("highlight_galaxy")
     def on_highlight_galaxy():
-        """Toggle a green splat on the currently-selected galaxy."""
+        """Toggle white-border + regime-coloured splat on the selected galaxy."""
         cam = scene.camera
         if cam.has_member_indicators:
             cam._clear_member_indicators()
@@ -2081,7 +2086,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
         _, galaxies = scene._loader.get(scene.current_snap)
         if gidx < 0 or gidx >= galaxies.count:
             return
-        cam._add_selected_indicator(galaxies.positions[gidx])
+        has_regime = scene.primary.fields_available.get("cgm_regime", False)
+        regime = int(galaxies.cgm_regime[gidx]) if has_regime else None
+        cam._add_selected_indicator(galaxies.positions[gidx], regime)
         _push()
 
     @ctrl.set("toggle_focus")
@@ -2862,7 +2869,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VLabel(
                     "Screenshots and movies from <SAGE-Viewer>/sage_library/ and "
-                    "<SAGE-Viewer>/sage_outputs/.  Click a row to display.",
+                    "<SAGE-Viewer>/sage_outputs/.  Double-click a row to open as a floating viewer.",
                     style=(
                         "font-size:0.6rem;color:#9ca3af;line-height:1.35;"
                         "display:block;padding:0 0 4px;flex-shrink:0;"
@@ -2882,7 +2889,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         v3.VListItem(
                             v_for=("entry in library_files",),
                             key=("entry.path",),
-                            click=(
+                            dblclick=(
                                 server.controller.library_open,
                                 "[entry.path]",
                             ),
@@ -2922,7 +2929,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             )
                         with v3.VCol(style="padding:0;"):
                             v3.VBtn(
-                                "Close viewer", block=True, variant="outlined",
+                                "Close all", block=True, variant="outlined",
                                 color="red", density="compact", size="small",
                                 prepend_icon="mdi-close-circle-outline",
                                 click=ctrl.library_close,

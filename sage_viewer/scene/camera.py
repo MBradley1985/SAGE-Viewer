@@ -22,8 +22,8 @@ class CameraController:
         self._halo_index: NearestHaloIndex = NearestHaloIndex()
         self._galaxy_positions: np.ndarray | None = None
         self._indicator_actor = None
-        self._member_actor = None     # cyan splats for FOF group members
-        self._selected_actor = None   # green splat for the selected galaxy itself
+        self._member_actors: list = []   # splats for FOF group members (one per regime colour)
+        self._selected_actors: list = [] # splats for selected galaxy: [white border, regime fill]
         self._central_actor = None    # thin white outline marking the FOF central
         self._group_ring_actor = None # red ring sized to enclose the group
 
@@ -52,54 +52,91 @@ class CameraController:
                 self._pl.remove_actor(a, render=False)
         self._indicator_actor = None
 
-    def _clear_member_indicators(self) -> None:
-        for attr in ("_member_actor", "_selected_actor"):
-            a = getattr(self, attr, None)
-            if a is not None:
-                self._pl.remove_actor(a, render=False)
-                setattr(self, attr, None)
+    # Regime colours: cold CGM = dodger blue, hot = tomato, unknown = cyan
+    _REGIME_COLORS = {0: "dodgerblue", 1: "tomato", -1: "cyan"}
 
-    def _add_member_indicators(self, positions: "np.ndarray") -> None:
-        """Cyan gaussian splats for FOF group members (excluding the selected galaxy)."""
-        if self._member_actor is not None:
-            self._pl.remove_actor(self._member_actor, render=False)
-            self._member_actor = None
+    def _clear_member_indicators(self) -> None:
+        for a in self._member_actors + self._selected_actors:
+            self._pl.remove_actor(a, render=False)
+        self._member_actors.clear()
+        self._selected_actors.clear()
+
+    def _add_member_indicators(
+        self,
+        positions: "np.ndarray",
+        regimes: "np.ndarray | None" = None,
+    ) -> None:
+        """Splats for FOF group members coloured by CGM/hot regime."""
+        for a in self._member_actors:
+            self._pl.remove_actor(a, render=False)
+        self._member_actors.clear()
         if positions is None or len(positions) == 0:
             return
-        cloud = pv.PolyData(np.asarray(positions, dtype=np.float64))
-        self._member_actor = self._pl.add_mesh(
-            cloud,
-            color="cyan",
-            point_size=24.0,
-            render_points_as_spheres=True,
-            opacity=0.55,
-            show_scalar_bar=False,
-            render=False,
-            reset_camera=False,
-        )
+        positions = np.asarray(positions, dtype=np.float64)
+        # Group by regime so each colour gets one draw call
+        if regimes is not None and len(regimes) == len(positions):
+            groups = {0: [], 1: [], -1: []}
+            for i, r in enumerate(regimes):
+                groups[r if r in (0, 1) else -1].append(i)
+        else:
+            groups = {-1: list(range(len(positions)))}
+        for regime_key, idxs in groups.items():
+            if not idxs:
+                continue
+            cloud = pv.PolyData(positions[idxs])
+            a = self._pl.add_mesh(
+                cloud,
+                color=self._REGIME_COLORS[regime_key],
+                point_size=24.0,
+                render_points_as_spheres=True,
+                opacity=0.70,
+                show_scalar_bar=False,
+                render=False,
+                reset_camera=False,
+            )
+            self._member_actors.append(a)
 
-    def _add_selected_indicator(self, position: "np.ndarray") -> None:
-        """Green gaussian splat marking the selected galaxy itself."""
-        if self._selected_actor is not None:
-            self._pl.remove_actor(self._selected_actor, render=False)
-            self._selected_actor = None
+    def _add_selected_indicator(
+        self,
+        position: "np.ndarray",
+        regime: "int | None" = None,
+    ) -> None:
+        """Selected galaxy: white border sphere + regime-coloured fill sphere."""
+        for a in self._selected_actors:
+            self._pl.remove_actor(a, render=False)
+        self._selected_actors.clear()
         if position is None:
             return
         cloud = pv.PolyData(np.asarray([position], dtype=np.float64))
-        self._selected_actor = self._pl.add_mesh(
+        # White border (rendered first, larger)
+        a_border = self._pl.add_mesh(
             cloud,
-            color="lime",
-            point_size=28.0,
+            color="white",
+            point_size=36.0,
             render_points_as_spheres=True,
-            opacity=0.75,
+            opacity=0.90,
             show_scalar_bar=False,
             render=False,
             reset_camera=False,
         )
+        self._selected_actors.append(a_border)
+        # Regime fill (smaller, layered on top)
+        fill_color = self._REGIME_COLORS.get(regime if regime in (0, 1) else -1, "cyan")
+        a_fill = self._pl.add_mesh(
+            cloud,
+            color=fill_color,
+            point_size=26.0,
+            render_points_as_spheres=True,
+            opacity=0.90,
+            show_scalar_bar=False,
+            render=False,
+            reset_camera=False,
+        )
+        self._selected_actors.append(a_fill)
 
     @property
     def has_member_indicators(self) -> bool:
-        return self._member_actor is not None or self._selected_actor is not None
+        return bool(self._member_actors or self._selected_actors)
 
     # ---- White central marker -----------------------------------------
 

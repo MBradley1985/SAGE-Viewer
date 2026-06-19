@@ -928,13 +928,15 @@ def create_app(
                                     style="font-family:monospace;text-align:right;color:#e2e8f0;",
                                 )
 
-                    # Library media viewer — same right-side slot as the
-                    # Galaxy / Group info cards; mutually exclusive.
+                    # Library media pop-outs — one draggable card per open item,
+                    # floating over the viewport just like the other sage-popout cards.
                     with v3.VCard(
-                        v_show=("library_show",),
+                        v_for=("item in library_items",),
+                        key=("item.id",),
+                        classes="sage-popout",
                         style=(
                             "position:absolute;top:32px;right:24px;"
-                            "min-width:280px;max-width:520px;"
+                            "min-width:320px;max-width:540px;"
                             "background:rgba(17,24,39,0.92);"
                             "backdrop-filter:blur(6px);"
                             "border:1px solid #374151;"
@@ -944,37 +946,38 @@ def create_app(
                         elevation=8,
                     ):
                         with v3.VCardTitle(
+                            classes="sage-popout-handle",
                             style=(
                                 "display:flex;align-items:center;"
                                 "font-size:0.85rem;letter-spacing:0.06em;"
-                                "padding:10px 12px 6px;"
+                                "padding:10px 12px 6px;cursor:move;"
                             ),
                         ):
                             v3.VIcon("mdi-folder-multimedia-outline",
                                      size="small", color="cyan",
                                      style="margin-right:6px;")
-                            html.Span("{{ library_name }}")
+                            html.Span("{{ item.name }}")
                             v3.VSpacer()
                             v3.VBtn(
                                 icon="mdi-close",
                                 size="x-small",
                                 variant="text",
-                                click=server.controller.library_close,
+                                click=(server.controller.library_close_item,
+                                       "[item.id]"),
                             )
                         v3.VDivider()
-                        with v3.VCardText(
-                            style="padding:8px 12px;",
-                        ):
+                        with v3.VCardText(style="padding:8px 12px;"):
                             html.Img(
-                                src=("library_data_url",),
-                                v_show=("library_kind === 'image'",),
+                                src=("item.data_url",),
+                                v_if=("item.kind === 'image'",),
                                 style="max-width:100%;max-height:60vh;display:block;",
                             )
                             html.Video(
-                                src=("library_data_url",),
-                                v_show=("library_kind === 'video'",),
+                                src=("item.data_url",),
+                                v_if=("item.kind === 'video'",),
                                 controls=True,
                                 autoplay=True,
+                                muted=True,
                                 loop=True,
                                 style="max-width:100%;max-height:60vh;display:block;",
                             )

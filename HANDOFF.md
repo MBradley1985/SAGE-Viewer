@@ -93,9 +93,24 @@ SAGE-Viewer/
 - **Pop-out** button floats a movable + resizable card over the viewport mirroring the active session.
 - Console fills most of the right panel; inputs + 4 buttons anchored at the bottom.
 
+### Galaxy filters — active-only
+- Range sliders are **inert at their full-range defaults** — no galaxies are filtered unless the user moves a slider. This guarantees every galaxy with detectable mass is shown at startup.
+- Implemented via `_active(lo, hi, mn, mx)` in `_apply_filters()` (`navigation_panel.py`): returns True only when the slider is inside its range.
+- All slider maxima widened to cover the full SAGE26 distribution (mass fields to 14.0, sSFR max to 0.0, rates to 5.0, etc.).
+- B/T computed as `clip(BulgeMass / StellarMass, 0, 1)` to prevent false exclusion of satellites where BulgeMass > StellarMass numerically.
+
+### Galaxy picking — visibility-aware
+- `info_panel.py` restricts the KDTree search to `GalaxyLayer._combined_mask()` visible indices before picking, so only rendered galaxies are selectable. Environment checkboxes, focus regions, and filter sliders all apply.
+
+### Indicators — regime-coloured
+- `camera.py` redesigned with `_member_actors: list` and `_selected_actors: list` (replaces single `_indicator_actor`).
+- `_add_member_indicators(positions, regimes)` groups by regime and adds one mesh per colour: `dodgerblue` (CGM-regime, 0), `tomato` (Hot-regime, 1), `cyan` (unknown / no regime field).
+- `_add_selected_indicator(position, regime)` draws a white border ring (36 px) + regime-coloured fill (26 px) so the selected galaxy is visually distinct from members.
+- `_REGIME_COLORS = {0: "dodgerblue", 1: "tomato", -1: "cyan"}` at class level.
+
 ### Navigation
 - **Focus button** is tab-aware: Target → galaxy, Environment → halo, Coords → sphere, Box → box. Off always clears.
-- **Double-click** any point on any tab → populates Target halo + galaxy IDs, draws red marker, switches to Target tab. If Focus is already active, camera carries to the new selection.
+- **Double-click** any point on any tab → populates Target halo + galaxy IDs, draws red marker. Only queries visible (unfiltered, unfocused-in) galaxies.
 - **Indicators persist** across tab changes (only Reset Camera / Go / Clear / Focus toggle clear them).
 - "Use Current Position" (Coords) populates X/Y/Z + Standoff from the camera.
 - "Use Current View" (Box) populates the 6 bounds from the camera frustum.
@@ -126,7 +141,12 @@ Every typed field now Enter-submits the same as clicking its action button. Wiri
 
 ### Library tab
 - Browse stored screenshots / movies from `<repo>/sage_library/` and `sage_outputs/`.
-- Click a row to display inline.
+- **Double-click** a row to open it as a draggable floating card over the 3D viewport.
+- Multiple items can be open simultaneously — each card is independently movable (drag the title bar).
+- Per-item close (×) button on each card; "Close all" in the Library tab dismisses everything.
+- GIF/video always plays from frame 0 (a fresh `<img>` / `<video>` element is created for each open).
+- Backend: `state.library_items = [{id, name, kind, data_url, top_px}, ...]` — replaces the old
+  single-item `library_show` / `library_data_url` / `library_kind` / `library_name` state vars.
 
 ---
 
@@ -223,7 +243,7 @@ FoF links are gated on `halos_visible AND fof_links_on` — `fl.visible` is only
 - **Stress-test microUchuu** at higher `--max-halos` / `--max-galaxies` once perf is stable.
 - **Density colour mode** still does KDE per snapshot — could be cached or precomputed.
 - **Camera bookmarks UI** lives in a tab; could surface as a hover-out menu in the toolbar.
-- **Library tab** could support deletion + renaming, and inline thumbnails for movies.
+- **Library tab** multi-item pop-outs done; deletion, renaming, and inline thumbnails for movies still pending.
 - **`HALO_CB` / `GAL_CB` colour-by descriptors** still hard-coded — could be derived from `model_fields` so unsupported fields don't even appear in the dropdown.
 
 ---
@@ -255,3 +275,8 @@ FoF links are gated on `halos_visible AND fof_links_on` — `fl.visible` is only
 - Playback frame cache invalidates correctly on any filter / focus / visibility / color-mode change.
 - `_combined_mask()` shape-mismatch crash fixed in both `halo_layer.py` and `galaxy_layer.py`.
 - FoF links are fully filter-aware: respect focus regions, halo filter masks, and the halos-visible toggle; sync during playback and recording.
+- Galaxy filter sliders widened + **active-only** gate — all galaxies with mass now visible at startup; sliders only filter when moved away from endpoints.
+- B/T clamped to [0, 1] before filter comparison — SAGE satellites with BulgeMass > StellarMass no longer falsely excluded.
+- Double-click selection restricted to visible galaxies only (`_combined_mask()`).
+- Highlight Members / Highlight Galaxy indicators now use **CGM/Hot regime colours** (dodgerblue / tomato / cyan); selected galaxy shows a white border ring + regime fill.
+- Library tab redesigned: **multi-item draggable pop-outs** over the viewport, **double-click** to open, per-item × close, "Close all" button; GIF/video always starts from frame 0.

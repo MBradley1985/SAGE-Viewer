@@ -23,13 +23,14 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 ### Selection & inspection
 - **Galaxy Info** panel (Target tab) — GalaxyID, type, halo Mvir, stellar mass, sSFR, cold gas, B/T, BH mass, H2 mass, gas regime, FFB regime, environment classification, mass-weighted stellar age
 - **Group Info** panel (Environment tab) — FOF-aggregate stats: classification, member breakdown (centrals vs satellites), host Mvir, total stellar / cold gas / SFR, mean B/T, spatial extent, target role, BCG stellar mass
-- **Highlight Galaxy** / **Highlight Members** buttons add cyan splat overlays
-- **Double-click any point** in the viewport (any tab) to populate the Target tab's halo + galaxy IDs and draw a red marker on the selection. If Focus is active, the camera carries to the new selection at the last-used radius.
+- **Highlight Galaxy** / **Highlight Members** buttons add regime-coloured splat overlays — CGM-regime members in dodgerblue, Hot-regime in tomato; the selected galaxy is marked with a white border ring
+- **Double-click any point** in the viewport (any tab) to populate the Target tab's halo + galaxy IDs and draw a red marker on the selection. Only currently visible galaxies (passing all filters and focus) are selectable. If Focus is active, the camera carries to the new selection at the last-used radius.
 - **Enter to run** in every input field — Halo idx, Galaxy idx, Coords X/Y/Z, Box bounds, Console command, script path, screenshot/movie label all submit on Enter, equivalent to clicking the paired Go / Zoom / Run / Take Screenshot button
 
 ### Filtering
 - Halo filters: Mvir (log10), Rvir (Mpc/h), Vvir (km/s)
 - Galaxy filters: stellar mass, sSFR, B/T, age, BH mass, ICS mass, type (centrals / satellites), FFB regime, CGM / Hot regime, environment class (Field / Isolated / Group / Cluster, via checkboxes in the Environment tab)
+- Filters are **active-only** — a slider sitting at its full-range endpoints has no effect; move it inward to filter. Every galaxy with detectable mass is visible at startup.
 - Filters auto-disable when the loaded model doesn't contain the underlying field
 - Reset Filters button restores defaults
 - **FoF links are filter-aware** — satellite→central gold lines are only drawn for halos that pass the active filter mask, focus sphere/box, and the halos-visible toggle; they stay correct during playback and recording
@@ -151,7 +152,7 @@ Full documentation at [mbradley1985.github.io/SAGE-Viewer](https://mbradley1985.
 | Coords     | Fly to arbitrary (x, y, z) — "Use Current Position" populates from camera |
 | Box        | Zoom to axis-aligned sub-box — "Use Current View" populates from camera |
 | Console    | Shell terminal + Python REPL + SAGE natural-language commands. Multiple sessions, load scripts, pop-out window |
-| Library    | Browse stored screenshots / movies, play back in the viewport |
+| Library    | Browse stored screenshots / movies; double-click a row to open as a movable floating card over the viewport (multiple items can be open simultaneously) |
 
 The **Focus button** (top of the right panel) is tab-aware: it focuses on whatever's active in the current tab (target galaxy, environment halo, coords point, or box region).
 

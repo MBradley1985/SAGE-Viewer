@@ -135,6 +135,61 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   no `SetDesiredUpdateRate(15.0)` toggling during play / rotate /
   mouse drag)
 
+### Galaxy filter active-only architecture
+
+- Every range-slider filter now only takes effect when it has been moved away from its full-range
+  default — sliders sitting at both endpoints are completely inert, so every galaxy with a
+  detectable mass is visible at startup without touching any slider
+- Slider ranges widened to cover the full SAGE26 distribution: stellar mass 0–14,
+  sSFR −14–0, cold gas / bulge / BH mass 0–14, SFR / mass-loading −6–5,
+  cooling/heating −7–7, disk radius −4–1, metallicities −2–12
+- B/T clamping: SAGE can produce BulgeMass > StellarMass for satellites that lost
+  stellar mass after a major merger; the computed ratio is now clamped to [0, 1]
+  before the filter comparison so these galaxies are never falsely excluded
+- Same `_active(lo, hi, mn, mx)` guard used for all ~25 conditional fields (BH mass,
+  ICS mass, cooling, heating, disk radius, metallicities, etc.) — off by default,
+  engaged only when the user moves a slider
+
+### Visibility-aware galaxy picking
+
+- Double-click now queries only galaxies that are currently visible — the
+  `_combined_mask()` from `GalaxyLayer` (intersection of filter + focus masks)
+  is used to build a `visible` index array before the KDTree search, so
+  environment-class checkboxes, focus regions, and all slider filters are all
+  respected: you can only click what you can see
+- The hit index from the KDTree is mapped back into the full galaxy array to give
+  the correct `gidx`
+
+### Regime-coloured member and selected-galaxy indicators
+
+- **Highlight Members** splats are now coloured by CGM/Hot regime:
+  CGM-regime members in dodgerblue, Hot-regime in tomato, unknown/absent in cyan —
+  matching the outer envelope colouring used in Structure render mode
+- The **selected galaxy** (from Target tab or from Highlight Members) now shows
+  a white border ring (36 px, opacity 0.90) with a regime-coloured fill (26 px)
+  layered on top — visually distinct from the surrounding group members
+- `camera.py` redesigned: `_member_actors: list` and `_selected_actors: list`
+  replace the old single `_indicator_actor`; `_clear_member_indicators()` removes
+  all per-regime actors at once; `_add_member_indicators(positions, regimes)` groups
+  members by regime and draws one mesh per colour
+
+### Library: multi-item movable pop-outs
+
+- Any number of library items can now be open simultaneously — each becomes its own
+  independent draggable card floating over the 3D viewport
+- **Double-click** a row in the Library file list to open an item (single-click no
+  longer opens anything)
+- Each pop-out card is draggable by its title bar (same JS drag handler used by the
+  console pop-out — `.sage-popout` / `.sage-popout-handle` CSS classes)
+- Per-item close (×) on every card; **Close all** button in the Library tab clears
+  all open cards at once
+- GIF/video always plays from frame 0: `v_if` (not `v_show`) ensures a fresh DOM
+  media element is created each time an item is opened — no more mid-stream start
+- Videos carry `muted` so browsers permit autoplay without requiring user interaction
+- Backend: `state.library_items` list (each entry `{id, name, kind, data_url,
+  top_px}`) replaces the old single-item scalar state vars
+  (`library_show`, `library_data_url`, `library_kind`, `library_name`)
+
 ### Filter-aware FoF links
 - FoF satellite→central line segments now respect the active halo filter
   mask, focus sphere/box, and the halos-visible toggle — links for hidden
@@ -163,6 +218,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   when new filter state is introduced
 
 ### Bug fixes
+- Galaxy filters were silently excluding all zero-mass and low-mass galaxies:
+  stellar mass slider defaulted to [8.0, 12.5], sSFR slider max was −6 (excluding
+  all starbursty small galaxies), B/T could reject satellites with BulgeMass > StellarMass.
+  Fixed by the active-only architecture above.
+- Double-click could select a galaxy that was invisible (filtered or outside focus
+  region) — KDTree now restricted to `_combined_mask()` visible indices only.
 - Snapshot-slider crash when focus is active and adjacent snapshots have
   different galaxy / halo counts: `_combined_mask()` now returns `None`
   on a length mismatch (focus mask vs filter mask sized for different
