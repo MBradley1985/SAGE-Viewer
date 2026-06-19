@@ -29,6 +29,7 @@ class GalaxySnapshot:
     central_id: np.ndarray      # (N,)   int64 — SAGE CentralGalaxyIndex
     time_of_infall: np.ndarray  # (N,)   int32 — snapshot index of infall
     mean_age: np.ndarray        # (N,)   float32 — mass-weighted stellar age, Gyr
+    sage_indices: np.ndarray    # (N,)   int64  — row indices in the raw HDF5 snap group
     snap_num: int
 
     @property
@@ -51,6 +52,7 @@ class GalaxySnapshot:
             galaxy_id=zi64, central_id=zi64,
             time_of_infall=zi,
             mean_age=z,
+            sage_indices=np.empty(0, dtype=np.int64),
             snap_num=snap_num,
         )
 
@@ -199,6 +201,7 @@ def load_galaxy_snapshot(
         central_id=cid_raw[indices],
         time_of_infall=tinfall_raw[indices],
         mean_age=mean_age,
+        sage_indices=indices.astype(np.int64),
         snap_num=snap_num,
     )
 

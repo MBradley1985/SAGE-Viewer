@@ -470,6 +470,17 @@ def create_app(
                             color="cyan",
                         )
 
+            # ── Export catalogue button ────────────────────────────────────
+            v3.VBtn(
+                icon="mdi-database-export-outline",
+                variant="text",
+                density="compact",
+                color="white",
+                title="Export galaxy catalogue",
+                click="export_dialog_show = true",
+                style="margin-left:4px;",
+            )
+
             # Title
             v3.VToolbarTitle(
                 "SAGE-Viewer",
@@ -499,6 +510,130 @@ def create_app(
                 + _b64.b64encode(_THEME_CSS.encode("utf-8")).decode("ascii")
             )
             html.Link(rel="stylesheet", href=_css_data_url)
+
+            # ── Export catalogue dialog ────────────────────────────────────
+            _SCOPE_ITEMS = [
+                {"title": "Current Filters",  "value": "filters"},
+                {"title": "Target Galaxy",    "value": "target"},
+                {"title": "Group Members",    "value": "group"},
+                {"title": "Coords Sphere",    "value": "coords"},
+                {"title": "Box Region",       "value": "box"},
+            ]
+            _FMT_ITEMS = [
+                {"title": "CSV",  "value": "csv"},
+                {"title": "HDF5", "value": "hdf5"},
+                {"title": "FITS", "value": "fits"},
+                {"title": "TXT",  "value": "txt"},
+            ]
+            with v3.VDialog(
+                v_model=("export_dialog_show",),
+                max_width=500,
+                persistent=False,
+            ):
+                with v3.VCard(
+                    style="background:#1a1a2e;border:1px solid #06b6d4;color:#e2e8f0;",
+                    rounded=False,
+                ):
+                    with html.Div(
+                        style=(
+                            "display:flex;align-items:center;gap:8px;"
+                            "padding:14px 16px 10px;"
+                            "border-bottom:1px solid #374151;"
+                        ),
+                    ):
+                        v3.VIcon("mdi-database-export-outline",
+                                 color="cyan", size="small")
+                        html.Span(
+                            "Export Galaxy Catalogue",
+                            style=(
+                                "color:#06b6d4;font-weight:700;"
+                                "letter-spacing:0.06em;font-size:0.95rem;"
+                            ),
+                        )
+                        v3.VSpacer()
+                        v3.VBtn(
+                            icon="mdi-close", size="x-small",
+                            variant="text", color="#9ca3af",
+                            click="export_dialog_show = false",
+                        )
+                    with v3.VCardText(
+                        style="padding:16px;display:flex;flex-direction:column;gap:14px;"
+                    ):
+                        # Scope
+                        v3.VSelect(
+                            v_model=("export_scope",),
+                            items=(_SCOPE_ITEMS,),
+                            label="Selection scope",
+                            variant="outlined",
+                            density="compact",
+                            color="cyan",
+                            bg_color="#0d0d1a",
+                            hide_details=True,
+                        )
+                        # Format toggle
+                        with html.Div(
+                            style="display:flex;flex-direction:column;gap:4px;"
+                        ):
+                            html.Span(
+                                "Format",
+                                style="font-size:0.75rem;color:#9ca3af;",
+                            )
+                            with v3.VBtnToggle(
+                                v_model=("export_format",),
+                                mandatory=True,
+                                variant="outlined",
+                                density="compact",
+                                color="cyan",
+                                style="width:100%;",
+                            ):
+                                for _fi in _FMT_ITEMS:
+                                    v3.VBtn(
+                                        _fi["title"],
+                                        value=_fi["value"],
+                                        style="flex:1;font-family:monospace;",
+                                    )
+                        # Optional filename
+                        v3.VTextField(
+                            v_model=("export_filename",),
+                            label="Filename (optional, no extension)",
+                            variant="outlined",
+                            density="compact",
+                            color="cyan",
+                            bg_color="#0d0d1a",
+                            hide_details=True,
+                            placeholder="auto-generated if blank",
+                            style="font-family:monospace;",
+                        )
+                        # Status
+                        with html.Div(
+                            v_show=("export_status",),
+                            style=(
+                                "font-size:0.72rem;font-family:monospace;"
+                                "background:#0d0d1a;padding:8px 10px;"
+                                "border:1px solid #374151;word-break:break-all;"
+                                "color:#9ca3af;"
+                            ),
+                        ):
+                            html.Span("{{ export_status }}")
+                    with v3.VCardActions(
+                        style="padding:8px 16px 14px;gap:8px;justify-content:flex-end;"
+                    ):
+                        v3.VBtn(
+                            "Cancel",
+                            variant="text",
+                            color="#9ca3af",
+                            click="export_dialog_show = false",
+                        )
+                        v3.VBtn(
+                            "Export",
+                            variant="outlined",
+                            color="cyan",
+                            prepend_icon="mdi-export",
+                            loading=("export_busy",),
+                            disabled=("export_busy",),
+                            click=server.controller.do_export,
+                            style="font-family:monospace;",
+                        )
 
             with v3.VSheet(
                 style=(

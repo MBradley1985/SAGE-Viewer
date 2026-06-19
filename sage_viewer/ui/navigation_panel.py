@@ -639,6 +639,125 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.flush()
         _push()
 
+    # ------------------------------------------------------------------
+    # Export catalogue
+    # ------------------------------------------------------------------
+
+    state.export_dialog_show = False
+    state.export_scope        = "filters"   # filters|target|group|coords|box
+    state.export_format       = "csv"       # csv|hdf5|fits|txt
+    state.export_filename     = ""          # optional custom stem
+    state.export_status       = ""          # last result path or error
+    state.export_busy         = False
+
+    def _resolve_export_indices(scope: str) -> "np.ndarray":
+        import numpy as np
+        _, galaxies = scene._loader.get(scene.current_snap)
+        if galaxies.count == 0:
+            raise ValueError("No galaxies loaded.")
+
+        if scope == "target":
+            idx = int(state.nav_gal_idx)
+            if idx < 0 or idx >= galaxies.count:
+                raise ValueError(f"Target index {idx} out of range.")
+            return np.array([idx], dtype=np.int64)
+
+        if scope == "group":
+            from sage_viewer.utils.group_info import member_indices
+            idx = int(state.nav_gal_idx)
+            members = member_indices(galaxies, idx)
+            if len(members) == 0:
+                raise ValueError("No group members found for target galaxy.")
+            return members.astype(np.int64)
+
+        if scope == "coords":
+            cx, cy, cz = float(state.nav_x), float(state.nav_y), float(state.nav_z)
+            r = float(state.nav_distance)
+            d2 = np.sum((galaxies.positions - np.array([cx, cy, cz])) ** 2, axis=1)
+            mask = d2 <= r * r
+            if not mask.any():
+                raise ValueError(f"No galaxies within {r} Mpc/h of ({cx:.1f},{cy:.1f},{cz:.1f}).")
+            return np.where(mask)[0].astype(np.int64)
+
+        if scope == "box":
+            pos = galaxies.positions
+            mask = (
+                (pos[:, 0] >= float(state.nav_box_xmin)) & (pos[:, 0] <= float(state.nav_box_xmax)) &
+                (pos[:, 1] >= float(state.nav_box_ymin)) & (pos[:, 1] <= float(state.nav_box_ymax)) &
+                (pos[:, 2] >= float(state.nav_box_zmin)) & (pos[:, 2] <= float(state.nav_box_zmax))
+            )
+            if not mask.any():
+                raise ValueError("No galaxies within the current box bounds.")
+            return np.where(mask)[0].astype(np.int64)
+
+        # default: "filters" — use the active filter mask on the galaxy layer
+        import numpy as np
+        fmask = scene.primary.galaxy_layer._filter_mask
+        if fmask is None:
+            gal_indices = np.arange(galaxies.count, dtype=np.int64)
+        else:
+            gal_indices = np.where(fmask)[0].astype(np.int64)
+        if len(gal_indices) == 0:
+            raise ValueError("Filter mask excludes all galaxies.")
+        return gal_indices
+
+    _SCOPE_LABELS = {
+        "filters": "Current Filters",
+        "target":  "Target Galaxy",
+        "group":   "Group Members",
+        "coords":  "Coords Sphere",
+        "box":     "Box Region",
+    }
+
+    @ctrl.set("do_export")
+    async def on_do_export():
+        import asyncio, pathlib, datetime
+        scope  = str(state.export_scope)
+        fmt    = str(state.export_format)
+        stem   = str(state.export_filename or "").strip()
+        state.export_busy   = True
+        state.export_status = "Exporting…"
+        state.flush()
+
+        try:
+            gal_indices = _resolve_export_indices(scope)
+            _, galaxies = scene._loader.get(scene.current_snap)
+            sage_idx = galaxies.sage_indices[gal_indices]
+
+            hdf5_path = scene.primary.cfg.hdf5_path
+            snap_num  = scene.current_snap
+            snap_lbl  = str(state.snap_label) if hasattr(state, "snap_label") else f"snap{snap_num}"
+
+            repo_root = pathlib.Path(__file__).resolve().parents[2]
+            out_dir   = repo_root / "sage_outputs" / "catalogues"
+            if not stem:
+                ts   = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                stem = f"catalogue_{scope}_{ts}"
+            exts = {"csv": ".csv", "hdf5": ".h5", "fits": ".fits", "txt": ".txt"}
+            out_path = out_dir / f"{stem}{exts.get(fmt, '.csv')}"
+
+            from sage_viewer.utils.catalogue import write_catalogue
+            result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: write_catalogue(
+                    hdf5_path=hdf5_path,
+                    snap_num=snap_num,
+                    snap_label=snap_lbl,
+                    sage_indices=sage_idx,
+                    out_path=out_path,
+                    fmt=fmt,
+                    hubble_h=scene.primary.cfg.hubble_h,
+                    scope_label=_SCOPE_LABELS.get(scope, scope),
+                ),
+            )
+            n = len(sage_idx)
+            state.export_status = f"✓ {n:,} galaxies → {result}"
+        except Exception as exc:
+            state.export_status = f"Error: {exc}"
+
+        state.export_busy = False
+        state.flush()
+
     # Auto-refresh whichever info card is open when the selection changes.
     @state.change("nav_gal_idx")
     def _refresh_info_on_selection(**_):
