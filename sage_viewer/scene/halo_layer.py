@@ -9,12 +9,13 @@ from sage_viewer.io.halo_reader import HaloSnapshot
 from sage_viewer.utils.colormap import compute_density_colors, normalize_log
 from sage_viewer.utils.sizing import halo_world_radii
 
-ColorMode = Literal["mvir", "rvir", "vvir"]
+ColorMode = Literal["mvir", "rvir", "vvir", "vmax"]
 
 _RANGES = {
     "mvir": (10.0, 15.0),   # log10(Msun)
     "rvir": (-1.5, 0.5),    # log10(Mpc/h)
     "vvir": (1.5, 3.0),     # log10(km/s)
+    "vmax": (1.5, 3.0),     # log10(km/s)
 }
 
 class HaloLayer:
@@ -192,11 +193,13 @@ class HaloLayer:
             self._actors.append(actor)
 
     def _compute_colors(self, snap: HaloSnapshot) -> np.ndarray:
-        vmin, vmax = _RANGES[self._color_mode]
+        vmin, vmax_r = _RANGES[self._color_mode]
         if self._color_mode == "mvir":
-            return normalize_log(snap.masses, vmin, vmax)
+            return normalize_log(snap.masses, vmin, vmax_r)
         if self._color_mode == "rvir":
-            return normalize_log(snap.rvir, vmin, vmax)
+            return normalize_log(snap.rvir, vmin, vmax_r)
         if self._color_mode == "vvir":
-            return normalize_log(snap.vvir, vmin, vmax)
+            return normalize_log(snap.vvir, vmin, vmax_r)
+        if self._color_mode == "vmax":
+            return normalize_log(np.maximum(snap.vmax, 1e-3), vmin, vmax_r)
         return normalize_log(snap.masses, *_RANGES["mvir"])

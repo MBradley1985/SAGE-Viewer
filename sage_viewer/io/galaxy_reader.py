@@ -193,7 +193,7 @@ def load_galaxy_snapshot(
         ibm_raw        = _opt("InstabilityBulgeMass", np.float32)
         ibr_raw        = _opt("InstabilityBulgeRadius", np.float32)
         # Gas / outflows
-        h1_raw         = _opt("H1Gas", np.float32)
+        h1_raw         = _opt("H1gas", np.float32)
         ejected_raw    = _opt("EjectedMass", np.float32)
         outflow_raw    = _opt("OutflowRate", np.float32)
         massload_raw   = _opt("MassLoading", np.float32)

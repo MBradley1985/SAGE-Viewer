@@ -41,7 +41,7 @@ _OPTIONAL_FIELDS: dict[str, str] = {
     "instability_bulge_mass":   "InstabilityBulgeMass",
     "instability_bulge_radius": "InstabilityBulgeRadius",
     # Gas / outflows
-    "h1_gas":        "H1Gas",
+    "h1_gas":        "H1gas",
     "ejected_mass":  "EjectedMass",
     "outflow_rate":  "OutflowRate",
     "mass_loading":  "MassLoading",

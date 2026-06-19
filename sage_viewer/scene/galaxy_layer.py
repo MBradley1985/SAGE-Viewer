@@ -12,6 +12,18 @@ from sage_viewer.utils.sizing import galaxy_world_radii
 ColorMode = Literal[
     "stellar_mass", "ssfr", "sfr", "cold_gas", "bulge_mass", "bt",
     "bh_mass", "ics_mass", "age", "density", "type", "structure",
+    # Gas / outflows
+    "cgm_gas", "h1_gas", "h2_gas", "hot_gas", "ejected_mass",
+    "outflow_rate", "mass_loading", "cooling", "heating",
+    # Structural
+    "disk_radius", "bulge_radius",
+    "merger_bulge_mass", "merger_bulge_radius",
+    "instability_bulge_mass", "instability_bulge_radius",
+    # SFR components
+    "sfr_bulge", "sfr_disk", "sfr_bulge_z", "sfr_disk_z",
+    # Metals
+    "metals_stellar_mass", "metals_bulge_mass", "metals_cold_gas",
+    "metals_hot_gas", "metals_cgm_gas", "metals_ejected_mass", "metals_ics",
 ]
 
 _RANGES = {
@@ -24,6 +36,66 @@ _RANGES = {
     "ics_mass":     (6.0,  12.0),   # log10(Msun)
     "bt":           (0.0,   1.0),   # linear ratio
     "age":          (0.0,  14.0),   # Gyr (linear)
+    # Gas / outflows
+    "cgm_gas":      (7.0,  12.0),   # log10(Msun)
+    "h1_gas":       (7.0,  12.0),   # log10(Msun)
+    "h2_gas":       (6.0,  11.0),   # log10(Msun)
+    "hot_gas":      (7.0,  12.0),   # log10(Msun)
+    "ejected_mass": (7.0,  12.0),   # log10(Msun)
+    "outflow_rate": (-6.0,  3.0),   # log10(Msun/yr)
+    "mass_loading": (-2.0,  3.0),   # log10(dimensionless)
+    "cooling":      (-5.0,  5.0),   # log10(SAGE units)
+    "heating":      (-5.0,  5.0),   # log10(SAGE units)
+    # Structural
+    "disk_radius":              (-4.0, 0.0),  # log10(Mpc/h)
+    "bulge_radius":             (-4.0, 0.0),  # log10(Mpc/h)
+    "merger_bulge_mass":        (6.0, 12.0),  # log10(Msun)
+    "merger_bulge_radius":      (-4.0, 0.0),  # log10(Mpc/h)
+    "instability_bulge_mass":   (6.0, 12.0),  # log10(Msun)
+    "instability_bulge_radius": (-4.0, 0.0),  # log10(Mpc/h)
+    # SFR components
+    "sfr_bulge":   (-6.0, 3.0),   # log10(Msun/yr)
+    "sfr_disk":    (-6.0, 3.0),   # log10(Msun/yr)
+    "sfr_bulge_z": (-6.0, 0.0),   # log10(dimensionless)
+    "sfr_disk_z":  (-6.0, 0.0),   # log10(dimensionless)
+    # Metals
+    "metals_stellar_mass": (-2.0, 10.0),  # log10(Msun)
+    "metals_bulge_mass":   (-2.0, 10.0),  # log10(Msun)
+    "metals_cold_gas":     (-2.0, 10.0),  # log10(Msun)
+    "metals_hot_gas":      (-2.0, 10.0),  # log10(Msun)
+    "metals_cgm_gas":      (-2.0, 10.0),  # log10(Msun)
+    "metals_ejected_mass": (-2.0, 10.0),  # log10(Msun)
+    "metals_ics":          (-2.0, 10.0),  # log10(Msun)
+}
+
+# Simple log10-normalized fields: mode → (snap attr, floor before log10)
+_LOG_FIELDS: dict[str, tuple[str, float]] = {
+    "cgm_gas":               ("cgm_gas",               1.0),
+    "h1_gas":                ("h1_gas",                 1.0),
+    "h2_gas":                ("h2_mass",                1.0),
+    "hot_gas":               ("hot_gas",                1.0),
+    "ejected_mass":          ("ejected_mass",            1.0),
+    "merger_bulge_mass":     ("merger_bulge_mass",       1.0),
+    "instability_bulge_mass":("instability_bulge_mass",  1.0),
+    "metals_stellar_mass":   ("metals_stellar_mass",     1.0),
+    "metals_bulge_mass":     ("metals_bulge_mass",       1.0),
+    "metals_cold_gas":       ("metals_cold_gas",         1.0),
+    "metals_hot_gas":        ("metals_hot_gas",          1.0),
+    "metals_cgm_gas":        ("metals_cgm_gas",          1.0),
+    "metals_ejected_mass":   ("metals_ejected_mass",     1.0),
+    "metals_ics":            ("metals_ics",              1.0),
+    "outflow_rate":          ("outflow_rate",            1e-6),
+    "mass_loading":          ("mass_loading",            1e-6),
+    "cooling":               ("cooling",                 1e-6),
+    "heating":               ("heating",                 1e-6),
+    "sfr_bulge":             ("sfr_bulge",               1e-6),
+    "sfr_disk":              ("sfr_disk",                1e-6),
+    "sfr_bulge_z":           ("sfr_bulge_z",             1e-6),
+    "sfr_disk_z":            ("sfr_disk_z",              1e-6),
+    "disk_radius":           ("disk_radius",             1e-6),
+    "bulge_radius":          ("bulge_radius",            1e-6),
+    "merger_bulge_radius":   ("merger_bulge_radius",     1e-6),
+    "instability_bulge_radius": ("instability_bulge_radius", 1e-6),
 }
 
 _CENTRAL_CMAP    = "Blues"
@@ -435,4 +507,7 @@ class GalaxyLayer:
             ages = snap.mean_age.astype(np.float32)
             vmin, vmax = _RANGES["age"]
             return np.clip((ages - vmin) / (vmax - vmin + 1e-10), 0.0, 1.0)
+        if m in _LOG_FIELDS:
+            attr, floor = _LOG_FIELDS[m]
+            return normalize_log(np.maximum(getattr(snap, attr), floor), *_RANGES[m])
         return normalize_log(snap.stellar_mass, *_RANGES["stellar_mass"])
