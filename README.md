@@ -39,8 +39,7 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - **Double-click any point** in the viewport (any tab) to populate the Target tab's halo + galaxy IDs and draw a red marker on the selection. Only currently visible galaxies (passing all filters and focus) are selectable. If Focus is active, the camera carries to the new selection at the last-used radius.
 - **Enter to run** in every input field — Halo idx, Galaxy idx, Coords X/Y/Z, Box bounds, Console command, script path, screenshot/movie label all submit on Enter, equivalent to clicking the paired Go / Zoom / Run / Take Screenshot button
 
-<!-- Filter GIF: drop docs/images/filters.gif here once captured -->
-<!-- ![Filters in action](docs/images/filters.gif) -->
+![Filters in action](docs/images/filters.gif)
 
 ### Filtering
 - Halo filters: Mvir (log10), Rvir (Mpc/h), Vvir (km/s)
@@ -173,8 +172,7 @@ Full documentation at [mbradley1985.github.io/SAGE-Viewer](https://mbradley1985.
 | Console    | Shell terminal + Python REPL + SAGE natural-language commands. Multiple sessions, load scripts, pop-out window |
 | Library    | Browse stored screenshots / movies; double-click a row to open as a movable floating card over the viewport (multiple items open simultaneously); per-row delete button removes the file from disk immediately |
 
-<!-- Draw Sphere GIF: drop docs/images/draw_sphere.gif here once captured -->
-<!-- ![Draw Sphere](docs/images/draw_sphere.gif) -->
+![Draw Sphere](docs/images/draw_sphere.gif)
 
 <!-- Library pop-out GIF: drop docs/images/library_popup.gif here once captured -->
 <!-- ![Library pop-out](docs/images/library_popup.gif) -->
