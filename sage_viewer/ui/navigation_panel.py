@@ -2301,36 +2301,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
         ".mp4":  ("video", "video/mp4"),
     }
 
-    def _thumb_data_url(p: "_pathlib.Path", kind: str, ext: str) -> str:
-        """Return a tiny base64 data-URL thumbnail, or empty string on failure."""
-        try:
-            from PIL import Image as _PIL_Image
-            import io as _bio
-            import base64 as _b64
-            if kind == "image" and ext not in ("gif",):
-                img = _PIL_Image.open(p)
-            elif ext == "gif":
-                img = _PIL_Image.open(p)
-                img.seek(0)
-            else:
-                # Video: try ffmpeg to extract frame 0
-                import subprocess as _sp
-                result = _sp.run(
-                    ["ffmpeg", "-i", str(p), "-vframes", "1",
-                     "-f", "image2pipe", "-vcodec", "png", "-"],
-                    capture_output=True, timeout=10,
-                )
-                if result.returncode != 0:
-                    return ""
-                img = _PIL_Image.open(_bio.BytesIO(result.stdout))
-            img.thumbnail((80, 60))
-            buf = _bio.BytesIO()
-            img.convert("RGB").save(buf, "JPEG", quality=60)
-            b64 = _b64.b64encode(buf.getvalue()).decode("ascii")
-            return f"data:image/jpeg;base64,{b64}"
-        except Exception:
-            return ""
-
     def _scan_library() -> list[dict]:
         out: list[dict] = []
         roots = [_LIBRARY_DIR, _repo_root / "sage_outputs"]
@@ -2359,7 +2329,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "kind":     kind,
                     "ext":      ext.lstrip("."),
                     "size_kb":  int(size_kb),
-                    "thumb":    _thumb_data_url(p, kind, ext.lstrip(".")),
                 })
         return out
 
@@ -3316,36 +3285,32 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         "margin-top:6px;"
                     ),
                 ):
-                    with v3.VList(density="compact", bg_color="transparent"):
-                        with v3.VListItem(
+                    with html.Div():
+                        with html.Div(
                             v_for=("entry in library_files",),
                             key=("entry.path",),
-                            dblclick=(
-                                server.controller.library_open,
-                                "[entry.path]",
+                            style=(
+                                "display:flex;align-items:center;gap:6px;"
+                                "padding:4px 6px;border-bottom:1px solid #1f2937;"
+                                "cursor:pointer;"
                             ),
-                            style="padding:4px 6px;",
                         ):
-                            with html.Template(v_slot_prepend=True):
-                                html.Img(
-                                    v_if=("entry.thumb",),
-                                    src=("entry.thumb",),
-                                    style=(
-                                        "width:48px;height:36px;object-fit:cover;"
-                                        "border-radius:3px;margin-right:6px;"
-                                        "flex-shrink:0;"
-                                    ),
-                                )
-                                v3.VIcon(
-                                    v_else=True,
-                                    icon=(
-                                        "entry.kind === 'video' "
-                                        "? 'mdi-movie-open-outline' : 'mdi-image-outline'",
-                                    ),
-                                    color="cyan",
-                                    style="margin-right:6px;",
-                                )
-                            with html.Template(v_slot_default=True):
+                            v3.VIcon(
+                                icon=(
+                                    "entry.kind === 'video' "
+                                    "? 'mdi-movie-open-outline' : 'mdi-image-outline'",
+                                ),
+                                color="cyan",
+                                size="small",
+                                style="flex-shrink:0;",
+                            )
+                            with html.Div(
+                                style="flex:1;min-width:0;",
+                                dblclick=(
+                                    server.controller.library_open,
+                                    "[entry.path]",
+                                ),
+                            ):
                                 html.Div(
                                     "{{ entry.name }}",
                                     style=(
@@ -3355,36 +3320,20 @@ def build_navigation_panel(server, scene: Scene) -> None:
                                     ),
                                 )
                                 html.Div(
-                                    "{{ entry.ext.toUpperCase() }} · "
-                                    "{{ entry.size_kb }} KB",
+                                    "{{ entry.ext.toUpperCase() }}"
+                                    " · {{ entry.size_kb }} KB",
                                     style="font-size:0.6rem;color:#6b7280;",
                                 )
-                                with html.Div(
-                                    style=(
-                                        "display:flex;align-items:center;"
-                                        "gap:4px;margin-top:3px;"
-                                    ),
-                                ):
-                                    v3.VTextField(
-                                        v_model=("entry.rename_val || ''",),
-                                        placeholder=("entry.name",),
-                                        density="compact", hide_details=True,
-                                        variant="outlined",
-                                        style="font-size:0.65rem;max-width:120px;",
-                                        change=(
-                                            server.controller.library_rename,
-                                            "[entry.path, $event]",
-                                        ),
-                                    )
-                                    v3.VBtn(
-                                        icon="mdi-delete-outline",
-                                        density="compact", size="x-small",
-                                        color="red", variant="text",
-                                        click=(
-                                            server.controller.library_delete,
-                                            "[entry.path]",
-                                        ),
-                                    )
+                            v3.VBtn(
+                                icon="mdi-delete-outline",
+                                density="compact", size="x-small",
+                                color="red", variant="text",
+                                style="flex-shrink:0;",
+                                click=(
+                                    server.controller.library_delete,
+                                    "[entry.path]",
+                                ),
+                            )
                 # Bottom block — count + action buttons anchored to the
                 # panel's bottom edge, mirroring the Console tab layout.
                 with html.Div(
