@@ -106,111 +106,143 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                 "justify-content:center;overflow:hidden;padding:24px;"
             ),
         ):
-            with v3.VCard(
+            # Row wrapper — expands to two columns when par editor is visible
+            with html.Div(
                 style=(
-                    "width:860px;max-width:96vw;height:640px;max-height:80vh;"
-                    "background:#000000;border:2px solid #06b6d4;"
-                    "display:flex;flex-direction:column;"
-                    "position:relative;"
+                    "{"
+                    "display:'flex',gap:'16px',alignItems:'stretch',"
+                    "height:'640px',maxHeight:'80vh',"
+                    "width:'100%',maxWidth:'calc(100vw - 48px)',"
+                    "justifyContent: wiz_par_show ? 'flex-start' : 'center'"
+                    "}",
                 ),
-                elevation=0,
-                rounded=False,
             ):
-                # Terminal output
-                with v3.VSheet(
-                    classes="sage-console-scroll wiz-console-scroll",
-                    color="#000000",
+                # ── Left: terminal card ───────────────────────────────────────
+                with v3.VCard(
                     style=(
-                        "flex:1;min-height:0;overflow-y:auto;"
-                        "padding:14px 18px;"
-                        "font-size:0.82rem;line-height:1.55;"
+                        "flex:1;min-width:0;max-width:860px;"
+                        "background:#000000;border:2px solid #06b6d4;"
+                        "display:flex;flex-direction:column;"
+                        "position:relative;"
                     ),
+                    elevation=0,
+                    rounded=False,
                 ):
-                    with html.Div(
-                        v_for="(line, idx) in wiz_lines",
-                        key="idx",
-                    ):
-                        html.Div(
-                            v_html=("line.html || '&nbsp;'",),
-                            classes=("'wiz-' + line.kind",),
-                            style="white-space:pre-wrap;",
-                        )
-
-                # Par file editor (shown only when wiz_par_show)
-                with v3.VSheet(
-                    v_show=("wiz_par_show",),
-                    color="#000000",
-                    style=(
-                        "border-top:1px solid #374151;"
-                        "padding:8px 12px;flex-shrink:0;"
-                        "max-height:220px;overflow-y:auto;"
-                    ),
-                ):
-                    v3.VTextarea(
-                        v_model=("wiz_par_text",),
-                        rows=9,
-                        variant="outlined",
-                        bg_color="#000000",
-                        hide_details=True,
-                        classes="wiz-par-area",
-                        style="font-family:monospace;color:#e2e8f0;",
-                        label="Parameter file (edit freely, format is preserved)",
-                    )
-
-                # Action bar
-                with html.Div(
-                    style=(
-                        "border-top:1px solid #374151;"
-                        "background:#000000;"
-                        "padding:10px 14px;"
-                        "flex-shrink:0;"
-                        "display:flex;flex-direction:column;gap:8px;"
-                    ),
-                ):
-                    v3.VProgressLinear(
-                        v_show=("wiz_busy",),
-                        indeterminate=True,
-                        color="#06b6d4",
-                        height=3,
-                        style="width:100%;",
-                    )
-                    # Filename input — shown when creating a new config file
-                    with html.Div(
-                        v_show=("wiz_filename_show",),
-                        style="display:flex;align-items:center;gap:8px;",
-                    ):
-                        v3.VTextField(
-                            v_model=("wiz_filename",),
-                            label="Config file name",
-                            variant="outlined",
-                            density="compact",
-                            color="cyan",
-                            bg_color="#000000",
-                            hide_details=True,
-                            suffix=".par",
-                            style=(
-                                "font-family:monospace;"
-                                "max-width:320px;"
-                            ),
-                        )
-                    with html.Div(
-                        v_show=("!wiz_busy && wiz_choices.length > 0",),
-                        style="display:flex;flex-wrap:wrap;gap:8px;",
+                    # Terminal output
+                    with v3.VSheet(
+                        classes="sage-console-scroll wiz-console-scroll",
+                        color="#000000",
+                        style=(
+                            "flex:1;min-height:0;overflow-y:auto;"
+                            "padding:14px 18px;"
+                            "font-size:0.82rem;line-height:1.55;"
+                        ),
                     ):
                         with html.Div(
-                            v_for="(ch, ci) in wiz_choices",
-                            key="ci",
+                            v_for="(line, idx) in wiz_lines",
+                            key="idx",
                         ):
-                            v3.VBtn(
-                                "{{ ch.label }}",
-                                prepend_icon=("ch.icon",),
-                                color="#06b6d4",
-                                variant="outlined",
-                                size="small",
-                                disabled=("ch.disabled",),
-                                click=(server.controller.wiz_choose, "[ch.value]"),
-                                style="font-family:monospace;text-transform:none;",
+                            html.Div(
+                                v_html=("line.html || '&nbsp;'",),
+                                classes=("'wiz-' + line.kind",),
+                                style="white-space:pre-wrap;",
                             )
+
+                    # Action bar
+                    with html.Div(
+                        style=(
+                            "border-top:1px solid #374151;"
+                            "background:#000000;"
+                            "padding:10px 14px;"
+                            "flex-shrink:0;"
+                            "display:flex;flex-direction:column;gap:8px;"
+                        ),
+                    ):
+                        v3.VProgressLinear(
+                            v_show=("wiz_busy",),
+                            indeterminate=True,
+                            color="#06b6d4",
+                            height=3,
+                            style="width:100%;",
+                        )
+                        # Filename input — shown when creating a new config file
+                        with html.Div(
+                            v_show=("wiz_filename_show",),
+                            style="display:flex;align-items:center;gap:8px;",
+                        ):
+                            v3.VTextField(
+                                v_model=("wiz_filename",),
+                                label="Config file name",
+                                variant="outlined",
+                                density="compact",
+                                color="cyan",
+                                bg_color="#000000",
+                                hide_details=True,
+                                suffix=".par",
+                                style=(
+                                    "font-family:monospace;"
+                                    "max-width:320px;"
+                                ),
+                            )
+                        with html.Div(
+                            v_show=("!wiz_busy && wiz_choices.length > 0",),
+                            style="display:flex;flex-wrap:wrap;gap:8px;",
+                        ):
+                            with html.Div(
+                                v_for="(ch, ci) in wiz_choices",
+                                key="ci",
+                            ):
+                                v3.VBtn(
+                                    "{{ ch.label }}",
+                                    prepend_icon=("ch.icon",),
+                                    color="#06b6d4",
+                                    variant="outlined",
+                                    size="small",
+                                    disabled=("ch.disabled",),
+                                    click=(server.controller.wiz_choose, "[ch.value]"),
+                                    style="font-family:monospace;text-transform:none;",
+                                )
+
+                # ── Right: par file card (shown when wiz_par_show) ───────────
+                with v3.VCard(
+                    v_show=("wiz_par_show",),
+                    style=(
+                        "flex:1;min-width:0;"
+                        "background:#000000;border:2px solid #06b6d4;"
+                        "display:flex;flex-direction:column;"
+                    ),
+                    elevation=0,
+                    rounded=False,
+                ):
+                    with html.Div(
+                        style=(
+                            "padding:8px 14px;border-bottom:1px solid #374151;"
+                            "flex-shrink:0;display:flex;align-items:center;gap:8px;"
+                        ),
+                    ):
+                        v3.VIcon("mdi-file-document-outline", color="#06b6d4", size="small")
+                        html.Span(
+                            "Parameter File",
+                            style="color:#06b6d4;font-size:0.82rem;",
+                        )
+                    with v3.VSheet(
+                        color="#000000",
+                        style="flex:1;min-height:0;overflow-y:auto;padding:8px 12px;",
+                    ):
+                        v3.VTextarea(
+                            v_model=("wiz_par_text",),
+                            rows=9,
+                            auto_grow=True,
+                            variant="outlined",
+                            bg_color="#000000",
+                            hide_details=True,
+                            classes="wiz-par-area",
+                            style=(
+                                "font-family:monospace;color:#e2e8f0;"
+                                "height:100%;"
+                            ),
+                            label="Edit freely — format is preserved",
+                        )
 
         # SAGE logo — pinned to bottom-right corner of the wizard screen
         html.Img(
