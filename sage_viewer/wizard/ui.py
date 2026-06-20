@@ -32,7 +32,8 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
     with html.Div(
         style=(
             "display:flex;flex-direction:column;height:100%;"
-            "background:#0a0a1a;font-family:monospace;"
+            "background:#000000;font-family:monospace;"
+            "position:relative;"
         ),
     ):
         html.Link(rel="stylesheet", href=css_url)
@@ -40,7 +41,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
         # ── Header ──────────────────────────────────────────────────────────
         with html.Div(
             style=(
-                "background:#1a1a2e;border-bottom:2px solid #06b6d4;"
+                "background:#000000;border-bottom:2px solid #06b6d4;"
                 "padding:10px 20px;display:flex;align-items:center;gap:12px;"
                 "flex-shrink:0;"
             ),
@@ -58,6 +59,19 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                 ),
             )
             v3.VSpacer()
+            # Rescan button — to the left of the step chips
+            v3.VBtn(
+                "Rescan",
+                prepend_icon="mdi-refresh",
+                color="#06b6d4",
+                variant="outlined",
+                size="x-small",
+                click=server.controller.wiz_rescan,
+                style=(
+                    "font-family:monospace;text-transform:none;"
+                    "margin-right:10px;"
+                ),
+            )
             # Step indicator chips
             with html.Div(style="display:flex;gap:6px;align-items:center;"):
                 for i, label in enumerate(_STEPS):
@@ -66,7 +80,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                         size="small",
                         color=(
                             f"wiz_step === {i} ? '#06b6d4' : "
-                            f"(wiz_step > {i} ? '#22c55e' : '#374151')",
+                            f"(wiz_step > {i} ? '#22c55e' : '#e2e8f0')",
                         ),
                         variant=(
                             f"wiz_step === {i} ? 'elevated' : 'outlined'",
@@ -95,8 +109,9 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
             with v3.VCard(
                 style=(
                     "width:860px;max-width:96vw;height:640px;max-height:80vh;"
-                    "background:#1a1a2e;border:2px solid #06b6d4;"
+                    "background:#000000;border:2px solid #06b6d4;"
                     "display:flex;flex-direction:column;"
+                    "position:relative;"
                 ),
                 elevation=0,
                 rounded=False,
@@ -104,7 +119,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                 # Terminal output
                 with v3.VSheet(
                     classes="sage-console-scroll wiz-console-scroll",
-                    color="#0a0a0f",
+                    color="#000000",
                     style=(
                         "flex:1;min-height:0;overflow-y:auto;"
                         "padding:14px 18px;"
@@ -124,7 +139,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                 # Par file editor (shown only when wiz_par_show)
                 with v3.VSheet(
                     v_show=("wiz_par_show",),
-                    color="#0d0d1a",
+                    color="#000000",
                     style=(
                         "border-top:1px solid #374151;"
                         "padding:8px 12px;flex-shrink:0;"
@@ -135,7 +150,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                         v_model=("wiz_par_text",),
                         rows=9,
                         variant="outlined",
-                        bg_color="#0a0a0f",
+                        bg_color="#000000",
                         hide_details=True,
                         classes="wiz-par-area",
                         style="font-family:monospace;color:#e2e8f0;",
@@ -146,7 +161,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                 with html.Div(
                     style=(
                         "border-top:1px solid #374151;"
-                        "background:#111122;"
+                        "background:#000000;"
                         "padding:10px 14px;"
                         "flex-shrink:0;"
                         "display:flex;flex-direction:column;gap:8px;"
@@ -159,6 +174,25 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                         height=3,
                         style="width:100%;",
                     )
+                    # Filename input — shown when creating a new config file
+                    with html.Div(
+                        v_show=("wiz_filename_show",),
+                        style="display:flex;align-items:center;gap:8px;",
+                    ):
+                        v3.VTextField(
+                            v_model=("wiz_filename",),
+                            label="Config file name",
+                            variant="outlined",
+                            density="compact",
+                            color="cyan",
+                            bg_color="#000000",
+                            hide_details=True,
+                            suffix=".par",
+                            style=(
+                                "font-family:monospace;"
+                                "max-width:320px;"
+                            ),
+                        )
                     with html.Div(
                         v_show=("!wiz_busy && wiz_choices.length > 0",),
                         style="display:flex;flex-wrap:wrap;gap:8px;",
@@ -177,3 +211,13 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                                 click=(server.controller.wiz_choose, "[ch.value]"),
                                 style="font-family:monospace;text-transform:none;",
                             )
+
+        # SAGE logo — pinned to bottom-right corner of the wizard screen
+        html.Img(
+            src="/sage_static/SAGElogo.jpg",
+            style=(
+                "position:absolute;bottom:20px;right:20px;"
+                "width:140px;"
+                "pointer-events:none;"
+            ),
+        )

@@ -18,6 +18,11 @@ from sage_viewer.utils.discover import find_models
 # UI palettes
 # ──────────────────────────────────────────────────────────────────────────
 _THEME_CSS = dedent("""
+/* Force the page root to black so no theme colour bleeds through
+   above the toolbar or in any uncovered gap. */
+html, body, .v-application { background: #000000 !important; }
+.v-app-bar, .v-toolbar { background: #000000 !important; box-shadow: none !important; }
+
 /* ============================================================
    MODERN (default) — colours come from the Vuetify theme.  No
    structural overrides; Vuetify defaults apply.
@@ -169,8 +174,8 @@ def create_app(
                     "colors": {
                         "primary":    "#ffff55",   # DOS yellow
                         "secondary":  "#ffffff",
-                        "background": "#0000aa",   # IBM blue
-                        "surface":    "#0000aa",
+                        "background": "#000000",
+                        "surface":    "#000000",
                         "on-surface": "#ffffff",
                         "on-background": "#ffffff",
                     },
@@ -374,6 +379,13 @@ def create_app(
         if wiz_active:
             _wiz_ctrl.reset_and_start()
 
+    @server.controller.set("open_wizard")
+    def _open_wizard():
+        """Always resets and shows the wizard, even if wiz_active is already True."""
+        _wiz_ctrl.reset_and_start()
+        server.state.wiz_active = True
+        server.state.flush()
+
     # `theme=("ui_theme",)` reactively binds the active Vuetify theme to
     # our state variable — Vuetify swaps the entire palette plus the root
     # `v-theme--<name>` class instantly when ui_theme changes.
@@ -382,6 +394,7 @@ def create_app(
         server, full_height=True,
         vuetify_config=_vuetify_config,
         theme=("ui_theme",),
+        style="background:#000000;",
     ) as layout:
         # Hide the SinglePageLayout's auto-built title — we render our own
         # later inside the toolbar so we can control its position relative
@@ -393,9 +406,10 @@ def create_app(
         with layout.toolbar as tb:
             tb.density = "compact"
             tb.color = "#000000"
+            tb.elevation = 0
 
             # ── Launch Mode button — wizard + models ───────────────────────
-            with v3.VMenu(close_on_content_click=False):
+            with v3.VMenu(close_on_content_click=True):
                 with v3.Template(v_slot_activator="{ props }"):
                     with v3.VBtn(
                         variant="text",
@@ -420,7 +434,7 @@ def create_app(
                     v3.VListItem(
                         title="Setup Wizard",
                         prepend_icon="mdi-console",
-                        click="wiz_active = true",
+                        click=server.controller.open_wizard,
                         color="cyan",
                         density="compact",
                     )
@@ -488,7 +502,7 @@ def create_app(
                     )
 
             # ── Explore Mode menu (hamburger) — tabs only ──────────────────
-            with v3.VMenu(close_on_content_click=False):
+            with v3.VMenu(close_on_content_click=True):
                 with v3.Template(v_slot_activator="{ props }"):
                     v3.VBtn(
                         icon="mdi-menu",
@@ -542,15 +556,10 @@ def create_app(
                     "family=VT323&display=swap"
                 ),
             )
-            # Theme overrides — encoded as a data: URL so it loads via a real
-            # stylesheet link rather than an inline <style> element (Vue's
-            # template compiler doesn't reliably emit inline <style>).
-            import base64 as _b64
-            _css_data_url = (
-                "data:text/css;charset=utf-8;base64,"
-                + _b64.b64encode(_THEME_CSS.encode("utf-8")).decode("ascii")
-            )
-            html.Link(rel="stylesheet", href=_css_data_url)
+            # Theme overrides injected via html.Style so they land as a real
+            # <style> block in the page (data-URL link was unreliable for
+            # root-level selectors like html/body).
+            html.Style(_THEME_CSS)
 
             # ── Export catalogue dialog ────────────────────────────────────
             _SCOPE_ITEMS = [

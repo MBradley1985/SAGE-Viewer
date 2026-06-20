@@ -299,11 +299,21 @@
       var term = new Terminal({
         cols: 80, rows: 24,
         theme: {
-          background: '#0a0a0f', foreground: '#e2e8f0',
-          cursor: '#06b6d4', selectionBackground: 'rgba(6,182,212,0.25)',
+          background: '#0d1117', foreground: '#f0f6fc',
+          cursor: '#58a6ff', cursorAccent: '#0d1117',
+          selectionBackground: 'rgba(88,166,255,0.3)',
+          black: '#484f58',   red: '#ff7b72',   green: '#3fb950',  yellow: '#d29922',
+          blue: '#58a6ff',    magenta: '#bc8cff', cyan: '#39c5cf',  white: '#b1bac4',
+          brightBlack: '#6e7681', brightRed: '#ffa198', brightGreen: '#56d364',
+          brightYellow: '#e3b341', brightBlue: '#79c0ff', brightMagenta: '#d2a8ff',
+          brightCyan: '#56d4dd', brightWhite: '#f0f6fc',
         },
-        fontSize: 12,
-        fontFamily: '"Courier New", "DejaVu Sans Mono", monospace',
+        fontSize: 16,
+        lineHeight: 1.4,
+        letterSpacing: 2.5,
+        fontFamily: '"Menlo", "Monaco", "Consolas", "DejaVu Sans Mono", monospace',
+        fontWeight: 'normal',
+        fontWeightBold: 'bold',
         scrollback: 5000, convertEol: false, allowTransparency: false,
       });
       var FitCtor = (typeof FitAddon !== 'undefined') ? FitAddon.FitAddon : null;
@@ -358,13 +368,19 @@
       _xtermsOut[sid] = t;
     }
 
-    // Install a state listener for immediate PTY output delivery.
-    // window.trame.state.addListener fires synchronously for EVERY server push —
-    // unlike the 50 ms poll which only sees the latest pty_out_seq value and
-    // silently drops every intermediate chunk.
-    var _lastRenderedSeq = -1;
+    // PTY output listener — fires synchronously on every server state push so
+    // no chunks are dropped between 50 ms polls.
+    //
+    // The listener fires mid-loop inside trame's update() (while the for..of
+    // over incoming keys is still running), so pty_out_seq may not be updated
+    // yet when pty_out_data fires.  Scheduling a Promise microtask defers the
+    // actual read until after the entire update() loop completes, at which
+    // point both keys are guaranteed to be current.
+    var _lastRenderedSeq  = -1;
+    var _pendingPtyWrite  = false;
 
-    function _writePtyOutput() {
+    function _writePtyNow() {
+      _pendingPtyWrite = false;
       var seq = _getState('pty_out_seq');
       if (seq === undefined || seq === _lastRenderedSeq) return;
       var b64 = _getState('pty_out_data');
@@ -381,14 +397,17 @@
       if (!window.trame || !window.trame.state ||
           typeof window.trame.state.addListener !== 'function') return;
       _ptyListenerInstalled = true;
-      // Catch any output that arrived before the listener was installed.
-      _writePtyOutput();
+      // Flush any output that arrived before the listener was installed.
+      _writePtyNow();
       window.trame.state.addListener(function (ev) {
         if (!ev || ev.type !== 'dirty-state') return;
         var keys = ev.keys || [];
         for (var i = 0; i < keys.length; i++) {
           if (keys[i] === 'pty_out_seq' || keys[i] === 'pty_out_data') {
-            _writePtyOutput();
+            if (!_pendingPtyWrite) {
+              _pendingPtyWrite = true;
+              Promise.resolve().then(_writePtyNow);
+            }
             break;
           }
         }

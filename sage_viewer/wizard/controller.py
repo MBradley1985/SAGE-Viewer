@@ -76,6 +76,118 @@ _STEPS = [
     "Launch Explore",
 ]
 
+_MILLENNIUM_PAR_TEMPLATE = """\
+%------------------------------------------
+%----- SAGE output file information -------
+%------------------------------------------
+
+FileNameGalaxies   model
+%OutputDir         /<absolute>/<root>/<path>/sage-model/output/millennium/
+OutputDir   /Users/mbradley/Documents/PhD/SAGE26/output/millennium/
+
+FirstFile         0
+LastFile          7
+
+%------------------------------------------
+%----- Snapshot output list ---------------
+%------------------------------------------
+
+NumOutputs        -1  % sets the desired number of galaxy outputs; use -1 for all outputs
+
+% List your output snapshots after the arrow, highest to lowest (ignored when NumOutputs=-1).
+-> 63 37 32 27 23 20 18 16
+
+OutputFormat      sage_hdf5 % sets the desired output format. Either 'sage_binary' or 'sage_hdf5'.
+
+%------------------------------------------
+%----- Simulation information  ------------
+%------------------------------------------
+
+TreeName              trees_063   % assumes the trees are named TreeName.n where n is the file number
+TreeType              lhalo_binary % 'genesis_lhalo_hdf5', 'lhalo_binary', 'consistentrees_ascii', 'consistentrees_hdf5', 'lhalo_ascii', 'lhalo_hdf5'
+NumSimulationTreeFiles 8 % Number of files the trees are split over. This can be different to `FirstFile` -> `LastFile` range.
+
+%SimulationDir      /<absolute>/<root>/<path>/sage-home/sage-model/input/millennium/trees/
+SimulationDir   /Users/mbradley/Documents/PhD/SAGE26/input/millennium/trees/
+%FileWithSnapList   /<absolute>/<root>/<path>/sage-home/sage-model/input/millennium/trees/millennium.a_list
+FileWithSnapList /Users/mbradley/Documents/PhD/SAGE26/input/millennium/trees/millennium.a_list
+LastSnapShotNr        63
+
+Omega           0.25
+OmegaLambda     0.75
+BaryonFrac      0.17
+Hubble_h        0.73
+PartMass        0.086
+BoxSize         62.5 % Size of the simulation box in Mpc/h.
+
+%------------------------------------------
+%----- SAGE recipe options ----------------
+%------------------------------------------
+
+SFprescription              1   %0: original Croton et al. 2006; 1: BR06 H2 Stars; 2: Somerville et al. 2025 SFR; 3: Somerville et al. 2025 SFR + H2; 4: KD12 H2 Stars; 5: KMT09; 6: K13; 7: GD14
+AGNrecipeOn                 2   %0: switch off; 1: empirical model; 2: Bondi-Hoyle model; 3: cold cloud accretion model
+SupernovaRecipeOn           1   %0: switch off; 1: original Croton et al. 2016
+ReionizationOn              1   %0: switch off
+DiskInstabilityOn           1   %0: switch off; 1: bulge and BH growth through instabilities w. instability starbursts
+
+CGMrecipeOn                 1   %0: switch off
+FIREmodeOn                  1   %0: switch off
+
+ConcentrationOn             3   %0: off; 1: Ishiyama+21 lookup table; 2: Vmax/Vvir from simulation; 3: Vmax/Vvir + infall freeze for satellites
+FeedbackFreeModeOn          1   %0: off; 1: Li+24 sigmoid; 2: BK25 (Ishiyama+21 conc); 3: BK25 (ConcentrationOn method); 4: BK25 + log-normal c scatter; 5: Li+24 sharp; 6: Li+24 sigmoid + H2 SF; 7: BK25 log-normal c scatter + H2 SF
+
+SaveFullSFH                 1   %0: switch off
+TrackICSAssembly            1   %0: switch off; 1: track ICS_disrupt and ICS_accrete
+
+%------------------------------------------
+%----- SAGE model parameters --------------
+%------------------------------------------
+
+SfrEfficiency               0.05    %efficiency of SF; unused for SFprescription=3,6
+FFBMaxEfficiency            0.2     %0.2 fits observations best, 1.0 is theoretical maximum
+
+FeedbackReheatingEpsilon    2.9     %mass of cold gas reheated due to SF (see Martin 1999) (SupernovaRecipeOn=1)
+FeedbackEjectionEfficiency  0.3     %mixing efficiency of SN energy with hot gas to unbind and eject some (SupernovaRecipeOn=1)
+
+ReIncorporationFactor       0.15    %fraction of ejected mass reincorporated per dynamical time to hot
+
+RadioModeEfficiency         0.08    %AGN radio mode efficiency (AGNrecipeOn=2)
+QuasarModeEfficiency        0.005   %AGN quasar mode wind heating efficiency (AGNrecipeOn>0)
+BlackHoleGrowthRate         0.015   %fraction of cold gas added to the BH during mergers (AGNrecipeOn>0)
+
+ThreshMajorMerger           0.3     %major merger when mass ratio greater than this
+ThresholdSatDisruption      1.0     %Mvir-to-baryonic mass ratio threshold for satellite merger or disruption
+
+Yield                       0.025   %fraction of SF mass produced as metals
+RecycleFraction             0.43    %fraction of SF mass instantaneously recycled back to cold
+FracZleaveDisk              0.0     %fraction of metals produced directly to hot component
+
+Reionization_z0             8.0     %these parameter choices give the best fit to Genedin (2000)...
+Reionization_zr             7.0     %using the analytic fit of Kravtsov et al. 2004 (ReionizationOn=1)
+
+EnergySN                    1.0e51  %energy per supernova
+EtaSN                       5.0e-3  %supernova efficiency
+
+%------------------------------------------
+%----- Other code-related information -----
+%------------------------------------------
+
+%% The following two parameters determine how forests are distributed over MPI tasks
+%% The scheme determines the computing cost for processing each forest
+%% uniform_in_forests -> every forest has the same cost, regardless of the size of the forest
+%% linear_in_nhalos -> the cost scales linearly with the forest size
+%% quadratic_in_nhalos -> the cost scales quadratically with forest size
+%% exponent_in_nhalos -> the cost scales to some (integer) power of forest size, the exponent is given by the (integral) value of 'ExponentForestDistributionScheme'
+%% generic_power_in_nhalos -> the cost is directly scaled by  pow(forest size, 'ExponentForestDistributionScheme')
+ForestDistributionScheme                    generic_power_in_nhalos  % options are 'uniform_in_forests', 'linear_in_nhalos',
+ExponentForestDistributionScheme            0.7 % only relevant for the last two schemes
+
+
+UnitLength_in_cm          3.08568e+24 %WATCH OUT: Mpc/h
+UnitMass_in_g             1.989e+43   %WATCH OUT: 10^10Msun
+UnitVelocity_in_cm_per_s  100000      %WATCH OUT: km/s
+"""
+
 _KIND_COLORS = {
     "title": "#06b6d4",
     "ok":    "#22c55e",
@@ -108,16 +220,19 @@ class WizardController:
         self._par_path:   Path | None = None
         self._models:     list[dict]  = []
 
-        self._st.wiz_step        = 0
-        self._st.wiz_lines       = []
-        self._st.wiz_choices     = []
-        self._st.wiz_busy        = True
-        self._st.wiz_par_show    = False
-        self._st.wiz_par_text    = ""
-        self._st.wiz_kind_colors = _KIND_COLORS
+        self._st.wiz_step          = 0
+        self._st.wiz_lines         = []
+        self._st.wiz_choices       = []
+        self._st.wiz_busy          = True
+        self._st.wiz_par_show      = False
+        self._st.wiz_par_text      = ""
+        self._st.wiz_filename_show = False
+        self._st.wiz_filename      = "millennium"
+        self._st.wiz_kind_colors   = _KIND_COLORS
 
         server.controller.set("wiz_choose")(self._on_choice)
         server.controller.set("wiz_close")(self._on_close)
+        server.controller.set("wiz_rescan")(self._on_rescan)
 
         if auto_start:
             asyncio.ensure_future(self._step_scan())
@@ -127,18 +242,23 @@ class WizardController:
         self._sage26_dir = None
         self._par_path   = None
         self._models     = []
-        self._st.wiz_step     = 0
-        self._st.wiz_lines    = []
-        self._st.wiz_choices  = []
-        self._st.wiz_busy     = True
-        self._st.wiz_par_show = False
-        self._st.wiz_par_text = ""
+        self._st.wiz_step          = 0
+        self._st.wiz_lines         = []
+        self._st.wiz_choices       = []
+        self._st.wiz_busy          = True
+        self._st.wiz_par_show      = False
+        self._st.wiz_par_text      = ""
+        self._st.wiz_filename_show = False
+        self._st.wiz_filename      = "millennium"
         self._st.flush()
         asyncio.ensure_future(self._step_scan())
 
     def _on_close(self, **_) -> None:
         self._st.wiz_active = False
         self._st.flush()
+
+    def _on_rescan(self, **_) -> None:
+        self.reset_and_start()
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -170,8 +290,9 @@ class WizardController:
 
     def _busy(self) -> None:
         self._st.wiz_choices  = []
-        self._st.wiz_busy     = True
-        self._st.wiz_par_show = False
+        self._st.wiz_busy          = True
+        self._st.wiz_par_show      = False
+        self._st.wiz_filename_show = False
         self._st.flush()
 
     async def _run_cmd(self, cmd: list[str], cwd: Path | None = None) -> int:
@@ -374,6 +495,12 @@ class WizardController:
         elif value == "compile_sage26":
             await self._step_compile()
 
+        elif value == "create_par":
+            await self._step_create_par()
+
+        elif value == "do_create_par":
+            await self._do_create_par()
+
         elif value.startswith("par:"):
             self._par_path = Path(value[4:])
             await self._step_par_edit()
@@ -491,14 +618,25 @@ class WizardController:
     async def _step_pick_par(self) -> None:
         self._st.wiz_step = 3
         par_files = self._find_par_files()
+        _create_choice = {
+            "label": "Create config file",
+            "value": "create_par",
+            "icon": "mdi-file-plus-outline",
+            "disabled": False,
+        }
         if not par_files:
+            self._emit("No .par files found.", "warn")
             self._emit(
-                "No .par files found in SAGE26/input/. "
-                "Add a parameter file and try again.",
-                "err",
+                "Create a millennium.par template below, or add a "
+                "parameter file to SAGE26/input/ and rescan.",
+                "info",
             )
-            self._set_choices([{"label": "Back", "value": "back_fresh",
-                                "icon": "mdi-arrow-left", "disabled": False}])
+            self._emit("", "info")
+            self._set_choices([
+                _create_choice,
+                {"label": "Back", "value": "back_fresh",
+                 "icon": "mdi-arrow-left", "disabled": False},
+            ])
             return
         if len(par_files) == 1:
             self._par_path = par_files[0]
@@ -511,9 +649,45 @@ class WizardController:
                  "icon": "mdi-file-cog", "disabled": False}
                 for p in par_files
             ]
+            choices.append(_create_choice)
             choices.append({"label": "Back", "value": "back_fresh",
                             "icon": "mdi-arrow-left", "disabled": False})
             self._set_choices(choices)
+
+    async def _step_create_par(self) -> None:
+        """Show filename input then wait for the user to confirm."""
+        self._st.wiz_step = 3
+        self._emit("Enter a name for the new config file:", "info")
+        self._st.wiz_filename_show = True
+        self._st.wiz_filename      = "millennium"
+        self._st.flush()
+        self._set_choices([
+            {"label": "Create",
+             "value": "do_create_par",
+             "icon": "mdi-check", "disabled": False},
+            {"label": "Back",
+             "value": "back_fresh",
+             "icon": "mdi-arrow-left", "disabled": False},
+        ])
+
+    async def _do_create_par(self) -> None:
+        """Create the par file using the user-supplied filename."""
+        raw  = str(self._st.wiz_filename or "millennium").strip() or "millennium"
+        name = raw if raw.endswith(".par") else raw + ".par"
+        self._st.wiz_filename_show = False
+        self._st.flush()
+        if self._sage26_dir:
+            inp_dir = self._sage26_dir / "input"
+        else:
+            inp_dir = Path.cwd() / "input"
+        inp_dir.mkdir(parents=True, exist_ok=True)
+        dest = inp_dir / name
+        self._emit(f"Creating config file: {dest}", "info")
+        dest.write_text(_MILLENNIUM_PAR_TEMPLATE)
+        self._par_path = dest
+        self._emit("Template written. Edit the paths below, then Save & Run.", "ok")
+        self._emit("", "info")
+        await self._step_par_edit()
 
     async def _step_par_edit(self) -> None:
         self._st.wiz_step = 3
