@@ -187,8 +187,8 @@ class Scene:
                 m.visible = False
         # Show the new primary
         self.primary.visible = True
-        # Make sure the new primary is on the right snapshot
-        snap = min(self._current_snap, self.primary.snap_count - 1)
+        # Always start the new primary at z=0 (its last snapshot).
+        snap = self.primary.snap_count - 1
         self._current_snap = snap
         self.primary.set_snapshot(snap)
         # Camera box may have changed — reset if the box is significantly different

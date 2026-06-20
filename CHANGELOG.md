@@ -4,6 +4,36 @@ All notable changes to SAGE-Viewer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — post-0.3.0
+
+### Added
+
+#### Interactive draw widgets — Coords and Box tabs
+
+- **Draw Sphere** button in the Coords tab places two draggable handle balls in the 3D viewport:
+  - *Centre ball* — drag to translate the sphere; fields (X, Y, Z) update live as you drag
+  - *Edge ball* (+X from centre) — drag toward or away from centre to resize; Standoff updates live
+  - The sphere is rendered as five great-circle rings (1 equatorial + 4 meridionals at 0°, 45°, 90°, 135°) — identical in style to the indicator that appears on a normal Coords Zoom
+  - Both balls and rings track each other in real time (`interaction_event='always'`)
+  - Button turns orange and reads **Lock Sphere**; clicking it removes the widget and runs Zoom so the locked sphere becomes the active focus region
+- **Draw Box** button in the Box tab places a native `vtkBoxWidget2` with corner and face handle balls:
+  - Drag any handle to translate or resize; all six min/max fields update live
+  - Button turns orange and reads **Lock Box**; clicking it removes the widget and runs Zoom so the locked box becomes the active focus region
+- **Clear** button appears at the bottom of both Coords and Box tabs while a draw widget is active; cancels the widget without committing or navigating
+- Both draw widgets are cleared automatically on Reset Camera, Focus toggle (off), and model switch
+- Initial sphere radius is `min(Standoff × 0.25, 3.0)` Mpc/h; initial box is 50 % of the current field extents from centre — both intentionally small so you can grow to taste
+
+#### Model switch always lands at z=0
+
+- `scene.switch_primary()` always sets `snap = snap_count − 1` (z=0 of the new model) instead of clamping to the previous model's snapshot position
+- `on_switch_model` in `app.py` explicitly syncs `snap_num`, `snap_max`, and `snap_label` in its `finally` block so the slider and snap chip reflect z=0 of the new model immediately, even when `snap_num` didn't change numerically
+
+### Changed
+
+- Coords tab **"Go" button renamed to "Zoom"** — consistent with the Box tab
+
+---
+
 ## [Unreleased] — 0.3.0
 
 ### Major additions

@@ -303,6 +303,13 @@ def create_app(
             scene.switch_primary(name)
         finally:
             server.state.model_loading = False
+            # Force-sync slider and snap chip to z=0 of the new model so the
+            # UI always reflects the new model, even when snap_num hasn't
+            # changed numerically (e.g. both models share the same snap count).
+            z0 = scene.primary.snap_count - 1
+            server.state.snap_max   = z0
+            server.state.snap_num   = z0
+            server.state.snap_label = scene.snap_label
             _refresh_models_state()
 
     @server.controller.set("toggle_overlay")

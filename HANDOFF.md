@@ -70,6 +70,41 @@ SAGE-Viewer/
 
 ---
 
+## Recent changes (post-0.3.0)
+
+### Interactive draw widgets — Coords and Box tabs
+
+#### Draw Sphere (Coords tab)
+- New **Draw Sphere** button places two draggable handle balls in the 3D viewport via `add_sphere_widget(num=2, pass_widget=True, interaction_event='always')`:
+  - **index 0 — centre ball**: translates the sphere; when released the edge ball slides to `(cx + r, cy, cz)`.
+  - **index 1 — edge ball**: resizes the sphere; radius = `norm(edge_pos − centre)`.
+- Visual is 5 great-circle rings (identical to `_add_sphere_indicator` in `camera.py`): 1 equatorial + 4 meridionals at 0°, 45°, 90°, 135°, redrawn via `_rebuild_sphere_rings()` on every drag tick.
+- A separate `_draw_sphere_actor` slot (alongside `_draw_sphere_widget`) tracks the ring mesh; `_remove_sphere_actor()` is called in all 4 sphere-clear paths.
+- Button turns orange / "Lock Sphere"; second click removes the widget and ring mesh, then runs `on_go_to_coords` (now labelled **Zoom**) to apply the sphere as the focus region.
+- Initial sphere radius: `min(nav_distance × 0.25, 3.0)` Mpc/h.
+
+#### Draw Box (Box tab)
+- New **Draw Box** button places a native `vtkBoxWidget2` (no rotation) via `add_box_widget(pass_widget=False)`.
+- Callback receives `vtkPlanes`; bounds extracted as `min/max` over the 6 face-origin points.
+- Initial box: 50 % of current field extents from centre (each half-width = `max(1.0, extent × 0.25)`).
+- Button turns orange / "Lock Box"; second click removes the widget and runs `on_zoom_to_box`.
+
+#### Clear buttons
+- A red **Clear** button appears at the bottom of both Coords and Box tabs while a draw widget is active; calls `on_clear_draw_sphere` / `on_clear_draw_box` — cancels without committing.
+
+#### Shared housekeeping
+- `_clear_draw_widgets()` is the single authoritative cleaner for both widgets; called from `on_reset`, `on_toggle_focus` (off branch), and a `register_model_change_callback`.
+- `on_go_to_coords` and `on_zoom_to_box` also call their respective clear paths so clicking Zoom with a widget active just commits the widget's last-reported position.
+
+### Model switch → always z=0
+- `scene.switch_primary()` sets `snap = self.primary.snap_count - 1` (z=0 of the new model) instead of `min(current_snap, new_max)`.
+- `on_switch_model` in `app.py` explicitly syncs `snap_max`, `snap_num`, and `snap_label` in its `finally` block so the slider and snap chip reflect z=0 of the new model immediately, even when `snap_num` hasn't changed numerically.
+
+### Coords tab "Go" → "Zoom"
+- The action button in the Coords tab is now labelled **Zoom** for consistency with the Box tab. Controller name (`go_to_coords`) and Enter-submit target (`btn-coords-go`) are unchanged.
+
+---
+
 ## What works today
 
 ### Rendering
@@ -250,7 +285,6 @@ FoF links are gated on `halos_visible AND fof_links_on` — `fl.visible` is only
 
 ## Style / housekeeping
 
-- No Claude/Anthropic mentions in commits, code, or docs.
 - Comments only when the *why* is non-obvious.
 - No Unicode super/subscripts in user-visible strings (use ASCII: `Msun`, `10^12.5`, `log10`, `H2`, `yr^-1`).
 - `pytest tests/ -v` before committing.

@@ -18,6 +18,9 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - Continuous camera rotation (CW / CCW at 15° / 30° / 60° per second)
 - Reset / Centre / Focus buttons
 - Fly to halo, galaxy, coordinates, or sub-box (with focus mode that masks everything outside)
+- **Draw Sphere** (Coords tab): place a live two-handle sphere in the viewport — drag the centre ball to translate, drag the edge ball to resize; **Lock Sphere** commits it as the active focus region
+- **Draw Box** (Box tab): place a live resizable box widget — drag any face or corner handle; **Lock Box** commits it; **Clear** on both tabs cancels the widget without navigating
+- Switching models always lands at z=0 of the new model; slider and snap chip update immediately
 - Camera bookmarks (save, restore, delete)
 
 ### Selection & inspection
@@ -149,8 +152,8 @@ Full documentation at [mbradley1985.github.io/SAGE-Viewer](https://mbradley1985.
 | Record     | Screenshots and movie recording |
 | Target     | Halo / galaxy navigation, focus zoom, Galaxy Info, Highlight Galaxy |
 | Environment| Halo selector, environment-class checkboxes, Group Info, Highlight Members |
-| Coords     | Fly to arbitrary (x, y, z) — "Use Current Position" populates from camera |
-| Box        | Zoom to axis-aligned sub-box — "Use Current View" populates from camera |
+| Coords     | Fly to arbitrary (x, y, z) — "Use Current Position" populates from camera; **Draw Sphere** places an interactive two-handle sphere (drag centre ball to translate, drag edge ball to resize); **Lock Sphere** commits it as the focus region |
+| Box        | Zoom to axis-aligned sub-box — "Use Current View" populates from camera; **Draw Box** places a resizable interactive box; **Lock Box** commits it as the focus region |
 | Console    | Shell terminal + Python REPL + SAGE natural-language commands. Multiple sessions, load scripts, pop-out window |
 | Library    | Browse stored screenshots / movies; double-click a row to open as a movable floating card over the viewport (multiple items can be open simultaneously) |
 

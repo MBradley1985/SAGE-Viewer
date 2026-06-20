@@ -174,6 +174,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.nav_box_zmax         = round(scene._cfg.box_size / 2, 2)
     state.focus_active         = False
     state.nav_active_tab       = "layers"
+    state.draw_sphere_active   = False   # interactive sphere widget in Coords tab
+    state.draw_box_active      = False   # interactive box widget in Box tab
 
     # Console — supports multiple parallel sessions. The state vars
     # below always reflect the *active* console; switching consoles
@@ -742,6 +744,77 @@ def build_navigation_panel(server, scene: Scene) -> None:
         from sage_viewer.utils.colormap import cmap_css_gradient
         state.gal_cbar_style = _cbar_style(cmap_css_gradient(galaxy_colormap))
         _push()
+
+    # ------------------------------------------------------------------
+    # Interactive draw-widget storage (one slot each; only one active at a time)
+    # ------------------------------------------------------------------
+
+    _draw_sphere_widget: list = [None]   # vtkSphereWidget or None
+    _draw_sphere_actor:  list = [None]   # custom 5-ring mesh actor or None
+    _draw_box_widget:    list = [None]   # vtkBoxWidget2 or None
+
+    def _remove_sphere_actor() -> None:
+        if _draw_sphere_actor[0] is not None:
+            try:
+                scene.plotter.remove_actor(_draw_sphere_actor[0], render=False)
+            except Exception:
+                pass
+            _draw_sphere_actor[0] = None
+
+    def _rebuild_sphere_rings(center, radius: float) -> None:
+        """Draw 5 great-circle rings identical to _add_sphere_indicator."""
+        import numpy as _np2
+        import pyvista as _pv2
+        _remove_sphere_actor()
+        cx2 = float(center[0]); cy2 = float(center[1]); cz2 = float(center[2])
+        r2 = max(0.01, float(radius))
+        t = _np2.linspace(0.0, 2.0 * _np2.pi, 64, dtype=_np2.float64)
+        c2, s2 = _np2.cos(t) * r2, _np2.sin(t) * r2
+        rings = [_np2.column_stack([cx2 + c2, cy2 + s2, _np2.full_like(c2, cz2)])]
+        for deg in (0.0, 45.0, 90.0, 135.0):
+            ca, sa = _np2.cos(_np2.deg2rad(deg)), _np2.sin(_np2.deg2rad(deg))
+            rings.append(_np2.column_stack([cx2 + c2 * ca, cy2 + c2 * sa, cz2 + s2]))
+        all_pts = _np2.vstack(rings)
+        n = len(t)
+        lines = []
+        for i in range(len(rings)):
+            lines.append(n + 1)
+            lines.extend([i * n + j for j in range(n)])
+            lines.append(i * n)
+        poly = _pv2.PolyData(all_pts)
+        poly.verts = _np2.empty(0, dtype=_np2.int64)
+        poly.lines = _np2.array(lines, dtype=_np2.int64)
+        _draw_sphere_actor[0] = scene.plotter.add_mesh(
+            poly, color="cyan", opacity=0.9, line_width=2,
+            style="wireframe", render_points_as_spheres=False, point_size=0,
+        )
+        try:
+            _draw_sphere_actor[0].GetProperty().SetRenderPointsAsSpheres(False)
+            _draw_sphere_actor[0].GetProperty().SetVertexVisibility(False)
+            _draw_sphere_actor[0].GetProperty().SetPointSize(0)
+        except Exception:
+            pass
+
+    def _clear_draw_widgets() -> None:
+        """Remove any active interactive sphere/box widget and reset state."""
+        if bool(state.draw_sphere_active):
+            try:
+                scene.plotter.clear_sphere_widgets()
+            except Exception:
+                pass
+            _draw_sphere_widget[0] = None
+            _remove_sphere_actor()
+            state.draw_sphere_active = False
+        if bool(state.draw_box_active):
+            try:
+                scene.plotter.clear_box_widgets()
+            except Exception:
+                pass
+            _draw_box_widget[0] = None
+            state.draw_box_active = False
+
+    # Clear draw widgets whenever the primary model changes (world coords shift).
+    scene.register_model_change_callback(_clear_draw_widgets)
 
     # ------------------------------------------------------------------
     # Navigation controllers
@@ -1531,16 +1604,101 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     @ctrl.set("go_to_coords")
     def on_go_to_coords():
+        # Clear any active draw widget — its final position is already in the fields.
+        if bool(state.draw_sphere_active):
+            try:
+                scene.plotter.clear_sphere_widgets()
+            except Exception:
+                pass
+            _draw_sphere_widget[0] = None
+            _remove_sphere_actor()
+            state.draw_sphere_active = False
         x, y, z, d = (
             float(state.nav_x), float(state.nav_y),
             float(state.nav_z), float(state.nav_distance),
         )
-        scene.camera.go_to_coords(x, y, z, d)
+        scene.camera.zoom_to_radius((x, y, z), d)
         # Always engage focus on Go
         scene.set_focus_sphere((x, y, z), d)
         state.focus_active = True
         _sync_fof_layer()
         _push()
+
+    @ctrl.set("toggle_draw_sphere")
+    def on_toggle_draw_sphere():
+        """Toggle the interactive sphere widget in the Coords tab.
+
+        First click places a draggable sphere in the 3D view; dragging its
+        handles updates the X/Y/Z and Standoff fields in real time.
+        Second click (Lock) removes the widget and runs go_to_coords so
+        the locked sphere becomes the active focus region."""
+        if bool(state.draw_sphere_active):
+            # Lock — clear widget; fields already hold the final position.
+            try:
+                scene.plotter.clear_sphere_widgets()
+            except Exception:
+                pass
+            _draw_sphere_widget[0] = None
+            _remove_sphere_actor()
+            state.draw_sphere_active = False
+            state.flush()
+            on_go_to_coords()
+        else:
+            # Start — place two draggable handle balls:
+            #   index 0 = center ball  (translates the sphere)
+            #   index 1 = edge ball    (resizes: distance from centre = radius)
+            # A custom 5-ring mesh (identical to the Coords indicator sphere)
+            # is drawn between them and rebuilt whenever either ball moves.
+            cx = float(state.nav_x)
+            cy = float(state.nav_y)
+            cz = float(state.nav_z)
+            r  = max(0.5, min(float(state.nav_distance) * 0.25, 3.0))
+
+            # Mutable centre/radius shared by the callback closure.
+            _sc = [cx, cy, cz]
+            _sr = [r]
+
+            def _sphere_cb(point, index, widget):
+                import numpy as _np2
+                if index == 0:
+                    # Centre ball moved — translate sphere.
+                    _sc[0], _sc[1], _sc[2] = (
+                        float(point[0]), float(point[1]), float(point[2])
+                    )
+                    state.nav_x = round(_sc[0], 2)
+                    state.nav_y = round(_sc[1], 2)
+                    state.nav_z = round(_sc[2], 2)
+                    # Slide the edge ball to stay on the sphere surface (+X).
+                    ww = _draw_sphere_widget[0]
+                    if isinstance(ww, list) and len(ww) > 1:
+                        ww[1].SetCenter(_sc[0] + _sr[0], _sc[1], _sc[2])
+                        ww[1].Modified()
+                else:
+                    # Edge ball moved — resize from distance to centre.
+                    p = _np2.array([float(point[0]), float(point[1]), float(point[2])])
+                    c = _np2.array(_sc)
+                    _sr[0] = max(0.1, float(_np2.linalg.norm(p - c)))
+                    state.nav_distance = round(_sr[0], 2)
+                _rebuild_sphere_rings(_sc, _sr[0])
+                state.flush()
+
+            handle_r = max(0.3, r * 0.12)
+            try:
+                _draw_sphere_widget[0] = scene.plotter.add_sphere_widget(
+                    _sphere_cb,
+                    center=[(cx, cy, cz), (cx + r, cy, cz)],
+                    radius=handle_r,
+                    color="cyan",
+                    style="surface",
+                    pass_widget=True,
+                    interaction_event="always",
+                )
+                _rebuild_sphere_rings((cx, cy, cz), r)
+                state.draw_sphere_active = True
+            except Exception:
+                pass
+            state.flush()
+            _push()
 
     @ctrl.set("populate_coords_from_camera")
     def on_populate_coords_from_camera():
@@ -1579,6 +1737,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     @ctrl.set("zoom_to_box")
     def on_zoom_to_box():
+        # Clear any active draw widget — its final bounds are already in the fields.
+        if bool(state.draw_box_active):
+            try:
+                scene.plotter.clear_box_widgets()
+            except Exception:
+                pass
+            _draw_box_widget[0] = None
+            state.draw_box_active = False
         xmin, xmax = float(state.nav_box_xmin), float(state.nav_box_xmax)
         ymin, ymax = float(state.nav_box_ymin), float(state.nav_box_ymax)
         zmin, zmax = float(state.nav_box_zmin), float(state.nav_box_zmax)
@@ -1590,8 +1756,107 @@ def build_navigation_panel(server, scene: Scene) -> None:
         _sync_fof_layer()
         _push()
 
+    @ctrl.set("toggle_draw_box")
+    def on_toggle_draw_box():
+        """Toggle the interactive box widget in the Box tab.
+
+        First click places a draggable, resizable box in the 3D view; moving
+        its handles updates the six min/max bound fields in real time.
+        Second click (Lock) removes the widget and runs zoom_to_box so the
+        locked box becomes the active focus region."""
+        if bool(state.draw_box_active):
+            # Lock — clear widget; fields already hold the final bounds.
+            try:
+                scene.plotter.clear_box_widgets()
+            except Exception:
+                pass
+            _draw_box_widget[0] = None
+            state.draw_box_active = False
+            state.flush()
+            on_zoom_to_box()
+        else:
+            # Start — place an interactive box at the current bound values.
+            xmin = float(state.nav_box_xmin)
+            xmax = float(state.nav_box_xmax)
+            ymin = float(state.nav_box_ymin)
+            ymax = float(state.nav_box_ymax)
+            zmin = float(state.nav_box_zmin)
+            zmax = float(state.nav_box_zmax)
+            # Ensure a non-degenerate box (all dims > 0)
+            if xmax <= xmin: xmax = xmin + 5.0
+            if ymax <= ymin: ymax = ymin + 5.0
+            if zmax <= zmin: zmax = zmin + 5.0
+            # Start at 50% of the field extents (centred) so the widget
+            # is visually manageable; dragging handles grows it to taste.
+            _cx = (xmin + xmax) / 2
+            _cy = (ymin + ymax) / 2
+            _cz = (zmin + zmax) / 2
+            _hx = max(1.0, (xmax - xmin) * 0.25)
+            _hy = max(1.0, (ymax - ymin) * 0.25)
+            _hz = max(1.0, (zmax - zmin) * 0.25)
+            xmin, xmax = _cx - _hx, _cx + _hx
+            ymin, ymax = _cy - _hy, _cy + _hy
+            zmin, zmax = _cz - _hz, _cz + _hz
+
+            def _box_cb(planes):
+                pts = planes.GetPoints()
+                if pts is None or pts.GetNumberOfPoints() == 0:
+                    return
+                n = pts.GetNumberOfPoints()
+                xs = [pts.GetPoint(i)[0] for i in range(n)]
+                ys = [pts.GetPoint(i)[1] for i in range(n)]
+                zs = [pts.GetPoint(i)[2] for i in range(n)]
+                state.nav_box_xmin = round(min(xs), 2)
+                state.nav_box_xmax = round(max(xs), 2)
+                state.nav_box_ymin = round(min(ys), 2)
+                state.nav_box_ymax = round(max(ys), 2)
+                state.nav_box_zmin = round(min(zs), 2)
+                state.nav_box_zmax = round(max(zs), 2)
+                state.flush()
+
+            try:
+                _draw_box_widget[0] = scene.plotter.add_box_widget(
+                    _box_cb,
+                    bounds=[xmin, xmax, ymin, ymax, zmin, zmax],
+                    color="cyan",
+                    rotation_enabled=False,
+                )
+                state.draw_box_active = True
+            except Exception:
+                pass
+            state.flush()
+            _push()
+
+    @ctrl.set("clear_draw_sphere")
+    def on_clear_draw_sphere():
+        """Cancel an in-progress sphere draw without committing it."""
+        if bool(state.draw_sphere_active):
+            try:
+                scene.plotter.clear_sphere_widgets()
+            except Exception:
+                pass
+            _draw_sphere_widget[0] = None
+            _remove_sphere_actor()
+            state.draw_sphere_active = False
+            state.flush()
+            _push()
+
+    @ctrl.set("clear_draw_box")
+    def on_clear_draw_box():
+        """Cancel an in-progress box draw without committing it."""
+        if bool(state.draw_box_active):
+            try:
+                scene.plotter.clear_box_widgets()
+            except Exception:
+                pass
+            _draw_box_widget[0] = None
+            state.draw_box_active = False
+            state.flush()
+            _push()
+
     @ctrl.set("reset_camera")
     def on_reset():
+        _clear_draw_widgets()
         scene.camera.reset()
         scene.clear_focus()
         state.focus_active = False
@@ -2096,6 +2361,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         currently_on = bool(state.focus_active)
         if currently_on:
             # Turning OFF — always just clears focus, regardless of tab.
+            _clear_draw_widgets()
             state.focus_active = False
             scene.clear_focus()
             _sync_fof_layer()
@@ -2629,6 +2895,22 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             target_id="btn-coords-go")
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
+                        "{{ draw_sphere_active ? 'Lock Sphere' : 'Draw Sphere' }}",
+                        block=True, variant="outlined",
+                        color=("draw_sphere_active ? 'orange' : 'cyan'",),
+                        density="compact",
+                        prepend_icon=(
+                            "draw_sphere_active ? 'mdi-lock-outline' : 'mdi-sphere'",
+                        ),
+                        click=ctrl.toggle_draw_sphere,
+                        title=(
+                            "draw_sphere_active "
+                            "? 'Lock this sphere and apply as focus region' "
+                            ": 'Place an interactive sphere you can drag to size'"
+                        ),
+                        style="margin-bottom:6px;",
+                    )
+                    v3.VBtn(
                         "Use Current Position", block=True, variant="outlined",
                         color="cyan", density="compact",
                         prepend_icon="mdi-crosshairs-gps",
@@ -2636,9 +2918,18 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         style="margin-bottom:6px;",
                     )
                     v3.VBtn(
-                        "Go", block=True, color="cyan",
+                        "Zoom", block=True, color="cyan",
                         density="compact", click=ctrl.go_to_coords,
                         id="btn-coords-go",
+                        style="margin-bottom:6px;",
+                    )
+                    v3.VBtn(
+                        "Clear", block=True, variant="outlined",
+                        color="#ef4444", density="compact",
+                        prepend_icon="mdi-close-circle-outline",
+                        click=ctrl.clear_draw_sphere,
+                        title="Cancel the active Draw Sphere widget",
+                        v_show=("draw_sphere_active",),
                     )
 
             # Box
@@ -2656,6 +2947,22 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             target_id="btn-box-zoom")
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
+                        "{{ draw_box_active ? 'Lock Box' : 'Draw Box' }}",
+                        block=True, variant="outlined",
+                        color=("draw_box_active ? 'orange' : 'cyan'",),
+                        density="compact",
+                        prepend_icon=(
+                            "draw_box_active ? 'mdi-lock-outline' : 'mdi-cube-outline'",
+                        ),
+                        click=ctrl.toggle_draw_box,
+                        title=(
+                            "draw_box_active "
+                            "? 'Lock this box and apply as focus region' "
+                            ": 'Place an interactive box you can drag to resize'"
+                        ),
+                        style="margin-bottom:6px;",
+                    )
+                    v3.VBtn(
                         "Use Current View", block=True, variant="outlined",
                         color="cyan", density="compact",
                         prepend_icon="mdi-crosshairs-gps",
@@ -2666,6 +2973,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         "Zoom", block=True, color="cyan",
                         density="compact", click=ctrl.zoom_to_box,
                         id="btn-box-zoom",
+                        style="margin-bottom:6px;",
+                    )
+                    v3.VBtn(
+                        "Clear", block=True, variant="outlined",
+                        color="#ef4444", density="compact",
+                        prepend_icon="mdi-close-circle-outline",
+                        click=ctrl.clear_draw_box,
+                        title="Cancel the active Draw Box widget",
+                        v_show=("draw_box_active",),
                     )
 
             # ── CONSOLE tab — multi-session REPL ────────────────────
