@@ -11,55 +11,60 @@ from sage_viewer.scene.scene import Scene
 _FIELD = "padding:8px 0 4px;"
 _BTN   = "padding:8px 0 4px;"
 
+# Full ordered lists; each entry may carry an optional "requires" key naming
+# the model_fields flag that must be True for the mode to appear.
 _HALO_MODES = [
     {"title": "Mvir", "value": "mvir"},
     {"title": "Rvir", "value": "rvir"},
     {"title": "Vvir", "value": "vvir"},
-    {"title": "Vmax", "value": "vmax"},
+    {"title": "Vmax", "value": "vmax",  "requires": "vmax"},
 ]
 
 _GALAXY_MODES = [
-    # Special / computed
+    # Special / computed — always available
     {"title": "Structure",    "value": "structure"},
     {"title": "Stellar Mass", "value": "stellar_mass"},
     {"title": "SFR",          "value": "sfr"},
     {"title": "sSFR",         "value": "ssfr"},
     {"title": "B / T",        "value": "bt"},
-    {"title": "Age",          "value": "age"},
-    {"title": "Density",      "value": "density"},
+    {"title": "Age",          "value": "age",        "requires": "mean_age"},
     {"title": "Type",         "value": "type"},
-    # Alphabetical — SAGE26 properties
-    {"title": "BH Mass",           "value": "bh_mass"},
+    # Alphabetical — optional SAGE26 properties
+    {"title": "BH Mass",           "value": "bh_mass",                  "requires": "bh_mass"},
     {"title": "Bulge Mass",        "value": "bulge_mass"},
-    {"title": "Bulge Radius",      "value": "bulge_radius"},
-    {"title": "CGM Gas",           "value": "cgm_gas"},
+    {"title": "Bulge Radius",      "value": "bulge_radius",             "requires": "bulge_radius"},
+    {"title": "CGM Gas",           "value": "cgm_gas",                  "requires": "cgm_gas"},
     {"title": "Cold Gas",          "value": "cold_gas"},
-    {"title": "Cooling",           "value": "cooling"},
-    {"title": "Disk Radius",       "value": "disk_radius"},
-    {"title": "Ejected Mass",      "value": "ejected_mass"},
-    {"title": "H1 Gas",            "value": "h1_gas"},
-    {"title": "H2 Gas",            "value": "h2_gas"},
-    {"title": "Heating",           "value": "heating"},
-    {"title": "Hot Gas",           "value": "hot_gas"},
-    {"title": "ICS Mass",          "value": "ics_mass"},
-    {"title": "Inst. Bulge Mass",  "value": "instability_bulge_mass"},
-    {"title": "Inst. Bulge Rad",   "value": "instability_bulge_radius"},
-    {"title": "Mass Loading",      "value": "mass_loading"},
-    {"title": "Merger Bulge Mass", "value": "merger_bulge_mass"},
-    {"title": "Merger Bulge Rad",  "value": "merger_bulge_radius"},
-    {"title": "Metals — Bulge",    "value": "metals_bulge_mass"},
-    {"title": "Metals — CGM Gas",  "value": "metals_cgm_gas"},
-    {"title": "Metals — Cold Gas", "value": "metals_cold_gas"},
-    {"title": "Metals — Ejected",  "value": "metals_ejected_mass"},
-    {"title": "Metals — Hot Gas",  "value": "metals_hot_gas"},
-    {"title": "Metals — ICS",      "value": "metals_ics"},
-    {"title": "Metals — Stellar",  "value": "metals_stellar_mass"},
-    {"title": "Outflow Rate",      "value": "outflow_rate"},
-    {"title": "SFR Bulge",         "value": "sfr_bulge"},
-    {"title": "SFR Bulge Z",       "value": "sfr_bulge_z"},
-    {"title": "SFR Disk",          "value": "sfr_disk"},
-    {"title": "SFR Disk Z",        "value": "sfr_disk_z"},
+    {"title": "Cooling",           "value": "cooling",                  "requires": "cooling"},
+    {"title": "Disk Radius",       "value": "disk_radius",              "requires": "disk_radius"},
+    {"title": "Ejected Mass",      "value": "ejected_mass",             "requires": "ejected_mass"},
+    {"title": "H1 Gas",            "value": "h1_gas",                   "requires": "h1_gas"},
+    {"title": "H2 Gas",            "value": "h2_gas",                   "requires": "h2_mass"},
+    {"title": "Heating",           "value": "heating",                  "requires": "heating"},
+    {"title": "Hot Gas",           "value": "hot_gas",                  "requires": "hot_gas"},
+    {"title": "ICS Mass",          "value": "ics_mass",                 "requires": "ics_mass"},
+    {"title": "Inst. Bulge Mass",  "value": "instability_bulge_mass",   "requires": "instability_bulge_mass"},
+    {"title": "Inst. Bulge Rad",   "value": "instability_bulge_radius", "requires": "instability_bulge_radius"},
+    {"title": "Mass Loading",      "value": "mass_loading",             "requires": "mass_loading"},
+    {"title": "Merger Bulge Mass", "value": "merger_bulge_mass",        "requires": "merger_bulge_mass"},
+    {"title": "Merger Bulge Rad",  "value": "merger_bulge_radius",      "requires": "merger_bulge_radius"},
+    {"title": "Metals — Bulge",    "value": "metals_bulge_mass",        "requires": "metals_bulge_mass"},
+    {"title": "Metals — CGM Gas",  "value": "metals_cgm_gas",           "requires": "metals_cgm_gas"},
+    {"title": "Metals — Cold Gas", "value": "metals_cold_gas",          "requires": "metals_cold_gas"},
+    {"title": "Metals — Ejected",  "value": "metals_ejected_mass",      "requires": "metals_ejected_mass"},
+    {"title": "Metals — Hot Gas",  "value": "metals_hot_gas",           "requires": "metals_hot_gas"},
+    {"title": "Metals — ICS",      "value": "metals_ics",               "requires": "metals_ics"},
+    {"title": "Metals — Stellar",  "value": "metals_stellar_mass",      "requires": "metals_stellar_mass"},
+    {"title": "Outflow Rate",      "value": "outflow_rate",             "requires": "outflow_rate"},
+    {"title": "SFR Bulge",         "value": "sfr_bulge",                "requires": "sfr_bulge"},
+    {"title": "SFR Bulge Z",       "value": "sfr_bulge_z",              "requires": "sfr_bulge_z"},
+    {"title": "SFR Disk",          "value": "sfr_disk",                 "requires": "sfr_disk"},
+    {"title": "SFR Disk Z",        "value": "sfr_disk_z",               "requires": "sfr_disk_z"},
 ]
+
+def _filter_modes(mode_list: list[dict], fields: dict) -> list[dict]:
+    """Return only modes whose required field is present (or have no requirement)."""
+    return [m for m in mode_list if fields.get(m.get("requires", ""), True)]
 
 _CMAPS = [
     # Sequential
@@ -112,7 +117,6 @@ _GAL_CB = {
     "ics_mass":        ("Mics",        "10^6",    "10^12 Msun"),
     "age":             ("Age",         "0",       "14 Gyr"),
     "bulge_mass":      ("Mbulge",      "10^7",    "10^12 Msun"),
-    "density":         ("Density",     "Low",     "High"),
     "type":            ("Type",        "Central", "Satellite"),
     # Gas / outflows
     "cgm_gas":         ("Mcgm",        "10^7",    "10^12 Msun"),
@@ -299,6 +303,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.halo_colormap     = scene.halo_layer.colormap
     state.galaxy_colormap   = scene.galaxy_layer.colormap
 
+    def _rebuild_color_mode_lists() -> None:
+        fields = dict(scene.primary.fields_available)
+        state.halo_color_modes   = _filter_modes(_HALO_MODES, fields)
+        state.galaxy_color_modes = _filter_modes(_GALAXY_MODES, fields)
+
+    _rebuild_color_mode_lists()
 
     def _push():
         if hasattr(server.controller, "view_update"):
@@ -815,6 +825,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     # Clear draw widgets whenever the primary model changes (world coords shift).
     scene.register_model_change_callback(_clear_draw_widgets)
+    scene.register_model_change_callback(_rebuild_color_mode_lists)
 
     # ------------------------------------------------------------------
     # Navigation controllers
@@ -1957,22 +1968,35 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.console_mode   = _consoles_data[1]["mode"]
     state.console_prompt = _consoles_data[1]["prompt"]
 
-    def _py_eval(d: dict, source: str) -> str | None:
-        """Compile + run source in this console's interpreter; return
-        captured stdout+stderr, or None if the input is incomplete."""
-        out_buf, err_buf = _io.StringIO(), _io.StringIO()
+    def _py_compile(d: dict, source: str):
+        """Compile source; returns (compiled_code, None) or (None, error_str)
+        or (None, None) for incomplete input."""
+        err_buf = _io.StringIO()
         try:
             compiled = _code.compile_command(source, "<console>", "single")
         except (SyntaxError, OverflowError, ValueError):
             with _contextlib.redirect_stderr(err_buf):
                 d["py_interp"].showsyntaxerror("<console>")
-            return err_buf.getvalue()
-        if compiled is None:
-            return None
+            return None, err_buf.getvalue()
+        return compiled, None
+
+    def _py_run(d: dict, compiled) -> str:
+        """Run a compiled code object; returns captured stdout+stderr."""
+        out_buf, err_buf = _io.StringIO(), _io.StringIO()
         with _contextlib.redirect_stdout(out_buf), \
              _contextlib.redirect_stderr(err_buf):
             d["py_interp"].runcode(compiled)
         return out_buf.getvalue() + err_buf.getvalue()
+
+    async def _py_eval_async(d: dict, source: str) -> str | None:
+        """Compile + run source off the event loop; return output or None for
+        incomplete input."""
+        compiled, err = _py_compile(d, source)
+        if err is not None:
+            return err
+        if compiled is None:
+            return None
+        return await asyncio.to_thread(_py_run, d, compiled)
 
     def _push_history(prompt: str, cmd: str, out: str) -> None:
         d = _consoles_data[_active_console[0]]
@@ -2002,15 +2026,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
         except Exception:
             return "$"
 
-    def _run_shell(d: dict, cmd: str) -> str:
-        """Execute one shell command in `d`'s cwd. Handles `cd`, `pwd`,
-        `export` as builtins; everything else hits the user's $SHELL."""
+    def _run_shell_builtins(d: dict, cmd: str) -> str | None:
+        """Handle cd / pwd / export in-process. Returns output string if
+        handled, or None to indicate the command should be passed to the shell."""
         stripped = cmd.strip()
         if not stripped:
             return ""
-
-        # `cd` / `cd <path>` — must be handled in-process because
-        # subprocess.run can't change our cwd.
         if stripped == "cd" or stripped.startswith("cd ") \
                 or stripped.startswith("cd\t"):
             arg = stripped[2:].strip() or "~"
@@ -2022,11 +2043,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 return f"cd: {arg}: No such directory"
             d["cwd"] = target
             return ""
-
         if stripped == "pwd":
             return d["cwd"]
-
-        # `export FOO=bar` — basic env mutation.
         if stripped.startswith("export "):
             try:
                 assignments = _shlex.split(stripped[7:])
@@ -2039,31 +2057,49 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 else:
                     d["env"].pop(a, None)
             return ""
+        return None
 
-        # Anything else: pass through the user's interactive shell so
-        # globs, pipes, redirects, $vars, aliases (from .bashrc/.zshrc
-        # — though non-interactive shells skip those by default) work.
+    async def _run_shell_streaming(d: dict, cmd: str, entry_id: int) -> None:
+        """Run cmd via asyncio subprocess, streaming each line into the history
+        entry as it arrives so the console updates in real time."""
         shell = d["env"].get("SHELL", "/bin/bash")
+        merged_env = {**_os.environ, **d["env"]}
+
+        def _update_entry(text: str) -> None:
+            history = list(state.console_history)
+            for item in history:
+                if item["id"] == entry_id:
+                    item["out"] = _truncate(text)
+                    break
+            state.console_history = history
+            _consoles_data[_active_console[0]]["history"] = list(history)
+            state.flush()
+
         try:
-            res = _subprocess.run(
-                cmd, shell=True, executable=shell,
-                cwd=d["cwd"], env=d["env"],
-                stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
-                text=True, timeout=300,
+            proc = await asyncio.create_subprocess_shell(
+                cmd,
+                executable=shell,
+                cwd=d["cwd"],
+                env=merged_env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
             )
-            out = (res.stdout or "").rstrip()
-            if res.returncode != 0 and not out:
-                out = f"(exit {res.returncode})"
-            elif res.returncode != 0:
-                out += f"\n(exit {res.returncode})"
-            return out
-        except _subprocess.TimeoutExpired:
-            return "(timed out after 300s — try backgrounding with &)"
+            lines: list[str] = []
+            async for raw in proc.stdout:
+                lines.append(raw.decode("utf-8", errors="replace").rstrip())
+                _update_entry("\n".join(lines))
+            await proc.wait()
+            if proc.returncode != 0:
+                suffix = f"(exit {proc.returncode})"
+                lines.append(suffix) if lines else lines.append(suffix)
+                _update_entry("\n".join(lines))
+        except asyncio.TimeoutError:
+            _update_entry("(timed out after 300s — try backgrounding with &)")
         except Exception as e:
-            return f"Error: {e}"
+            _update_entry(f"Error: {e}")
 
     @ctrl.set("console_submit")
-    def on_console_submit():
+    async def on_console_submit():
         cid = _active_console[0]
         d   = _consoles_data[cid]
         cmd_raw = str(state.console_input or "")
@@ -2096,8 +2132,19 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "'snap 30', 'screenshot'. Type 'help' for the full "
                     "list, 'exit' or 'terminal' to return to terminal.")
             else:
-                out = _run_shell(d, cmd)
-                _push_history(_shell_prompt(d), cmd, out)
+                builtin_out = _run_shell_builtins(d, cmd)
+                if builtin_out is not None:
+                    _push_history(_shell_prompt(d), cmd, builtin_out)
+                else:
+                    # Push a placeholder entry first, then stream output into it.
+                    _push_history(_shell_prompt(d), cmd, "")
+                    entry_id = _consoles_data[cid]["counter"]
+                    state.console_input = ""
+                    d["input"] = ""
+                    state.flush()
+                    _push()
+                    await _run_shell_streaming(d, cmd, entry_id)
+                    return
 
         elif d["mode"] == "command":
             cmd = cmd_raw.rstrip()
@@ -2130,7 +2177,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 source = "\n".join(d["py_buffer"])
                 force = (line == "" and len(d["py_buffer"]) > 1)
                 if force:
-                    result = _py_eval(d, source)
+                    result = await _py_eval_async(d, source)
                     if result is None:
                         result = "SyntaxError: unexpected EOF while parsing"
                     d["py_buffer"].clear()
@@ -2138,7 +2185,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     d["prompt"] = ">>>"
                     state.console_prompt = ">>>"
                 else:
-                    result = _py_eval(d, source)
+                    result = await _py_eval_async(d, source)
                     if result is None:
                         prompt = ">>>" if len(d["py_buffer"]) == 1 else "..."
                         _push_history(prompt, line, "")
@@ -2199,7 +2246,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             state.flush()
 
     @ctrl.set("console_load_script")
-    def on_console_load_script():
+    async def on_console_load_script():
         path = str(state.console_script_path or "").strip()
         if not path:
             return
@@ -2212,16 +2259,20 @@ def build_navigation_panel(server, scene: Scene) -> None:
             _push_history("$", f"load {path}", f"Error reading {path}: {e}")
             state.flush(); _push()
             return
-        out_buf, err_buf = _io.StringIO(), _io.StringIO()
-        try:
-            with _contextlib.redirect_stdout(out_buf), \
-                 _contextlib.redirect_stderr(err_buf):
-                exec(compile(source, path, "exec"), d["py_locals"])
-            out = (out_buf.getvalue() + err_buf.getvalue()).rstrip() \
-                  or "(script ran)"
-        except Exception:
-            out = (out_buf.getvalue() + err_buf.getvalue()
-                   + _traceback.format_exc()).rstrip()
+
+        def _exec_script():
+            out_buf, err_buf = _io.StringIO(), _io.StringIO()
+            try:
+                with _contextlib.redirect_stdout(out_buf), \
+                     _contextlib.redirect_stderr(err_buf):
+                    exec(compile(source, path, "exec"), d["py_locals"])
+                return (out_buf.getvalue() + err_buf.getvalue()).rstrip() \
+                       or "(script ran)"
+            except Exception:
+                return (out_buf.getvalue() + err_buf.getvalue()
+                        + _traceback.format_exc()).rstrip()
+
+        out = await asyncio.to_thread(_exec_script)
         _push_history("$", f"load {path}", out)
         state.flush(); _push()
 
@@ -2250,6 +2301,36 @@ def build_navigation_panel(server, scene: Scene) -> None:
         ".mp4":  ("video", "video/mp4"),
     }
 
+    def _thumb_data_url(p: "_pathlib.Path", kind: str, ext: str) -> str:
+        """Return a tiny base64 data-URL thumbnail, or empty string on failure."""
+        try:
+            from PIL import Image as _PIL_Image
+            import io as _bio
+            import base64 as _b64
+            if kind == "image" and ext not in ("gif",):
+                img = _PIL_Image.open(p)
+            elif ext == "gif":
+                img = _PIL_Image.open(p)
+                img.seek(0)
+            else:
+                # Video: try ffmpeg to extract frame 0
+                import subprocess as _sp
+                result = _sp.run(
+                    ["ffmpeg", "-i", str(p), "-vframes", "1",
+                     "-f", "image2pipe", "-vcodec", "png", "-"],
+                    capture_output=True, timeout=10,
+                )
+                if result.returncode != 0:
+                    return ""
+                img = _PIL_Image.open(_bio.BytesIO(result.stdout))
+            img.thumbnail((80, 60))
+            buf = _bio.BytesIO()
+            img.convert("RGB").save(buf, "JPEG", quality=60)
+            b64 = _b64.b64encode(buf.getvalue()).decode("ascii")
+            return f"data:image/jpeg;base64,{b64}"
+        except Exception:
+            return ""
+
     def _scan_library() -> list[dict]:
         out: list[dict] = []
         roots = [_LIBRARY_DIR, _repo_root / "sage_outputs"]
@@ -2267,7 +2348,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     size_kb = max(1, p.stat().st_size // 1024)
                 except OSError:
                     continue
-                # Friendly display path (relative to repo root)
                 try:
                     rel = p.relative_to(_repo_root)
                 except ValueError:
@@ -2279,6 +2359,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "kind":     kind,
                     "ext":      ext.lstrip("."),
                     "size_kb":  int(size_kb),
+                    "thumb":    _thumb_data_url(p, kind, ext.lstrip(".")),
                 })
         return out
 
@@ -2327,6 +2408,38 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.library_items = [x for x in state.library_items if x["id"] != int(item_id)]
         state.flush()
 
+    @ctrl.set("library_delete")
+    def on_library_delete(path: str):
+        p = _pathlib.Path(path)
+        if p.is_file():
+            try:
+                p.unlink()
+            except OSError:
+                pass
+        state.library_files = _scan_library()
+        state.flush()
+
+    @ctrl.set("library_rename")
+    def on_library_rename(path: str, new_name: str):
+        new_name = str(new_name).strip()
+        if not new_name:
+            return
+        p = _pathlib.Path(path)
+        if not p.is_file():
+            return
+        # Keep the original extension if the user didn't type one.
+        if "." not in new_name:
+            new_name += p.suffix
+        dest = p.parent / new_name
+        if dest.exists():
+            return
+        try:
+            p.rename(dest)
+        except OSError:
+            return
+        state.library_files = _scan_library()
+        state.flush()
+
     # Populate the file list at startup
     state.library_files = _scan_library()
 
@@ -2335,6 +2448,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
     server.trigger("console_load_script_trigger")(on_console_load_script)
     server.trigger("console_switch_trigger")(on_console_switch)
     server.trigger("console_close_trigger")(on_console_close)
+    server.trigger("library_rename_trigger")(on_library_rename)
+    server.trigger("library_delete_trigger")(on_library_delete)
 
     @ctrl.set("highlight_galaxy")
     def on_highlight_galaxy():
@@ -2580,7 +2695,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
-                        v_model=("halo_color_mode",), items=(_HALO_MODES,),
+                        v_model=("halo_color_mode",), items=("halo_color_modes",),
                         label="Colour by", hide_details=True,
                         variant="outlined", color="#c084fc", density="compact",
                     )
@@ -2627,7 +2742,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
-                        v_model=("galaxy_color_mode",), items=(_GALAXY_MODES,),
+                        v_model=("galaxy_color_mode",), items=("galaxy_color_modes",),
                         label="Colour by", hide_details=True,
                         variant="outlined", color="#FFD700", density="compact",
                     )
@@ -3202,24 +3317,74 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 ):
                     with v3.VList(density="compact", bg_color="transparent"):
-                        v3.VListItem(
+                        with v3.VListItem(
                             v_for=("entry in library_files",),
                             key=("entry.path",),
                             dblclick=(
                                 server.controller.library_open,
                                 "[entry.path]",
                             ),
-                            title=("entry.name",),
-                            subtitle=(
-                                "entry.ext.toUpperCase() + ' · ' + "
-                                "entry.size_kb + ' KB · ' + entry.rel",
-                            ),
-                            prepend_icon=(
-                                "entry.kind === 'video' "
-                                "? 'mdi-movie-open-outline' : 'mdi-image-outline'",
-                            ),
-                            color="cyan",
-                        )
+                            style="padding:4px 6px;",
+                        ):
+                            with html.Template(v_slot_prepend=True):
+                                html.Img(
+                                    v_if=("entry.thumb",),
+                                    src=("entry.thumb",),
+                                    style=(
+                                        "width:48px;height:36px;object-fit:cover;"
+                                        "border-radius:3px;margin-right:6px;"
+                                        "flex-shrink:0;"
+                                    ),
+                                )
+                                v3.VIcon(
+                                    v_else=True,
+                                    icon=(
+                                        "entry.kind === 'video' "
+                                        "? 'mdi-movie-open-outline' : 'mdi-image-outline'",
+                                    ),
+                                    color="cyan",
+                                    style="margin-right:6px;",
+                                )
+                            with html.Template(v_slot_default=True):
+                                html.Div(
+                                    "{{ entry.name }}",
+                                    style=(
+                                        "font-size:0.72rem;color:#e5e7eb;"
+                                        "white-space:nowrap;overflow:hidden;"
+                                        "text-overflow:ellipsis;"
+                                    ),
+                                )
+                                html.Div(
+                                    "{{ entry.ext.toUpperCase() }} · "
+                                    "{{ entry.size_kb }} KB",
+                                    style="font-size:0.6rem;color:#6b7280;",
+                                )
+                                with html.Div(
+                                    style=(
+                                        "display:flex;align-items:center;"
+                                        "gap:4px;margin-top:3px;"
+                                    ),
+                                ):
+                                    v3.VTextField(
+                                        v_model=("entry.rename_val || ''",),
+                                        placeholder=("entry.name",),
+                                        density="compact", hide_details=True,
+                                        variant="outlined",
+                                        style="font-size:0.65rem;max-width:120px;",
+                                        change=(
+                                            server.controller.library_rename,
+                                            "[entry.path, $event]",
+                                        ),
+                                    )
+                                    v3.VBtn(
+                                        icon="mdi-delete-outline",
+                                        density="compact", size="x-small",
+                                        color="red", variant="text",
+                                        click=(
+                                            server.controller.library_delete,
+                                            "[entry.path]",
+                                        ),
+                                    )
                 # Bottom block — count + action buttons anchored to the
                 # panel's bottom edge, mirroring the Console tab layout.
                 with html.Div(

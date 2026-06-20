@@ -6,12 +6,12 @@ import numpy as np
 import pyvista as pv
 
 from sage_viewer.io.galaxy_reader import GalaxySnapshot
-from sage_viewer.utils.colormap import compute_density_colors, normalize_log
+from sage_viewer.utils.colormap import normalize_log
 from sage_viewer.utils.sizing import galaxy_world_radii
 
 ColorMode = Literal[
     "stellar_mass", "ssfr", "sfr", "cold_gas", "bulge_mass", "bt",
-    "bh_mass", "ics_mass", "age", "density", "type", "structure",
+    "bh_mass", "ics_mass", "age", "type", "structure",
     # Gas / outflows
     "cgm_gas", "h1_gas", "h2_gas", "hot_gas", "ejected_mass",
     "outflow_rate", "mass_loading", "cooling", "heating",
@@ -490,8 +490,6 @@ class GalaxyLayer:
 
     def _compute_colors(self, snap: GalaxySnapshot) -> np.ndarray:
         m = self._color_mode
-        if m == "density":
-            return compute_density_colors(snap.positions)
         if m == "ssfr":
             return normalize_log(snap.ssfr, *_RANGES["ssfr"])
         if m == "sfr":

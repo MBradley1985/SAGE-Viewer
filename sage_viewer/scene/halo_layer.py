@@ -6,7 +6,7 @@ import numpy as np
 import pyvista as pv
 
 from sage_viewer.io.halo_reader import HaloSnapshot
-from sage_viewer.utils.colormap import compute_density_colors, normalize_log
+from sage_viewer.utils.colormap import normalize_log
 from sage_viewer.utils.sizing import halo_world_radii
 
 ColorMode = Literal["mvir", "rvir", "vvir", "vmax"]
