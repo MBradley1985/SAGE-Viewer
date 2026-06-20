@@ -11,6 +11,7 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - **Structure** render mode: each galaxy drawn as a layered composition — cold-gas envelope (blue, sized by ColdGas) + outer envelope (green for CGM-regime sized by CGMgas, red for Hot-regime sized by HotGas)
 - 27 selectable matplotlib colormaps, identical lists for halo and galaxy layers
 - Live colormap, colour-by mode, opacity and visibility controls per layer
+- Colour-by dropdowns are model-aware — only modes whose underlying field is present in the loaded model appear in the list; they update automatically on model switch
 - Full still-quality rendering at all times — no resolution drop during camera drag or playback
 
 ### Playback & camera
@@ -53,8 +54,9 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 
 ### Embedded console (Console tab)
 - A real shell terminal — every command runs through `$SHELL` with a per-session `cwd` + `env`, so pipes, globs, `&` backgrounding, redirects, and `$VAR` expansion all work
+- **Streaming output** — long-running commands update the history entry line-by-line as they run, not after the process exits
 - Built-in `cd`, `pwd`, `export` are sticky between commands
-- Type `python` to drop into an embedded Python REPL (locals: `scene`, `state`, `ctrl`, `server`, `plotter`, `np`); `exit` returns to shell
+- Type `python` to drop into an embedded Python REPL (locals: `scene`, `state`, `ctrl`, `server`, `plotter`, `np`); `exit` returns to shell — REPL execution is threaded so the UI stays responsive during long scripts
 - Type `sage` to enter natural-language SAGE command mode (`show only clusters`, `go to halo 42`, etc.)
 - **Multiple sessions** with a `+` button — each console has its own history, cwd, env, and interpreter
 - **Load Script** button reads a `.py` file from disk and executes it in the active session — perfect for plotting and analysis scripts on HPC
@@ -155,7 +157,7 @@ Full documentation at [mbradley1985.github.io/SAGE-Viewer](https://mbradley1985.
 | Coords     | Fly to arbitrary (x, y, z) — "Use Current Position" populates from camera; **Draw Sphere** places an interactive two-handle sphere (drag centre ball to translate, drag edge ball to resize); **Lock Sphere** commits it as the focus region |
 | Box        | Zoom to axis-aligned sub-box — "Use Current View" populates from camera; **Draw Box** places a resizable interactive box; **Lock Box** commits it as the focus region |
 | Console    | Shell terminal + Python REPL + SAGE natural-language commands. Multiple sessions, load scripts, pop-out window |
-| Library    | Browse stored screenshots / movies; double-click a row to open as a movable floating card over the viewport (multiple items can be open simultaneously) |
+| Library    | Browse stored screenshots / movies; double-click a row to open as a movable floating card over the viewport (multiple items open simultaneously); per-row delete button removes the file from disk immediately |
 
 The **Focus button** (top of the right panel) is tab-aware: it focuses on whatever's active in the current tab (target galaxy, environment halo, coords point, or box region).
 

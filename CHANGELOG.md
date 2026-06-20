@@ -4,7 +4,52 @@ All notable changes to SAGE-Viewer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — post-0.3.0
+## [Unreleased] — post-0.3.0 (continued)
+
+### Added
+
+#### Streaming shell output
+- Shell commands in the Console tab now stream output line-by-line as they run — long-running commands update the history entry in real time instead of waiting until the process exits
+- Implemented via `asyncio.create_subprocess_shell`; stdout+stderr are merged and the history entry is patched on every received line
+
+#### Threaded Python REPL execution
+- Python REPL `exec` is offloaded to a thread via `asyncio.to_thread` so the Trame event loop stays responsive during long-running scripts — previously the UI froze until the script returned
+- Script loading (`Load Script` button) uses the same thread-offload approach
+
+#### Dynamic colour-by dropdowns
+- Halo and galaxy "Colour by" selectors now only show modes whose underlying field is actually present in the loaded model (checked against `model_fields`)
+- Dropdown lists rebuild automatically when the primary model is switched
+
+#### Library tab — per-row delete button
+- Each row in the Library file list now has a red delete (trash) button that permanently removes the file from disk and refreshes the list immediately
+
+### Changed
+
+#### Colour scheme
+- **Filters tab**: DARK MATTER HALOES section header and all seven halo range sliders use purple (`#c084fc`); GALAXIES and CATEGORICAL headers and all galaxy range sliders use gold (`#FFD700`)
+- **Environment tab**: HALO section header and its Go button use purple (`#c084fc`); ENVIRONMENT FILTER header and all five environment-class checkboxes use cyan
+- **Target tab**: Highlight Galaxy button uses gold (`#FFD700`); Group Info and Highlight Members buttons use purple (`#c084fc`)
+
+#### Snapshot step buttons
+- Previous / next snapshot buttons rendered without any border, background, outline, or box-shadow in any interaction state (hover, focus, active)
+- Buttons flash cyan on press and return to white after 300 ms — implemented via inline `onmousedown` JS so the flash overrides Vuetify's `!important` CSS rules that CSS animations cannot
+
+#### Halo default opacity
+- Default halo layer opacity changed from 0.15 → 0.12
+
+### Removed
+
+- **Density colour mode** removed from both halo and galaxy "Colour by" dropdowns — `scipy.stats.gaussian_kde` computation was slow and not physically meaningful; all other colour modes are unaffected
+
+### Fixed
+
+- Filter section thumb label bubbles were clipped by `overflow-x:hidden` on the scrollable section container, and there was no top padding to give the topmost slider's label room — removed the overflow restriction and added `padding-top:18px` so labels appear fully at all scroll positions
+- Thumb label bubble width was too narrow for values like `−14.0` or `10000` — `min-width` raised to `4em` and `white-space:nowrap` added so the full numeric value is never truncated
+- Library tab caused a Vue template compile error (blank/black page) due to three issues: `html.Template` used instead of `v3.Template` for slot content; `v_else=True` generating `v-else="True"` (Vue's `v-else` directive takes no value); `v_model` bound to a compound expression (`entry.rename_val || ''`) which Vue 3 cannot assign to — replaced the entire slot structure with plain `html.Div` flex rows
+
+---
+
+## [Unreleased] — post-0.3.0 (draw widgets + step polish)
 
 ### Added
 

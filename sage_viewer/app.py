@@ -65,9 +65,14 @@ _THEME_CSS = dedent("""
 }
 /* Filter range sliders are rendered at transform:scale(0.7) to save space,
    which shrinks their value bubble. Bump the font so the on-screen size
-   matches the (unscaled) opacity sliders: 1.5rem * 0.7 ~= 1.05rem. */
+   matches the (unscaled) opacity sliders: 1.5rem * 0.7 ~= 1.05rem.
+   Also widen the bubble so values like "-14.0" or "10000" never get clipped.
+   white-space:nowrap prevents the text wrapping inside the bubble. */
 .v-theme--dos_blue .sage-fslider .v-slider-thumb__label {
     font-size: 1.5rem !important;
+    min-width: 4em !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
 }
 .v-theme--dos_blue .v-select__selection-text { font-size: 1.0rem !important; }
 .v-theme--dos_blue .v-select__selection { font-size: 1.0rem !important; }
@@ -89,6 +94,13 @@ _THEME_CSS = dedent("""
     letter-spacing: 0.1em !important;
     box-shadow: 2px 2px 0 #000 !important;
     font-weight: 700;
+}
+/* Text-variant and icon-only buttons should look borderless — the DOS
+   border treatment is for solid action buttons, not inline controls. */
+.v-theme--dos_blue .v-btn--variant-text,
+.v-theme--dos_blue .v-btn--icon {
+    border: none !important;
+    box-shadow: none !important;
 }
 .v-theme--dos_blue .v-text-field .v-field,
 .v-theme--dos_blue .v-select .v-field { border-radius: 0 !important; }

@@ -3393,7 +3393,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 # Explicit heights so each section scrolls independently
                 # while the panel itself never needs an outer scrollbar.
-                _SH = "overflow-y:auto;overflow-x:hidden;padding-right:2px;"
+                _SH = "overflow-y:auto;padding-right:2px;padding-top:18px;"
 
                 # ── Halo section ──────────────────────────────
                 v3.VLabel("DARK MATTER HALOES", style=_FSEC_HALO)
