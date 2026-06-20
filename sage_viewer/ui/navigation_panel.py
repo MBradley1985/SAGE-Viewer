@@ -2564,31 +2564,31 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "DARK MATTER HALOES",
                     style=(
                         "font-size:0.95rem;font-weight:700;letter-spacing:0.08em;"
-                        "color:#06b6d4;padding:6px 0 8px;display:block;"
+                        "color:#c084fc;padding:6px 0 8px;display:block;"
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSwitch(
                         v_model=("halos_visible",), label="Visible",
-                        color="cyan", hide_details=True, density="compact",
+                        color="#c084fc", hide_details=True, density="compact",
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSlider(
                         v_model=("halo_opacity",), label="Opacity",
                         min=0.0, max=1.0, step=0.01,
-                        thumb_label=True, color="cyan", hide_details=True,
+                        thumb_label=True, color="#c084fc", hide_details=True,
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
                         v_model=("halo_color_mode",), items=(_HALO_MODES,),
                         label="Colour by", hide_details=True,
-                        variant="outlined", color="cyan", density="compact",
+                        variant="outlined", color="#c084fc", density="compact",
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
                         v_model=("halo_colormap",), items=(_CMAPS,),
                         label="Colormap", hide_details=True,
-                        variant="outlined", color="cyan", density="compact",
+                        variant="outlined", color="#c084fc", density="compact",
                     )
                 with v3.VSheet(color="transparent", style="padding:4px 0 8px;"):
                     with v3.VSheet(
@@ -2611,7 +2611,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "GALAXIES",
                     style=(
                         "font-size:0.95rem;font-weight:700;letter-spacing:0.08em;"
-                        "color:#06b6d4;padding:6px 0 8px;display:block;"
+                        "color:#FFD700;padding:6px 0 8px;display:block;"
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
@@ -2676,7 +2676,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "HALO",
                     style=(
                         "font-size:0.85rem;font-weight:700;letter-spacing:0.06em;"
-                        "color:#06b6d4;display:block;padding:4px 0 6px;"
+                        "color:#c084fc;display:block;padding:4px 0 6px;"
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
@@ -2689,7 +2689,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         target_id="btn-target-halo-go")
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
-                        "Go", block=True, color="cyan",
+                        "Go", block=True, color="#c084fc",
                         density="compact", click=ctrl.go_to_halo,
                         id="btn-target-halo-go",
                     )
@@ -2700,7 +2700,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "GALAXY",
                     style=(
                         "font-size:0.85rem;font-weight:700;letter-spacing:0.06em;"
-                        "color:#06b6d4;display:block;padding:4px 0 6px;"
+                        "color:#FFD700;display:block;padding:4px 0 6px;"
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
@@ -2744,7 +2744,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 v3.VBtn(
                     "Highlight Galaxy",
-                    block=True, color="cyan", variant="outlined",
+                    block=True, color="#FFD700", variant="outlined",
                     density="compact",
                     prepend_icon="mdi-bullseye-arrow",
                     click=ctrl.highlight_galaxy,
@@ -2768,7 +2768,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "HALO  (pick a FOF group)",
                     style=(
                         "font-size:0.85rem;font-weight:700;letter-spacing:0.06em;"
-                        "color:#06b6d4;display:block;padding:4px 0 6px;"
+                        "color:#c084fc;display:block;padding:4px 0 6px;"
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
@@ -2781,7 +2781,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         target_id="btn-env-go")
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
-                        "Go", block=True, color="cyan",
+                        "Go", block=True, color="#c084fc",
                         density="compact", click=ctrl.go_to_env_halo,
                         id="btn-env-go",
                     )
@@ -2807,7 +2807,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v_model=("env_show_field",),
                     label="Field",
                     hide_details=True, density="compact",
-                    color="#FFD700",
+                    color="cyan",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
@@ -2815,7 +2815,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v_model=("env_show_isolated",),
                     label="Isolated",
                     hide_details=True, density="compact",
-                    color="#FFD700",
+                    color="cyan",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
@@ -2823,7 +2823,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v_model=("env_show_pairs",),
                     label="Pairs",
                     hide_details=True, density="compact",
-                    color="#FFD700",
+                    color="cyan",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
@@ -2831,7 +2831,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v_model=("env_show_group",),
                     label="Groups",
                     hide_details=True, density="compact",
-                    color="#FFD700",
+                    color="cyan",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
@@ -2839,7 +2839,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v_model=("env_show_cluster",),
                     label="Clusters",
                     hide_details=True, density="compact",
-                    color="#FFD700",
+                    color="cyan",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
                 )
@@ -2848,7 +2848,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 v3.VBtn(
                     "Group Info",
-                    block=True, color="#FFD700",
+                    block=True, color="#c084fc",
                     density="compact",
                     prepend_icon="mdi-account-group-outline",
                     click=ctrl.show_group_info,
@@ -2856,7 +2856,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VBtn(
                     "Highlight Members",
-                    block=True, color="cyan", variant="outlined",
+                    block=True, color="#c084fc", variant="outlined",
                     density="compact",
                     prepend_icon="mdi-bullseye-arrow",
                     click=ctrl.highlight_group_members,
@@ -3256,9 +3256,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 color="transparent",
                 v_show=("nav_active_tab === 'filters'",),
             ):
-                _FSEC = (
+                _FSEC_HALO = (
                     "font-size:0.78rem;font-weight:700;letter-spacing:0.08em;"
-                    "color:#06b6d4;padding:2px 0 2px;display:block;"
+                    "color:#c084fc;padding:2px 0 2px;display:block;"
+                )
+                _FSEC_GAL = (
+                    "font-size:0.78rem;font-weight:700;letter-spacing:0.08em;"
+                    "color:#FFD700;padding:2px 0 2px;display:block;"
                 )
                 _FLBL = (
                     "font-size:0.6rem;color:#9ca3af;display:block;"
@@ -3278,13 +3282,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 _SH = "overflow-y:auto;overflow-x:hidden;padding-right:2px;"
 
                 # ── Halo section ──────────────────────────────
-                v3.VLabel("DARK MATTER HALOES", style=_FSEC)
+                v3.VLabel("DARK MATTER HALOES", style=_FSEC_HALO)
                 with html.Div(style=_SH + "height:120px;"):
                     v3.VLabel("Mvir  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_mvir",),
                         min=10.0, max=15.0, step=0.1,
-                        thumb_label=True, color="cyan",
+                        thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
                         classes="sage-fslider", style=_FSLD,
                     )
@@ -3292,7 +3296,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VRangeSlider(
                         v_model=("filter_halo_rvir",),
                         min=0.0, max=3.0, step=0.05,
-                        thumb_label=True, color="cyan",
+                        thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
                         classes="sage-fslider", style=_FSLD,
                     )
@@ -3300,7 +3304,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VRangeSlider(
                         v_model=("filter_halo_vvir",),
                         min=0.0, max=1000.0, step=10.0,
-                        thumb_label=True, color="cyan",
+                        thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
                         classes="sage-fslider", style=_FSLD,
                     )
@@ -3308,7 +3312,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VRangeSlider(
                         v_model=("filter_halo_vmax",),
                         min=0.0, max=1000.0, step=10.0,
-                        thumb_label=True, color="cyan",
+                        thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.vmax",),
                         classes="sage-fslider", style=_FSLD,
@@ -3317,7 +3321,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VRangeSlider(
                         v_model=("filter_halo_len",),
                         min=0, max=10000, step=100,
-                        thumb_label=True, color="cyan",
+                        thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.len_particles",),
                         classes="sage-fslider", style=_FSLD,
@@ -3326,7 +3330,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VRangeSlider(
                         v_model=("filter_halo_conc",),
                         min=0.0, max=50.0, step=0.5,
-                        thumb_label=True, color="cyan",
+                        thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.concentration",),
                         classes="sage-fslider", style=_FSLD,
@@ -3335,7 +3339,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VRangeSlider(
                         v_model=("filter_halo_spin",),
                         min=0.0, max=0.2, step=0.002,
-                        thumb_label=True, color="cyan",
+                        thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.spin",),
                         classes="sage-fslider", style=_FSLD,
@@ -3344,7 +3348,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VDivider(style="margin:4px 0 2px;")
 
                 # ── Galaxy section ────────────────────────────
-                v3.VLabel("GALAXIES", style=_FSEC)
+                v3.VLabel("GALAXIES", style=_FSEC_GAL)
                 with html.Div(style=_SH + "height:185px;"):
                     # ── Top 5 ──────────────────────────────────────
                     v3.VLabel("Stellar mass  (log10 Msun)", style=_FLBL)
@@ -3661,7 +3665,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VDivider(style="margin:4px 0 2px;")
 
                 # ── Categorical section ───────────────────────
-                v3.VLabel("CATEGORICAL", style=_FSEC)
+                v3.VLabel("CATEGORICAL", style=_FSEC_GAL)
                 with html.Div(style=_SH):
                     v3.VLabel("Type", style=_FLBL)
                     v3.VSelect(

@@ -5,7 +5,7 @@ import base64
 import io
 
 import numpy as np
-from trame.widgets import vuetify3 as v3
+from trame.widgets import html, vuetify3 as v3
 
 from sage_viewer.scene.scene import Scene
 
@@ -630,17 +630,27 @@ def build_toolbar(server, scene: Scene) -> None:
             title="Loop",
         )
 
-    # Snapshot step-back button + slider + step-forward button
-    v3.VBtn(
-        icon="mdi-skip-previous",
-        click=ctrl.snap_prev,
-        density="compact", variant="plain", color="white",
-        title="Previous snapshot",
-        size="small",
-        ripple=False,
-        classes="sage-step-btn",
-        style="padding:0;min-width:20px;margin-left:10px;",
+    _FLASH_JS = (
+        "var b=this,i=b.querySelector('i');"
+        "b.style.color='cyan';"
+        "if(i)i.style.color='cyan';"
+        "clearTimeout(b._ft);"
+        "b._ft=setTimeout(function(){b.style.color='white';if(i)i.style.color='';},300);"
     )
+
+    # Snapshot step-back button + slider + step-forward button
+    with html.Button(
+        click=ctrl.snap_prev,
+        title="Previous snapshot",
+        classes="sage-step-btn",
+        raw_attrs=[f'onmousedown="{_FLASH_JS}"'],
+        style=(
+            "background:none;border:none;outline:none;box-shadow:none;"
+            "cursor:pointer;padding:2px;margin-left:10px;"
+            "color:white;font-size:20px;line-height:1;display:flex;align-items:center;"
+        ),
+    ):
+        html.I(classes="mdi mdi-skip-previous")
     with v3.VCol(style="max-width:240px;padding:0 4px;"):
         v3.VSlider(
             v_model=("snap_num",),
@@ -648,16 +658,18 @@ def build_toolbar(server, scene: Scene) -> None:
             thumb_label=False, hide_details=True,
             color="cyan", density="compact",
         )
-    v3.VBtn(
-        icon="mdi-skip-next",
+    with html.Button(
         click=ctrl.snap_next,
-        density="compact", variant="plain", color="white",
         title="Next snapshot",
-        size="small",
-        ripple=False,
         classes="sage-step-btn",
-        style="padding:0;min-width:20px;margin-right:10px;",
-    )
+        raw_attrs=[f'onmousedown="{_FLASH_JS}"'],
+        style=(
+            "background:none;border:none;outline:none;box-shadow:none;"
+            "cursor:pointer;padding:2px;margin-left:6px;margin-right:10px;"
+            "color:white;font-size:20px;line-height:1;display:flex;align-items:center;"
+        ),
+    ):
+        html.I(classes="mdi mdi-skip-next")
 
     # Snapshot label chip — Mustache interpolation for reactive content
     v3.VChip(

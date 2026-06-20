@@ -9,10 +9,28 @@
   (function () {
     var s = document.createElement('style');
     s.textContent =
+      '.sage-step-btn, .sage-step-btn:focus, .sage-step-btn:focus-visible,' +
+      ' .sage-step-btn:focus-within, .sage-step-btn:hover, .sage-step-btn:active' +
+      ' { border:none !important; outline:none !important; box-shadow:none !important;' +
+      '   background:none !important; opacity:1 !important; }' +
       '.sage-step-btn::before, .sage-step-btn::after { display:none !important; }' +
-      '.sage-step-btn { border:none !important; outline:none !important;' +
-      ' box-shadow:none !important; }';
+      '.sage-step-btn .v-btn__overlay, .sage-step-btn .v-btn__underlay' +
+      ' { display:none !important; opacity:0 !important; }' +
+      '.sage-step-btn .mdi { font-size:20px !important; }';
     document.head.appendChild(s);
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('.sage-step-btn');
+      if (!btn) return;
+      btn.style.color = 'cyan';
+      var icon = btn.querySelector('.mdi');
+      if (icon) icon.style.color = 'cyan';
+      clearTimeout(btn._flashTimer);
+      btn._flashTimer = setTimeout(function () {
+        btn.style.color = 'white';
+        if (icon) icon.style.color = '';
+      }, 300);
+    });
   })();
 
   // ─── Viewport fit ─────────────────────────────────────────────────
