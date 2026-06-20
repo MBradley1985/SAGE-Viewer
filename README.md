@@ -182,16 +182,3 @@ The **Focus button** (top of the right panel) is tab-aware: it focuses on whatev
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-## Citation
-
-If you use SAGE-Viewer in published work, please cite:
-
-```bibtex
-@software{bradley_sage_viewer_2026,
-  author = {Bradley, Michael},
-  title  = {{SAGE-Viewer}: Interactive 3D Visualization for SAGE Galaxy Formation Outputs},
-  year   = {2026},
-  url    = {https://github.com/MBradley1985/SAGE-Viewer}
-}
-```

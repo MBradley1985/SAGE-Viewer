@@ -1351,6 +1351,83 @@ def build_navigation_panel(server, scene: Scene) -> None:
         finally:
             rw.SetOffScreenRendering(prev)
 
+    def _vtk_to_pil(scale: int = 1):
+        """Return a PIL Image from the VTK render window (RGB, top-row first)."""
+        from vtkmodules.util.numpy_support import vtk_to_numpy
+        import numpy as _np2
+        from PIL import Image as _PIL
+        vimg = _capture_image(scale)
+        w, h, _ = vimg.GetDimensions()
+        arr = vtk_to_numpy(
+            vimg.GetPointData().GetScalars()
+        ).reshape(h, w, 3)[::-1]
+        return _PIL.fromarray(arr.astype(_np2.uint8), "RGB")
+
+    def _composite_console_overlay(pil_img):
+        """Draw the console pop-out onto *pil_img* when it is visible.
+
+        Matches the pop-out CSS: left:24, bottom:24, width≤560, height≤360.
+        The console history (cmd in cyan, out in grey) is drawn with a
+        monospace font so recordings capture exactly what the user sees."""
+        if not bool(getattr(state, "console_popout_show", False)):
+            return pil_img
+
+        from PIL import Image as _PIL, ImageDraw, ImageFont
+        import platform
+
+        W, H = pil_img.size
+        pop_w = min(560, int(W * 0.60))
+        pop_h = min(360, int(H * 0.55))
+        pop_x = 24
+        pop_y = max(0, H - 24 - pop_h)
+
+        # Try system monospace font; fall back to PIL default
+        font_sz = 11
+        try:
+            if platform.system() == "Darwin":
+                _font = ImageFont.truetype(
+                    "/System/Library/Fonts/Supplemental/Courier New.ttf", font_sz
+                )
+            else:
+                _font = ImageFont.truetype("DejaVuSansMono.ttf", font_sz)
+        except Exception:
+            _font = ImageFont.load_default()
+
+        overlay = _PIL.new("RGBA", (pop_w, pop_h), (13, 13, 26, 235))
+        draw = ImageDraw.Draw(overlay)
+
+        # Border
+        draw.rectangle([0, 0, pop_w - 1, pop_h - 1], outline=(6, 182, 212), width=1)
+
+        # Title bar
+        title_h = 26
+        draw.rectangle([1, 1, pop_w - 2, title_h], fill=(20, 20, 45, 255))
+        draw.line([1, title_h, pop_w - 2, title_h], fill=(31, 41, 55, 255))
+        cid = getattr(state, "console_active_id", 1)
+        draw.text((8, 6), f"CONSOLE  (Console {cid})", fill=(6, 182, 212), font=_font)
+
+        # History entries — collect (text, color) lines, show the tail that fits
+        pad_x, pad_y = 8, title_h + 6
+        line_h = font_sz + 3
+        max_visible = max(1, (pop_h - pad_y - 4) // line_h)
+        lines = []
+        for entry in list(getattr(state, "console_history", [])):
+            cmd = str(entry.get("cmd", "")).strip()
+            out = str(entry.get("out", "")).strip()
+            if cmd:
+                lines.append((cmd, (6, 182, 212)))
+            for ol in out.split("\n"):
+                ol = ol.rstrip()
+                if ol:
+                    lines.append((ol, (156, 163, 175)))
+        visible = lines[-max_visible:]
+        for i, (text, color) in enumerate(visible):
+            draw.text((pad_x, pad_y + i * line_h), text, fill=color, font=_font)
+
+        base = pil_img.convert("RGBA")
+        base.paste(overlay, (pop_x, pop_y), overlay)
+        return base.convert("RGB")
+
     def _save_image(image, path) -> None:
         """Write a vtkImageData to disk; format inferred from extension."""
         import vtk
@@ -1386,16 +1463,21 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 path = sess / f"{name}_{ts}.{ext}"
             pf = str(getattr(state, "playback_frame", "") or "")
             if pf.startswith("data:image"):
-                # During playback the user sees an HTML overlay image, not the
-                # VTK render window.  Decode the JPEG data URL directly.
                 import base64
                 import io as _io
                 from PIL import Image as _PIL
                 raw = base64.b64decode(pf.split(",", 1)[1])
-                _PIL.open(_io.BytesIO(raw)).convert("RGB").save(str(path))
+                pil = _PIL.open(_io.BytesIO(raw)).convert("RGB")
             else:
-                img = _capture_image(scale=1)
-                _save_image(img, path)
+                pil = _vtk_to_pil(scale=1)
+            pil = _composite_console_overlay(pil)
+            ext_out = str(path).lower().rsplit(".", 1)[-1]
+            if ext_out in ("jpg", "jpeg"):
+                pil.save(str(path), "JPEG", quality=95)
+            elif ext_out in ("tif", "tiff"):
+                pil.save(str(path), "TIFF")
+            else:
+                pil.save(str(path), "PNG")
             state.last_screenshot = str(path)
         except Exception as e:
             state.last_screenshot = f"ERROR: {e!s}"
