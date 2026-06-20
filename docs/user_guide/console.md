@@ -6,15 +6,15 @@ The **Console** tab is a multi-mode terminal embedded in the viewer's right pane
 
 | Mode | How to enter | Prompt |
 |---|---|---|
-| **Shell** (default) | (active on open) | `host:basename user$` |
+| **Terminal** (default) | (active on open) | `host:basename user$` |
 | **Python REPL** | type `python` / `python3` / `py` | `>>>` |
-| **SAGE natural-language** | type `sage` / `nl` / `natural` | `sage>` |
+| **SAGE commands** | type `command` / `cmd` | `cmd>` |
 
-Type `exit`, `quit`, or `shell` from any non-default mode to return to the shell prompt.
+Type `exit`, `quit`, or `terminal` from any non-default mode to return to the terminal prompt.
 
-## Shell mode
+## Terminal mode
 
-Each line is passed to `subprocess.run` with `shell=True`, the active session's `cwd`, and the active session's `env`. Globs, pipes, redirects, `&` backgrounding, and `$VAR` expansion all work as in a normal interactive shell.
+Each line is passed to your `$SHELL` via `asyncio.create_subprocess_shell` with the active session's `cwd` and `env`. Output streams line-by-line into the history entry as the process runs. Globs, pipes, redirects, `&` backgrounding, and `$VAR` expansion all work as in a normal interactive shell.
 
 Three built-ins are intercepted in-process so they persist between commands (a subprocess can't change the parent's cwd):
 
@@ -24,19 +24,21 @@ Three built-ins are intercepted in-process so they persist between commands (a s
 | `pwd` | Print the session cwd. |
 | `export FOO=bar` | Set an env var on the session; future commands inherit it. `export FOO=` clears the var. |
 
-Commands run synchronously with a 300 s timeout. For longer jobs (`python long_analysis.py`, `sbatch ...`, `tail -f ...`), background with `&`:
+Commands stream output line-by-line as they run — you see each output line appear in the history entry in real time rather than waiting for the process to finish. There is a 300 s timeout. For fire-and-forget jobs, background with `&`:
 
 ```
 mbradley$ python plot.py &
 ```
 
-The PID is printed and the prompt returns immediately; output going to stdout/stderr won't appear in the console after backgrounding (redirect to a log file if you need to capture it).
+The prompt returns immediately; backgrounded output won't stream back (redirect to a log file if you need to capture it).
 
 ### Limitations
 
 There's no pty, so anything that needs raw terminal control (`vim`, `top`, `less`, ncurses apps) won't render properly. For an HPC workflow `sbatch`, `squeue`, `ls`, `cat`, `python ...`, `tail file.log`, etc. all work fine.
 
 ## Python REPL mode
+
+REPL execution runs in a background thread via `asyncio.to_thread`, so the viewer stays responsive while a long script runs — you can still interact with the 3D viewport during execution.
 
 Inside the REPL, the following names are pre-bound:
 
@@ -66,7 +68,7 @@ Example:
 'done'
 ```
 
-## SAGE natural-language mode
+## SAGE command mode
 
 The same parser that backed the previous Console tab. Useful for one-shot commands without remembering exact Python or shell syntax:
 

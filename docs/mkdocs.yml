@@ -39,14 +39,16 @@ theme:
   font:
     text: Inter
     code: JetBrains Mono
-  favicon: https://raw.githubusercontent.com/MBradley1985/SAGE26/main/SAGElogo.png
-  logo: https://raw.githubusercontent.com/MBradley1985/SAGE26/main/SAGElogo.png
+  favicon: images/SAGElogo.jpg
+  logo: images/SAGElogo.jpg
 
 extra_css:
   - stylesheets/extra.css
 
 plugins:
   - search
+  - macros:
+      include_dir: ..
   - mkdocstrings:
       handlers:
         python:

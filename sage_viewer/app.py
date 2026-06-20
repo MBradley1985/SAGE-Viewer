@@ -386,13 +386,20 @@ def create_app(
             # ── Launch Mode button — wizard + models ───────────────────────
             with v3.VMenu(close_on_content_click=False):
                 with v3.Template(v_slot_activator="{ props }"):
-                    v3.VBtn(
-                        icon="mdi-rocket-launch",
+                    with v3.VBtn(
                         variant="text",
                         density="compact",
                         v_bind="props",
                         title="Launch Mode",
-                    )
+                        style="padding:2px 4px;min-width:36px;",
+                    ):
+                        html.Img(
+                            src="/sage_static/SAGElogo.jpg",
+                            style=(
+                                "height:30px;width:30px;"
+                                "object-fit:cover;border-radius:50%;"
+                            ),
+                        )
                 with v3.VList(density="compact", bg_color="#1a1a2e"):
                     # ── Launch Mode at the top ─────────────────────────────
                     v3.VListSubheader(

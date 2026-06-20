@@ -1,8 +1,14 @@
+<p align="center">
+  <img src="docs/images/SAGElogo.jpg" alt="SAGE-Viewer logo" width="220"/>
+</p>
+
 # SAGE-Viewer
 
 An interactive 3D visualization package for [SAGE26](https://github.com/MBradley1985/SAGE26) and [SAGE-PSO](https://github.com/MBradley1985/SAGE-PSO) semi-analytic galaxy formation outputs.
 
 Renders dark matter haloes and SAGE galaxies together in a browser-based interactive viewer powered by [PyVista](https://pyvista.org) and [Trame](https://kitware.github.io/trame/).
+
+![SAGE-Viewer](docs/images/hero.png)
 
 ## Features
 
@@ -13,6 +19,8 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - Live colormap, colour-by mode, opacity and visibility controls per layer
 - Colour-by dropdowns are model-aware — only modes whose underlying field is present in the loaded model appear in the list; they update automatically on model switch
 - Full still-quality rendering at all times — no resolution drop during camera drag or playback
+
+![Structure mode](docs/images/structure_mode.png)
 
 ### Playback & camera
 - Play / Pause / Stop / Reverse / Repeat transport at 0.1× – 5× speeds
@@ -30,6 +38,9 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - **Highlight Galaxy** / **Highlight Members** buttons add regime-coloured splat overlays — CGM-regime members in dodgerblue, Hot-regime in tomato; the selected galaxy is marked with a white border ring
 - **Double-click any point** in the viewport (any tab) to populate the Target tab's halo + galaxy IDs and draw a red marker on the selection. Only currently visible galaxies (passing all filters and focus) are selectable. If Focus is active, the camera carries to the new selection at the last-used radius.
 - **Enter to run** in every input field — Halo idx, Galaxy idx, Coords X/Y/Z, Box bounds, Console command, script path, screenshot/movie label all submit on Enter, equivalent to clicking the paired Go / Zoom / Run / Take Screenshot button
+
+<!-- Filter GIF: drop docs/images/filters.gif here once captured -->
+<!-- ![Filters in action](docs/images/filters.gif) -->
 
 ### Filtering
 - Halo filters: Mvir (log10), Rvir (Mpc/h), Vvir (km/s)
@@ -51,6 +62,9 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - Movie recording in GIF / MOV (H.264, via ffmpeg) / PNG sequence
 - Configurable FPS (1 – 60) and resolution (Native / 2× / 4× supersampled)
 - Optional user-typed label per capture; everything goes into a single session folder per app launch
+
+<!-- Console GIF: drop docs/images/console.gif here once captured -->
+<!-- ![Console streaming](docs/images/console.gif) -->
 
 ### Embedded console (Console tab)
 - A real shell terminal — every command runs through `$SHELL` with a per-session `cwd` + `env`, so pipes, globs, `&` backgrounding, redirects, and `$VAR` expansion all work
@@ -158,6 +172,12 @@ Full documentation at [mbradley1985.github.io/SAGE-Viewer](https://mbradley1985.
 | Box        | Zoom to axis-aligned sub-box — "Use Current View" populates from camera; **Draw Box** places a resizable interactive box; **Lock Box** commits it as the focus region |
 | Console    | Shell terminal + Python REPL + SAGE natural-language commands. Multiple sessions, load scripts, pop-out window |
 | Library    | Browse stored screenshots / movies; double-click a row to open as a movable floating card over the viewport (multiple items open simultaneously); per-row delete button removes the file from disk immediately |
+
+<!-- Draw Sphere GIF: drop docs/images/draw_sphere.gif here once captured -->
+<!-- ![Draw Sphere](docs/images/draw_sphere.gif) -->
+
+<!-- Library pop-out GIF: drop docs/images/library_popup.gif here once captured -->
+<!-- ![Library pop-out](docs/images/library_popup.gif) -->
 
 The **Focus button** (top of the right panel) is tab-aware: it focuses on whatever's active in the current tab (target galaxy, environment halo, coords point, or box region).
 
