@@ -1,0 +1,23 @@
+/* Loaded via server.enable_module so it lands in the page <head> and
+   applies to root-level selectors that Vue template CSS cannot reach. */
+
+/* --v-theme-surface resolves to 0,0,170 (DOS blue) despite theme config.
+   Override the CSS custom property directly so VAppBar background is black. */
+:root,
+.v-theme--dos_blue {
+    --v-theme-surface: 0, 0, 0 !important;
+    --v-theme-background: 0, 0, 0 !important;
+}
+
+html,
+body,
+.v-application,
+.v-application__wrap,
+.v-layout,
+.v-app-bar,
+.v-toolbar,
+.v-system-bar {
+    background: #000000 !important;
+    background-color: #000000 !important;
+    box-shadow: none !important;
+}

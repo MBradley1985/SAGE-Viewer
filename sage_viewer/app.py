@@ -151,6 +151,7 @@ def create_app(
     server.enable_module({
         "serve":   {"sage_static": _sage_static_dir},
         "scripts": ["sage_static/sage_viewer.js"],
+        "styles":  ["sage_static/sage_theme.css"],
     })
 
     # xterm.js — browser-side terminal emulator for the console PTY.
@@ -374,14 +375,8 @@ def create_app(
         auto_start=False,
     )
 
-    @server.state.change("wiz_active")
-    def _on_wiz_active(wiz_active, **_):
-        if wiz_active:
-            _wiz_ctrl.reset_and_start()
-
     @server.controller.set("open_wizard")
     def _open_wizard():
-        """Always resets and shows the wizard, even if wiz_active is already True."""
         _wiz_ctrl.reset_and_start()
         server.state.wiz_active = True
         server.state.flush()
@@ -556,9 +551,9 @@ def create_app(
                     "family=VT323&display=swap"
                 ),
             )
-            # Theme overrides injected via html.Style so they land as a real
-            # <style> block in the page (data-URL link was unreliable for
-            # root-level selectors like html/body).
+            # Vuetify DOS-blue theme overrides are loaded via enable_module
+            # (sage_static/sage_theme.css) — that's the only path that reliably
+            # reaches html/body from inside a Trame/Vue template.
             html.Style(_THEME_CSS)
 
             # ── Export catalogue dialog ────────────────────────────────────

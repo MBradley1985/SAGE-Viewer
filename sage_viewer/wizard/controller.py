@@ -782,6 +782,6 @@ class WizardController:
             ])
         else:
             os.execv(sys.executable, [
-                sys.executable, "-m", "sage_viewer",
+                sys.executable, "-m", "sage_viewer.cli",
                 "--par", str(par_path), "--port", str(self._port),
             ])
