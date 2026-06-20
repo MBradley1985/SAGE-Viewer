@@ -247,4 +247,159 @@
     setTimeout(grabKeyboardFocus, 1500);
   });
 
+  // ── xterm.js terminal integration ────────────────────────────────────
+  (function () {
+    var _xterms    = {};  // sid → { term, fit }  (panel)
+    var _xtermsOut = {};  // sid → { term, fit }  (pop-out)
+    var _lastPtySeq     = -1;
+    var _lastConsoleKey = null;
+    var _lastPopoutKey  = null;
+
+    function _getState(key) {
+      try { return window.trame.state.get(key); } catch (e) { return undefined; }
+    }
+    function _trigger(name, args) {
+      try { window.trame.trigger(name, args); } catch (e) {}
+    }
+    function _uint8ToB64(bytes) {
+      var s = '';
+      for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+      return btoa(s);
+    }
+    function _writePtyData(term, b64) {
+      try {
+        var raw = atob(b64);
+        var bytes = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        term.write(bytes);
+      } catch (e) {}
+    }
+
+    function _makeTerm(container, sid, isPopout) {
+      if (typeof Terminal === 'undefined') return null;
+      if (!container || container.offsetWidth === 0) return null;
+
+      var term = new Terminal({
+        cols: 80, rows: 24,
+        theme: {
+          background: '#0a0a0f', foreground: '#e2e8f0',
+          cursor: '#06b6d4', selectionBackground: 'rgba(6,182,212,0.25)',
+        },
+        fontSize: 12,
+        fontFamily: '"Courier New", "DejaVu Sans Mono", monospace',
+        scrollback: 5000, convertEol: false, allowTransparency: false,
+      });
+      var FitCtor = (typeof FitAddon !== 'undefined') ? FitAddon.FitAddon : null;
+      var fitAddon = FitCtor ? new FitCtor() : null;
+      if (fitAddon) term.loadAddon(fitAddon);
+      term.open(container);
+      if (fitAddon) fitAddon.fit();
+
+      term.onData(function (data) {
+        var bytes = new TextEncoder().encode(data);
+        var b64 = _uint8ToB64(bytes);
+        // Use state mutation (window.trame.set) which is the same mechanism as
+        // v-model bindings — guaranteed to reach the server state change handler.
+        try {
+          window.trame.set('pty_input_data', b64);
+          window.trame.set('pty_input_cid',  String(sid));
+          window.trame.set('pty_input_seq',  (_ptyInputSeq = (_ptyInputSeq + 1) % 1e9));
+        } catch (e) {
+          // Fallback: direct trigger
+          _trigger('pty_write_trigger', [sid, b64]);
+        }
+      });
+      term.onResize(function (dims) {
+        _trigger('pty_resize_trigger', [sid, dims.rows, dims.cols]);
+      });
+      return { term: term, fit: fitAddon };
+    }
+
+    var _ptyInputSeq = 0;
+
+    function _initTerm(sid, attempt) {
+      if (_xterms[sid]) {
+        if (_xterms[sid].fit) { try { _xterms[sid].fit.fit(); } catch (e) {} }
+        return;
+      }
+      var container = document.getElementById('sage-pty-' + sid);
+      var t = _makeTerm(container, sid, false);
+      if (!t) {
+        // Container may not be laid out yet — retry up to 15 times (1.5 s total).
+        if ((attempt || 0) < 15) {
+          setTimeout(function () { _initTerm(sid, (attempt || 0) + 1); }, 100);
+        }
+        return;
+      }
+      _xterms[sid] = t;
+      // Auto-focus so the user can type immediately without clicking.
+      try { t.term.focus(); } catch (e) {}
+      // Tell the server to start the PTY now that xterm.js is ready.
+      _trigger('pty_ensure_trigger', [sid]);
+    }
+
+    function _initPopout(sid, attempt) {
+      if (_xtermsOut[sid]) {
+        if (_xtermsOut[sid].fit) { try { _xtermsOut[sid].fit.fit(); } catch (e) {} }
+        return;
+      }
+      var container = document.getElementById('sage-pty-popout-' + sid);
+      var t = _makeTerm(container, sid, true);
+      if (!t) {
+        if ((attempt || 0) < 15) {
+          setTimeout(function () { _initPopout(sid, (attempt || 0) + 1); }, 100);
+        }
+        return;
+      }
+      _xtermsOut[sid] = t;
+    }
+
+    // Poll at 50 ms — feed PTY output + detect mode/popout changes.
+    setInterval(function () {
+      if (!window.trame) return;
+
+      // Feed PTY output into panel and pop-out terminals.
+      var seq = _getState('pty_out_seq');
+      if (seq !== undefined && seq !== _lastPtySeq) {
+        _lastPtySeq = seq;
+        var sid  = _getState('console_active_id');
+        var b64  = _getState('pty_out_data');
+        if (b64) {
+          if (sid !== undefined && _xterms[sid])    _writePtyData(_xterms[sid].term, b64);
+          if (sid !== undefined && _xtermsOut[sid]) _writePtyData(_xtermsOut[sid].term, b64);
+        }
+      }
+
+      // Detect terminal mode becoming active — mount or re-focus panel terminal.
+      var tab  = _getState('nav_active_tab');
+      var mode = _getState('console_mode');
+      var sid2 = _getState('console_active_id');
+      var key  = tab + '|' + mode + '|' + sid2;
+      if (key !== _lastConsoleKey) {
+        _lastConsoleKey = key;
+        if (tab === 'console' && mode === 'terminal' && sid2 !== undefined) {
+          setTimeout(function () {
+            _initTerm(sid2);
+            // Re-focus when switching back to the console tab.
+            var ex = _xterms[sid2];
+            if (ex) { try { ex.term.focus(); } catch (e) {} }
+          }, 80);
+        }
+      }
+
+      // Detect pop-out opening in terminal mode — mount pop-out terminal.
+      var popout = _getState('console_popout_show');
+      var poKey  = mode + '|' + sid2 + '|' + popout;
+      if (poKey !== _lastPopoutKey) {
+        _lastPopoutKey = poKey;
+        if (popout && mode === 'terminal' && sid2 !== undefined) {
+          setTimeout(function () { _initPopout(sid2); }, 80);
+        }
+      }
+    }, 50);
+
+    window.__sageXterms    = _xterms;
+    window.__sageXtermsOut = _xtermsOut;
+  })();
+
 })();

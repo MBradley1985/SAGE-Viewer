@@ -148,6 +148,17 @@ def create_app(
         "scripts": ["sage_static/sage_viewer.js"],
     })
 
+    # xterm.js — browser-side terminal emulator for the console PTY.
+    server.enable_module({
+        "styles":  [
+            "https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css",
+        ],
+        "scripts": [
+            "https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js",
+            "https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js",
+        ],
+    })
+
     # Single-theme config — DOS Blue is now the only palette.
     _vuetify_config = {
         "theme": {
@@ -471,6 +482,15 @@ def create_app(
                             color="cyan",
                             density="compact",
                         )
+                    # ── Close application ──────────────────────────────────
+                    v3.VDivider(style="margin:4px 0;")
+                    v3.VListItem(
+                        title="Close Everything",
+                        subtitle="Quit SAGE-Viewer",
+                        prepend_icon="mdi-close-box-outline",
+                        click=server.controller.close_app,
+                        color="#ef4444",
+                    )
 
             # ── Explore Mode menu (hamburger) — tabs only ──────────────────
             with v3.VMenu(close_on_content_click=False):
@@ -771,10 +791,19 @@ def create_app(
                                 variant="text", color="#9ca3af",
                                 click=server.controller.console_toggle_popout,
                             )
-                        # Mirrored history
+                        # Terminal mode: xterm.js instance in the pop-out.
+                        html.Div(
+                            id=("'sage-pty-popout-' + console_active_id",),
+                            v_show=("console_mode === 'terminal'",),
+                            style=(
+                                "flex:1 1 0;min-height:0;overflow:hidden;"
+                            ),
+                        )
+                        # Command mode: mirrored history + input.
                         with v3.VSheet(
                             color="#0a0a0f",
                             classes="sage-console-scroll",
+                            v_show=("console_mode === 'command'",),
                             style=(
                                 "flex:1 1 0;min-height:0;overflow-y:auto;"
                                 "padding:6px 10px;font-family:monospace;"
@@ -803,10 +832,8 @@ def create_app(
                                         "white-space:pre-wrap;"
                                     ),
                                 )
-                        # Input — submits via the same trigger as the
-                        # in-panel input, so the pop-out is just a second
-                        # surface onto the active console.
                         with html.Div(
+                            v_show=("console_mode === 'command'",),
                             style="padding:6px 8px;flex-shrink:0;",
                         ):
                             with html.Div(
@@ -816,13 +843,7 @@ def create_app(
                             ):
                                 v3.VTextField(
                                     v_model=("console_input",),
-                                    label=(
-                                        "console_mode === 'python' "
-                                        "? 'Python REPL  (Enter to run)' "
-                                        ": (console_mode === 'command' "
-                                        "    ? 'Command  (Enter to run)' "
-                                        "    : 'Terminal  (Enter to run)')",
-                                    ),
+                                    label="SAGE Commands  (Enter to run)",
                                     hide_details=True, variant="outlined",
                                     bg_color="#1a1a2e", density="compact",
                                     style="font-family:monospace;",

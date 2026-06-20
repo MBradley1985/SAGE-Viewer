@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import io
+import os as _os
+import signal as _signal
 
 import numpy as np
 from trame.widgets import html, vuetify3 as v3
@@ -696,5 +698,20 @@ def build_toolbar(server, scene: Scene) -> None:
         hide_details=True,
         style="max-width:120px;",
     )
+
+    # Close application button
+    v3.VBtn(
+        icon="mdi-close-thick",
+        variant="text",
+        density="compact",
+        color="#ef4444",
+        title="Close SAGE-Viewer",
+        click=ctrl.close_app,
+        style="margin-left:8px;margin-right:4px;",
+    )
+
+    @ctrl.set("close_app")
+    def on_close_app():
+        _os.kill(_os.getpid(), _signal.SIGINT)
 
     # (theme selector removed — DOS Blue is the only palette)

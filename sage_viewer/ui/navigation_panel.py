@@ -189,8 +189,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.console_history      = []   # active console's history
     state.consoles_list        = [{"id": 1, "title": "Console 1"}]
     state.console_active_id    = 1
-    state.console_script_path  = ""   # path used by Load Script
     state.console_popout_show  = False
+    state.pty_out_data         = ""   # base64-encoded latest PTY output chunk
+    state.pty_out_seq          = 0    # monotonically increasing; JS polls this
+    state.pty_input_data       = ""   # base64 keystroke data from JS (client → server)
+    state.pty_input_cid        = "1"  # console id the input belongs to
+    state.pty_input_seq        = 0    # incremented by JS each keystroke
 
     # Library
     state.library_files = []   # list of {"name", "path", "kind", "size_kb"}
@@ -1363,25 +1367,73 @@ def build_navigation_panel(server, scene: Scene) -> None:
         ).reshape(h, w, 3)[::-1]
         return _PIL.fromarray(arr.astype(_np2.uint8), "RGB")
 
-    def _composite_console_overlay(pil_img):
-        """Draw the console pop-out onto *pil_img* when it is visible.
+    def _composite_overlays(pil_img):
+        """Composite all visible HTML overlays: library cards, then console pop-out."""
+        lib_items = list(getattr(state, "library_items", []))
+        if lib_items:
+            pil_img = _draw_library_cards(pil_img, lib_items)
+        if bool(getattr(state, "console_popout_show", False)):
+            pil_img = _draw_console_popout(pil_img)
+        return pil_img
 
-        Matches the pop-out CSS: left:24, bottom:24, width≤560, height≤360.
-        The console history (cmd in cyan, out in grey) is drawn with a
-        monospace font so recordings capture exactly what the user sees."""
-        if not bool(getattr(state, "console_popout_show", False)):
-            return pil_img
+    # Backward-compat alias used by the screenshot path written earlier.
+    _composite_console_overlay = _composite_overlays
 
+    def _draw_library_cards(pil_img, items):
+        """Paste open library image cards at top-right, matching the UI position."""
+        import base64 as _b64, io as _bio2
+        from PIL import Image as _PIL2, ImageDraw as _ID2, ImageFont as _IF2
+        W, H = pil_img.size
+        card_max_w = min(540, int(W * 0.50))
+        right_pad = 24
+        stagger = 44
+        base = pil_img.convert("RGBA")
+        try:
+            _f = _IF2.truetype("/System/Library/Fonts/Helvetica.ttc", 11)
+        except Exception:
+            _f = _IF2.load_default()
+        for i, item in enumerate(items):
+            if item.get("kind") != "image":
+                continue
+            durl = item.get("data_url", "")
+            if not durl.startswith("data:image"):
+                continue
+            try:
+                raw = _b64.b64decode(durl.split(",", 1)[1])
+                img = _PIL2.open(_bio2.BytesIO(raw)).convert("RGBA")
+            except Exception:
+                continue
+            iw, ih = img.size
+            if iw > card_max_w:
+                ih = int(ih * card_max_w / iw)
+                iw = card_max_w
+                try:
+                    rs = _PIL2.Resampling.LANCZOS
+                except AttributeError:
+                    rs = _PIL2.LANCZOS
+                img = img.resize((iw, ih), rs)
+            hdr, pad = 36, 8
+            cw, ch = iw + pad * 2, ih + hdr + pad
+            card = _PIL2.new("RGBA", (cw, ch), (17, 24, 39, 235))
+            draw = _ID2.Draw(card)
+            draw.rectangle([0, 0, cw - 1, ch - 1], outline=(55, 65, 81), width=1)
+            draw.rectangle([0, 0, cw - 1, hdr], fill=(26, 35, 53, 255))
+            draw.text((8, 10), (item.get("name") or "")[:50], fill=(226, 232, 240), font=_f)
+            card.paste(img, (pad, hdr + pad // 2), img)
+            base.paste(card, (max(0, W - right_pad - cw), max(0, 32 + i * stagger)), card)
+        return base.convert("RGB")
+
+    def _draw_console_popout(pil_img):
+        """Draw the console pop-out onto *pil_img*.
+
+        Matches the CSS: left:24, bottom:24, width≤560, height≤360."""
         from PIL import Image as _PIL, ImageDraw, ImageFont
         import platform
-
         W, H = pil_img.size
         pop_w = min(560, int(W * 0.60))
         pop_h = min(360, int(H * 0.55))
         pop_x = 24
         pop_y = max(0, H - 24 - pop_h)
-
-        # Try system monospace font; fall back to PIL default
         font_sz = 11
         try:
             if platform.system() == "Darwin":
@@ -1392,21 +1444,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 _font = ImageFont.truetype("DejaVuSansMono.ttf", font_sz)
         except Exception:
             _font = ImageFont.load_default()
-
         overlay = _PIL.new("RGBA", (pop_w, pop_h), (13, 13, 26, 235))
         draw = ImageDraw.Draw(overlay)
-
-        # Border
         draw.rectangle([0, 0, pop_w - 1, pop_h - 1], outline=(6, 182, 212), width=1)
-
-        # Title bar
         title_h = 26
         draw.rectangle([1, 1, pop_w - 2, title_h], fill=(20, 20, 45, 255))
         draw.line([1, title_h, pop_w - 2, title_h], fill=(31, 41, 55, 255))
         cid = getattr(state, "console_active_id", 1)
         draw.text((8, 6), f"CONSOLE  (Console {cid})", fill=(6, 182, 212), font=_font)
-
-        # History entries — collect (text, color) lines, show the tail that fits
         pad_x, pad_y = 8, title_h + 6
         line_h = font_sz + 3
         max_visible = max(1, (pop_h - pad_y - 4) // line_h)
@@ -1423,7 +1468,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
         visible = lines[-max_visible:]
         for i, (text, color) in enumerate(visible):
             draw.text((pad_x, pad_y + i * line_h), text, fill=color, font=_font)
-
         base = pil_img.convert("RGBA")
         base.paste(overlay, (pop_x, pop_y), overlay)
         return base.convert("RGB")
@@ -1530,14 +1574,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     pf = str(getattr(state, "playback_frame", "") or "")
 
                     if pb_active and pf.startswith("data:image") and pf != last_url:
-                        # New unique playback frame — capture from overlay data URL.
+                        # New unique playback frame — composite overlays on top.
                         last_url = pf
                         outpath = (
                             _record_state["dir"]
                             / f"frame_{_record_state['frames']:05d}.png"
                         )
                         raw = base64.b64decode(pf.split(",", 1)[1])
-                        _PIL.open(_io.BytesIO(raw)).convert("RGB").save(str(outpath))
+                        frame = _PIL.open(_io.BytesIO(raw)).convert("RGB")
+                        frame = _composite_overlays(frame)
+                        frame.save(str(outpath))
                         _record_state["frames"] += 1
                         state.recording_frames = _record_state["frames"]
                         state.flush()
@@ -1546,14 +1592,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         continue
 
                     if not pb_active:
-                        # Live (non-playback) view — capture VTK at user FPS.
+                        # Live view — capture VTK then composite HTML overlays.
                         last_url = None
                         outpath = (
                             _record_state["dir"]
                             / f"frame_{_record_state['frames']:05d}.png"
                         )
-                        img = _capture_image(scale=_record_state["scale"])
-                        _save_image(img, outpath)
+                        frame = _vtk_to_pil(scale=_record_state["scale"])
+                        frame = _composite_overlays(frame)
+                        frame.save(str(outpath))
                         _record_state["frames"] += 1
                         state.recording_frames = _record_state["frames"]
                         state.flush()
@@ -1968,50 +2015,77 @@ def build_navigation_panel(server, scene: Scene) -> None:
     from sage_viewer.utils.command_parser import (
         CommandContext, execute_command,
     )
-    import sys as _sys
-    import io as _io
-    import code as _code
-    import contextlib as _contextlib
-    import traceback as _traceback
     import subprocess as _subprocess
-    import shlex as _shlex
     import os as _os
     import socket as _socket
     import getpass as _getpass
-    import numpy as _np
+    import base64 as _base64
 
-    _hostname_short = _socket.gethostname().split(".")[0]
-    _username       = _getpass.getuser()
     _cmd_ctx = CommandContext(scene=scene, state=state, ctrl=ctrl)
 
+    class _PTYSession:
+        """PTY-backed shell session powering the xterm.js terminal."""
+
+        def __init__(self, cwd: str, env: dict) -> None:
+            import pty as _pty, fcntl as _fcntl, struct as _struct, termios as _termios
+            master_fd, slave_fd = _pty.openpty()
+            try:
+                _fcntl.ioctl(slave_fd, _termios.TIOCSWINSZ,
+                             _struct.pack('HHHH', 24, 80, 0, 0))
+            except Exception:
+                pass
+            shell = env.get('SHELL', _os.environ.get('SHELL', '/bin/bash'))
+            self._proc = _subprocess.Popen(
+                [shell, '-l'],
+                stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+                close_fds=True, cwd=str(cwd), env=env,
+                preexec_fn=_os.setsid,
+            )
+            _os.close(slave_fd)
+            self._fd = master_fd
+            self._dead = False
+
+        @property
+        def fd(self) -> int:
+            return self._fd
+
+        def write(self, data: bytes) -> None:
+            if not self._dead:
+                try:
+                    _os.write(self._fd, data)
+                except OSError:
+                    self._dead = True
+
+        def resize(self, rows: int, cols: int) -> None:
+            try:
+                import fcntl as _fcntl2, struct as _struct2, termios as _termios2
+                _fcntl2.ioctl(self._fd, _termios2.TIOCSWINSZ,
+                              _struct2.pack('HHHH', rows, cols, 0, 0))
+            except Exception:
+                pass
+
+        def is_alive(self) -> bool:
+            return not self._dead and self._proc.poll() is None
+
+        def close(self) -> None:
+            self._dead = True
+            try:
+                _os.close(self._fd)
+            except Exception:
+                pass
+            try:
+                self._proc.terminate()
+            except Exception:
+                pass
+
     def _make_console_data() -> dict:
-        """Per-session state for one console: a real shell terminal by
-        default, with Python REPL and natural-language SAGE modes
-        reachable via the `python` / `sage` commands.
-        """
-        locals_dict = {
-            "__name__": "__console__",
-            "__doc__":  None,
-            "scene":    scene,
-            "state":    state,
-            "ctrl":     ctrl,
-            "server":   server,
-            "plotter":  scene.plotter,
-            "np":       _np,
-        }
-        # cwd persists per-session so `cd somewhere` is sticky between
-        # commands.  Env is the parent process env at startup; users can
-        # mutate via `export FOO=bar` (handled below).
+        """Per-session state for one console: PTY terminal + SAGE command mode."""
         return {
             "history":   [],
             "input":     "",
-            "mode":      "terminal",   # "terminal" | "python" | "command"
+            "mode":      "terminal",
             "prompt":    "$",
-            "cwd":       _os.getcwd(),
-            "env":       dict(_os.environ),
-            "py_buffer": [],
-            "py_interp": _code.InteractiveInterpreter(locals_dict),
-            "py_locals": locals_dict,
+            "pty":       None,   # _PTYSession, created lazily on first keystroke
             "counter":   0,
         }
 
@@ -2050,36 +2124,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.console_mode   = _consoles_data[1]["mode"]
     state.console_prompt = _consoles_data[1]["prompt"]
 
-    def _py_compile(d: dict, source: str):
-        """Compile source; returns (compiled_code, None) or (None, error_str)
-        or (None, None) for incomplete input."""
-        err_buf = _io.StringIO()
-        try:
-            compiled = _code.compile_command(source, "<console>", "single")
-        except (SyntaxError, OverflowError, ValueError):
-            with _contextlib.redirect_stderr(err_buf):
-                d["py_interp"].showsyntaxerror("<console>")
-            return None, err_buf.getvalue()
-        return compiled, None
-
-    def _py_run(d: dict, compiled) -> str:
-        """Run a compiled code object; returns captured stdout+stderr."""
-        out_buf, err_buf = _io.StringIO(), _io.StringIO()
-        with _contextlib.redirect_stdout(out_buf), \
-             _contextlib.redirect_stderr(err_buf):
-            d["py_interp"].runcode(compiled)
-        return out_buf.getvalue() + err_buf.getvalue()
-
-    async def _py_eval_async(d: dict, source: str) -> str | None:
-        """Compile + run source off the event loop; return output or None for
-        incomplete input."""
-        compiled, err = _py_compile(d, source)
-        if err is not None:
-            return err
-        if compiled is None:
-            return None
-        return await asyncio.to_thread(_py_run, d, compiled)
-
     def _push_history(prompt: str, cmd: str, out: str) -> None:
         d = _consoles_data[_active_console[0]]
         d["counter"] += 1
@@ -2094,91 +2138,70 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.console_history = history
         d["history"] = list(history)
 
-    def _shell_prompt(d: dict) -> str:
-        """macOS / Bash style: `host:basename user$`. Matches a real
-        Terminal.app prompt for visual consistency."""
-        try:
-            cwd  = d["cwd"]
-            home = _os.path.expanduser("~")
-            if cwd == home:
-                base = "~"
-            else:
-                base = _os.path.basename(cwd) or "/"
-            return f"{_hostname_short}:{base} {_username}$"
-        except Exception:
-            return "$"
+    def _start_pty_reader(cid: int, pty_sess: _PTYSession) -> None:
+        """Attach an I/O reader for PTY output — pure event-loop callback, no Task."""
+        loop = asyncio.get_running_loop()
+        seq  = [0]
 
-    def _run_shell_builtins(d: dict, cmd: str) -> str | None:
-        """Handle cd / pwd / export in-process. Returns output string if
-        handled, or None to indicate the command should be passed to the shell."""
-        stripped = cmd.strip()
-        if not stripped:
-            return ""
-        if stripped == "cd" or stripped.startswith("cd ") \
-                or stripped.startswith("cd\t"):
-            arg = stripped[2:].strip() or "~"
-            target = _os.path.expanduser(_os.path.expandvars(arg))
-            if not _os.path.isabs(target):
-                target = _os.path.join(d["cwd"], target)
-            target = _os.path.normpath(target)
-            if not _os.path.isdir(target):
-                return f"cd: {arg}: No such directory"
-            d["cwd"] = target
-            return ""
-        if stripped == "pwd":
-            return d["cwd"]
-        if stripped.startswith("export "):
+        def _on_readable() -> None:
             try:
-                assignments = _shlex.split(stripped[7:])
-            except ValueError as e:
-                return f"export: {e}"
-            for a in assignments:
-                if "=" in a:
-                    k, v = a.split("=", 1)
-                    d["env"][k] = v
-                else:
-                    d["env"].pop(a, None)
-            return ""
-        return None
+                data = _os.read(pty_sess.fd, 4096)
+            except OSError:
+                try: loop.remove_reader(pty_sess.fd)
+                except Exception: pass
+                return
+            if not data:
+                try: loop.remove_reader(pty_sess.fd)
+                except Exception: pass
+                return
+            if _active_console[0] == cid:
+                seq[0] += 1
+                state.pty_out_data = _base64.b64encode(data).decode('ascii')
+                state.pty_out_seq  = seq[0]
+                state.flush()
 
-    async def _run_shell_streaming(d: dict, cmd: str, entry_id: int) -> None:
-        """Run cmd via asyncio subprocess, streaming each line into the history
-        entry as it arrives so the console updates in real time."""
-        shell = d["env"].get("SHELL", "/bin/bash")
-        merged_env = {**_os.environ, **d["env"]}
+        loop.add_reader(pty_sess.fd, _on_readable)
 
-        def _update_entry(text: str) -> None:
-            history = list(state.console_history)
-            for item in history:
-                if item["id"] == entry_id:
-                    item["out"] = _truncate(text)
-                    break
-            state.console_history = history
-            _consoles_data[_active_console[0]]["history"] = list(history)
-            state.flush()
+    @ctrl.set("console_mode_sage")
+    def on_console_mode_sage():
+        d = _consoles_data[_active_console[0]]
+        d["mode"]   = "command"
+        d["prompt"] = "cmd>"
+        state.console_mode   = "command"
+        state.console_prompt = "cmd>"
+        _push_history("$", "sage",
+            "SAGE-Viewer command mode. "
+            "Examples: 'show only clusters', 'go to halo 42', "
+            "'snap 30', 'screenshot'. Type 'help' for the full "
+            "list, 'exit' to return to the terminal.")
+        state.flush()
 
-        try:
-            proc = await asyncio.create_subprocess_shell(
-                cmd,
-                executable=shell,
-                cwd=d["cwd"],
-                env=merged_env,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            lines: list[str] = []
-            async for raw in proc.stdout:
-                lines.append(raw.decode("utf-8", errors="replace").rstrip())
-                _update_entry("\n".join(lines))
-            await proc.wait()
-            if proc.returncode != 0:
-                suffix = f"(exit {proc.returncode})"
-                lines.append(suffix) if lines else lines.append(suffix)
-                _update_entry("\n".join(lines))
-        except asyncio.TimeoutError:
-            _update_entry("(timed out after 300s — try backgrounding with &)")
-        except Exception as e:
-            _update_entry(f"Error: {e}")
+    @ctrl.set("console_mode_terminal")
+    def on_console_mode_terminal():
+        d = _consoles_data[_active_console[0]]
+        d["mode"]   = "terminal"
+        d["prompt"] = "$"
+        state.console_mode   = "terminal"
+        state.console_prompt = "$"
+        state.flush()
+        # PTY is created by pty_ensure_trigger fired from JS after xterm.js mounts.
+
+    @ctrl.set("console_close_pty")
+    def on_console_close_pty():
+        """Kill the active PTY session and switch to SAGE command mode."""
+        cid = _active_console[0]
+        d   = _consoles_data.get(cid)
+        if d is None:
+            return
+        pty_sess = d.get("pty")
+        if pty_sess:
+            pty_sess.close()
+        d["pty"]  = None
+        d["mode"] = "command"
+        d["prompt"] = "cmd>"
+        state.console_mode   = "command"
+        state.console_prompt = "cmd>"
+        state.flush()
 
     @ctrl.set("console_submit")
     async def on_console_submit():
@@ -2186,102 +2209,28 @@ def build_navigation_panel(server, scene: Scene) -> None:
         d   = _consoles_data[cid]
         cmd_raw = str(state.console_input or "")
 
-        # In SHELL/SAGE modes an empty line is a no-op. In Python mode
-        # empty lines terminate multi-line blocks, so we keep them.
-        if d["mode"] in ("terminal", "command") and not cmd_raw.strip():
+        if d["mode"] == "terminal":
+            # Terminal uses xterm.js directly; text input is hidden.
             return
 
-        if d["mode"] == "terminal":
-            cmd = cmd_raw.rstrip()
-            low = cmd.strip().lower()
-            if low in ("python", "python3", "py"):
-                d["mode"]   = "python"
-                d["prompt"] = ">>>"
-                state.console_mode   = "python"
-                state.console_prompt = ">>>"
-                _push_history(_shell_prompt(d), cmd,
-                    f"Python {_sys.version.split()[0]} (embedded)\n"
-                    "Locals: scene, state, ctrl, server, plotter, np.\n"
-                    "Type 'exit' or 'terminal' to leave the REPL.")
-            elif low in ("command", "cmd"):
-                d["mode"]   = "command"
-                d["prompt"] = "cmd>"
-                state.console_mode   = "command"
-                state.console_prompt = "cmd>"
-                _push_history(_shell_prompt(d), cmd,
-                    "SAGE-Viewer command mode. "
-                    "Examples: 'show only clusters', 'go to halo 42', "
-                    "'snap 30', 'screenshot'. Type 'help' for the full "
-                    "list, 'exit' or 'terminal' to return to terminal.")
-            else:
-                builtin_out = _run_shell_builtins(d, cmd)
-                if builtin_out is not None:
-                    _push_history(_shell_prompt(d), cmd, builtin_out)
-                else:
-                    # Push a placeholder entry first, then stream output into it.
-                    _push_history(_shell_prompt(d), cmd, "")
-                    entry_id = _consoles_data[cid]["counter"]
-                    state.console_input = ""
-                    d["input"] = ""
-                    state.flush()
-                    _push()
-                    await _run_shell_streaming(d, cmd, entry_id)
-                    return
+        # Empty line is a no-op in command mode.
+        if not cmd_raw.strip():
+            return
 
-        elif d["mode"] == "command":
-            cmd = cmd_raw.rstrip()
-            low = cmd.strip().lower()
-            if low in ("exit", "quit", "terminal"):
-                d["mode"]   = "terminal"
-                d["prompt"] = "$"
-                state.console_mode   = "terminal"
-                state.console_prompt = _shell_prompt(d)
-                _push_history("cmd>", cmd, "(back to terminal)")
-            else:
-                try:
-                    out_text = execute_command(cmd, _cmd_ctx) or "(ok)"
-                except Exception as e:
-                    out_text = f"Error: {e}"
-                _push_history("cmd>", cmd, out_text)
-
-        else:  # python mode
-            line = cmd_raw.rstrip()
-            low  = line.strip().lower()
-            if low in ("exit", "quit", "exit()", "quit()", "terminal"):
-                d["py_buffer"].clear()
-                d["mode"]   = "terminal"
-                d["prompt"] = "$"
-                state.console_mode   = "terminal"
-                state.console_prompt = _shell_prompt(d)
-                _push_history(">>>", line, "(back to terminal)")
-            else:
-                d["py_buffer"].append(line)
-                source = "\n".join(d["py_buffer"])
-                force = (line == "" and len(d["py_buffer"]) > 1)
-                if force:
-                    result = await _py_eval_async(d, source)
-                    if result is None:
-                        result = "SyntaxError: unexpected EOF while parsing"
-                    d["py_buffer"].clear()
-                    _push_history("...", line, result.rstrip())
-                    d["prompt"] = ">>>"
-                    state.console_prompt = ">>>"
-                else:
-                    result = await _py_eval_async(d, source)
-                    if result is None:
-                        prompt = ">>>" if len(d["py_buffer"]) == 1 else "..."
-                        _push_history(prompt, line, "")
-                        d["prompt"] = "..."
-                        state.console_prompt = "..."
-                        state.console_input = ""
-                        d["input"] = ""
-                        state.flush()
-                        _push()
-                        return
-                    d["py_buffer"].clear()
-                    _push_history(">>>", line, (result or "").rstrip())
-                    d["prompt"] = ">>>"
-                    state.console_prompt = ">>>"
+        cmd = cmd_raw.rstrip()
+        low = cmd.strip().lower()
+        if low in ("exit", "quit", "terminal"):
+            d["mode"]   = "terminal"
+            d["prompt"] = "$"
+            state.console_mode   = "terminal"
+            state.console_prompt = "$"
+            _push_history("cmd>", cmd, "(back to terminal)")
+        else:
+            try:
+                out_text = execute_command(cmd, _cmd_ctx) or "(ok)"
+            except Exception as e:
+                out_text = f"Error: {e}"
+            _push_history("cmd>", cmd, out_text)
 
         state.console_input = ""
         d["input"] = ""
@@ -2317,46 +2266,22 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def on_console_close(cid):
         cid = int(cid)
         if len(_consoles_data) <= 1:
-            return    # always keep at least one
+            return
         _save_active()
-        _consoles_data.pop(cid, None)
+        closing = _consoles_data.pop(cid, None)
+        if closing:
+            try:
+                pty_sess = closing.get("pty")
+                if pty_sess:
+                    pty_sess.close()
+            except Exception:
+                pass
         state.consoles_list = [c for c in state.consoles_list if c["id"] != cid]
         if _active_console[0] == cid:
             new_active = state.consoles_list[0]["id"]
             _load_console(new_active)
         else:
             state.flush()
-
-    @ctrl.set("console_load_script")
-    async def on_console_load_script():
-        path = str(state.console_script_path or "").strip()
-        if not path:
-            return
-        cid = _active_console[0]
-        d = _consoles_data[cid]
-        try:
-            with open(path) as f:
-                source = f.read()
-        except Exception as e:
-            _push_history("$", f"load {path}", f"Error reading {path}: {e}")
-            state.flush(); _push()
-            return
-
-        def _exec_script():
-            out_buf, err_buf = _io.StringIO(), _io.StringIO()
-            try:
-                with _contextlib.redirect_stdout(out_buf), \
-                     _contextlib.redirect_stderr(err_buf):
-                    exec(compile(source, path, "exec"), d["py_locals"])
-                return (out_buf.getvalue() + err_buf.getvalue()).rstrip() \
-                       or "(script ran)"
-            except Exception:
-                return (out_buf.getvalue() + err_buf.getvalue()
-                        + _traceback.format_exc()).rstrip()
-
-        out = await asyncio.to_thread(_exec_script)
-        _push_history("$", f"load {path}", out)
-        state.flush(); _push()
 
     @ctrl.set("console_toggle_popout")
     def on_console_toggle_popout():
@@ -2494,9 +2419,68 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # Populate the file list at startup
     state.library_files = _scan_library()
 
+    # PTY triggers — fired from xterm.js in the browser.
+    @server.trigger("pty_ensure_trigger")
+    async def on_pty_ensure(session_id):
+        """Create the PTY for *session_id* if not already running.
+        Called from JS immediately after xterm.js mounts so the shell
+        prompt arrives after the terminal is ready to display it."""
+        cid = int(session_id)
+        d = _consoles_data.get(cid)
+        if d is None:
+            return
+        if d.get("pty") is None or not d["pty"].is_alive():
+            d["pty"] = _PTYSession(cwd=_os.getcwd(), env=dict(_os.environ))
+            _start_pty_reader(cid, d["pty"])
+
+    @server.trigger("pty_write_trigger")
+    async def on_pty_write(session_id, b64_data):
+        cid = int(session_id)
+        d = _consoles_data.get(cid)
+        if d is None:
+            return
+        if d.get("pty") is None or not d["pty"].is_alive():
+            d["pty"] = _PTYSession(cwd=_os.getcwd(), env=dict(_os.environ))
+            _start_pty_reader(cid, d["pty"])
+        data = _base64.b64decode(b64_data)
+        d["pty"].write(data)
+
+    @server.trigger("pty_resize_trigger")
+    def on_pty_resize(session_id, rows, cols):
+        cid = int(session_id)
+        d = _consoles_data.get(cid)
+        if d is None:
+            return
+        pty_sess = d.get("pty")
+        if pty_sess:
+            pty_sess.resize(int(rows), int(cols))
+
+    @state.change("pty_input_seq")
+    def on_pty_input_state(pty_input_seq, **_):
+        """Receive keystroke data sent via window.trame.set() from xterm.js onData."""
+        if not pty_input_seq:
+            return
+        try:
+            cid = int(state.pty_input_cid or 1)
+        except (ValueError, TypeError):
+            cid = 1
+        b64 = str(state.pty_input_data or "")
+        if not b64:
+            return
+        d = _consoles_data.get(cid)
+        if d is None:
+            return
+        if d.get("pty") is None or not d["pty"].is_alive():
+            d["pty"] = _PTYSession(cwd=_os.getcwd(), env=dict(_os.environ))
+            _start_pty_reader(cid, d["pty"])
+        try:
+            data = _base64.b64decode(b64)
+            d["pty"].write(data)
+        except Exception:
+            pass
+
     # Triggers — Enter / per-row buttons fire these from Vue templates.
     server.trigger("console_submit_trigger")(on_console_submit)
-    server.trigger("console_load_script_trigger")(on_console_load_script)
     server.trigger("console_switch_trigger")(on_console_switch)
     server.trigger("console_close_trigger")(on_console_close)
     server.trigger("library_rename_trigger")(on_library_rename)
@@ -3228,13 +3212,73 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         title="New console",
                         style="min-width:24px;padding:0;height:22px;",
                     )
+                    # Mode selector — terminal (>_) and SAGE command mode (cmd).
+                    v3.VBtn(
+                        ">_", size="x-small", density="compact",
+                        variant=("console_mode === 'terminal' ? 'flat' : 'outlined'",),
+                        color=("console_mode === 'terminal' ? 'cyan' : '#6b7280'",),
+                        click=ctrl.console_mode_terminal,
+                        title="Terminal",
+                        style=(
+                            "text-transform:none;font-size:0.62rem;"
+                            "min-width:0;padding:0 6px;height:22px;"
+                            "font-family:monospace;margin-left:4px;"
+                        ),
+                    )
+                    v3.VBtn(
+                        "cmd", size="x-small", density="compact",
+                        variant=("console_mode === 'command' ? 'flat' : 'outlined'",),
+                        color=("console_mode === 'command' ? 'cyan' : '#6b7280'",),
+                        click=ctrl.console_mode_sage,
+                        title="SAGE command mode",
+                        style=(
+                            "text-transform:none;font-size:0.62rem;"
+                            "min-width:0;padding:0 6px;height:22px;"
+                            "font-family:monospace;"
+                        ),
+                    )
 
-                # History — flex-fills the available vertical space.
-                # min-height:0 lets it shrink when needed so the
-                # bottom block is always visible.
+                # xterm.js terminal — shown in terminal mode.
+                html.Div(
+                    id=("'sage-pty-' + console_active_id",),
+                    v_show=("console_mode === 'terminal'",),
+                    style=(
+                        "flex:1 1 0;min-height:0;"
+                        "border:1px solid #1f2937;border-radius:4px;"
+                        "overflow:hidden;"
+                    ),
+                )
+
+                # Terminal action row — pop-out + close, only in terminal mode.
+                with html.Div(
+                    v_show=("console_mode === 'terminal'",),
+                    style=(
+                        "margin-top:6px;flex-shrink:0;"
+                        "display:flex;gap:6px;align-items:center;"
+                    ),
+                ):
+                    v3.VBtn(
+                        "Pop-out", variant="outlined",
+                        color=("console_popout_show ? 'cyan' : '#6b7280'",),
+                        density="compact",
+                        prepend_icon="mdi-dock-window",
+                        click=ctrl.console_toggle_popout,
+                        style="flex:1 1 auto;",
+                    )
+                    v3.VBtn(
+                        icon="mdi-close-circle-outline",
+                        variant="outlined", color="red",
+                        density="compact",
+                        click=ctrl.console_close_pty,
+                        title="Close terminal",
+                        style="flex-shrink:0;min-width:36px;",
+                    )
+
+                # History — shown in SAGE command mode.
                 with v3.VSheet(
                     color="#0a0a0f",
                     classes="sage-console-scroll",
+                    v_show=("console_mode === 'command'",),
                     style=(
                         "flex:1 1 0;min-height:0;overflow-y:auto;"
                         "padding:6px 8px;border:1px solid #1f2937;"
@@ -3260,10 +3304,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             style="color:#9ca3af;white-space:pre-wrap;",
                         )
 
-                # Bottom block — anchored to the panel's bottom edge via
-                # `margin-top:auto`. Holds the input field, script path,
-                # and the four action buttons.
+                # Bottom block — input field and action buttons (command mode only).
                 with html.Div(
+                    v_show=("console_mode === 'command'",),
                     style=(
                         "margin-top:6px;flex-shrink:0;"
                         "display:flex;flex-direction:column;gap:6px;"
@@ -3274,27 +3317,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ):
                         v3.VTextField(
                             v_model=("console_input",),
-                            label=(
-                                "console_mode === 'python' "
-                                "? 'Python REPL  (Enter to run)' "
-                                ": (console_mode === 'command' "
-                                "    ? 'Command  (Enter to run)' "
-                                "    : 'Terminal  (type python or command "
-                                "to switch modes)')",
-                            ),
+                            label="SAGE Commands  (type exit to return to terminal)",
                             hide_details=True, variant="outlined",
                             bg_color="#1a1a2e", density="compact",
                             keydown_enter=ctrl.console_submit,
-                        )
-                    with html.Div(
-                        raw_attrs=['data-enter-click="btn-console-load"'],
-                    ):
-                        v3.VTextField(
-                            v_model=("console_script_path",),
-                            label="Script path  (Enter to load + execute)",
-                            hide_details=True, variant="outlined",
-                            bg_color="#1a1a2e", density="compact",
-                            keydown_enter=ctrl.console_load_script,
                         )
                     with v3.VRow(no_gutters=True, style="gap:6px;"):
                         with v3.VCol(style="padding:0;"):
@@ -3312,25 +3338,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
                                 prepend_icon="mdi-delete-sweep-outline",
                                 click=ctrl.console_clear,
                             )
-                    with v3.VRow(no_gutters=True, style="gap:6px;"):
-                        with v3.VCol(style="padding:0;"):
-                            v3.VBtn(
-                                "Load Script", block=True,
-                                variant="outlined",
-                                color="cyan", density="compact",
-                                prepend_icon="mdi-file-code-outline",
-                                click=ctrl.console_load_script,
-                                id="btn-console-load",
-                            )
-                        with v3.VCol(style="padding:0;"):
-                            v3.VBtn(
-                                "Pop-out", block=True, variant="outlined",
-                                color=("console_popout_show ? 'cyan' "
-                                       ": '#6b7280'",),
-                                density="compact",
-                                prepend_icon="mdi-dock-window",
-                                click=ctrl.console_toggle_popout,
-                            )
+                    v3.VBtn(
+                        "Pop-out", block=True, variant="outlined",
+                        color=("console_popout_show ? 'cyan' : '#6b7280'",),
+                        density="compact",
+                        prepend_icon="mdi-dock-window",
+                        click=ctrl.console_toggle_popout,
+                    )
 
             # ── LIBRARY tab — browse stored media ──────────────
             with v3.VSheet(
