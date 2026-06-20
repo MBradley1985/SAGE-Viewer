@@ -190,11 +190,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.consoles_list        = [{"id": 1, "title": "Console 1"}]
     state.console_active_id    = 1
     state.console_popout_show  = False
-    state.pty_out_data         = ""   # base64-encoded latest PTY output chunk
-    state.pty_out_seq          = 0    # monotonically increasing; JS polls this
-    state.pty_input_data       = ""   # base64 keystroke data from JS (client → server)
-    state.pty_input_cid        = "1"  # console id the input belongs to
-    state.pty_input_seq        = 0    # incremented by JS each keystroke
+    state.pty_out_data   = ""   # base64-encoded latest PTY output chunk
+    state.pty_out_seq    = 0    # monotonically increasing; JS polls this
+    # PTY input relay — JS dispatches native input events to hidden <input> elements
+    # bound to these state vars via v-model; that is the only reliable path from
+    # external JS to @state.change handlers in Trame 3.
+    state.pty_input_raw  = ""   # "seq:cid:b64data" — set by JS onData
+    state.pty_ensure_seq = 0    # incremented by JS after xterm.js mounts
 
     # Library
     state.library_files = []   # list of {"name", "path", "kind", "size_kb"}
@@ -2139,28 +2141,69 @@ def build_navigation_panel(server, scene: Scene) -> None:
         d["history"] = list(history)
 
     def _start_pty_reader(cid: int, pty_sess: _PTYSession) -> None:
-        """Attach an I/O reader for PTY output — pure event-loop callback, no Task."""
-        loop = asyncio.get_running_loop()
-        seq  = [0]
+        """Stream PTY output to xterm.js via state updates.
 
-        def _on_readable() -> None:
+        Uses an async coroutine + run_in_executor so the blocking read happens
+        in a thread pool while state updates run on the event loop (same
+        pattern as other blocking I/O in this file).  select() with a 1 s
+        timeout makes the thread exit promptly on shutdown so the event loop
+        never hangs waiting for a blocked os.read().
+        Drains all immediately-available bytes after the first read so that
+        rapid bursts (echo + output) arrive as one chunk and are not dropped
+        between 50 ms JS polls.
+        """
+        import select as _select
+
+        def _read_chunk(fd: int) -> bytes | None:
+            """Wait up to 1 s for data, then drain all available bytes.
+            Returns None on timeout (caller retries), b"" on fd close."""
             try:
-                data = _os.read(pty_sess.fd, 4096)
+                r, _, _ = _select.select([fd], [], [], 1.0)
+            except (OSError, ValueError):
+                return b""
+            if not r:
+                return None           # timeout — is_alive() re-checked by caller
+            try:
+                chunk = _os.read(fd, 4096)
             except OSError:
-                try: loop.remove_reader(pty_sess.fd)
-                except Exception: pass
-                return
-            if not data:
-                try: loop.remove_reader(pty_sess.fd)
-                except Exception: pass
-                return
-            if _active_console[0] == cid:
-                seq[0] += 1
-                state.pty_out_data = _base64.b64encode(data).decode('ascii')
-                state.pty_out_seq  = seq[0]
-                state.flush()
+                return b""
+            if not chunk:
+                return b""
+            buf = bytearray(chunk)
+            # drain any further bytes already buffered (non-blocking)
+            while True:
+                try:
+                    r2, _, _ = _select.select([fd], [], [], 0)
+                    if not r2:
+                        break
+                    more = _os.read(fd, 4096)
+                    if not more:
+                        break
+                    buf.extend(more)
+                except OSError:
+                    break
+            return bytes(buf)
 
-        loop.add_reader(pty_sess.fd, _on_readable)
+        async def _pump() -> None:
+            loop = asyncio.get_running_loop()
+            seq  = 0
+            fd   = pty_sess.fd
+            while pty_sess.is_alive():
+                try:
+                    data = await loop.run_in_executor(None, lambda: _read_chunk(fd))
+                except asyncio.CancelledError:
+                    break
+                if data is None:
+                    continue          # select timeout — loop back and check is_alive
+                if not data:
+                    break             # fd closed / process exited
+                seq += 1
+                if _active_console[0] == cid:
+                    state.pty_out_data = _base64.b64encode(data).decode('ascii')
+                    state.pty_out_seq  = seq
+                    state.flush()
+
+        asyncio.ensure_future(_pump())
 
     @ctrl.set("console_mode_sage")
     def on_console_mode_sage():
@@ -2419,13 +2462,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # Populate the file list at startup
     state.library_files = _scan_library()
 
-    # PTY triggers — fired from xterm.js in the browser.
-    @server.trigger("pty_ensure_trigger")
-    async def on_pty_ensure(session_id):
-        """Create the PTY for *session_id* if not already running.
-        Called from JS immediately after xterm.js mounts so the shell
-        prompt arrives after the terminal is ready to display it."""
-        cid = int(session_id)
+    # PTY state-change handlers — JS writes to hidden <input v-model="...">
+    # elements and dispatches native 'input' events so Vue's reactivity carries
+    # the update to the server.  This is more reliable than window.trame.set()
+    # (local only) or window.trame.trigger() (broken in external JS on Trame 3).
+
+    def _ensure_pty(cid: int) -> None:
         d = _consoles_data.get(cid)
         if d is None:
             return
@@ -2433,49 +2475,35 @@ def build_navigation_panel(server, scene: Scene) -> None:
             d["pty"] = _PTYSession(cwd=_os.getcwd(), env=dict(_os.environ))
             _start_pty_reader(cid, d["pty"])
 
-    @server.trigger("pty_write_trigger")
-    async def on_pty_write(session_id, b64_data):
-        cid = int(session_id)
-        d = _consoles_data.get(cid)
-        if d is None:
-            return
-        if d.get("pty") is None or not d["pty"].is_alive():
-            d["pty"] = _PTYSession(cwd=_os.getcwd(), env=dict(_os.environ))
-            _start_pty_reader(cid, d["pty"])
-        data = _base64.b64decode(b64_data)
-        d["pty"].write(data)
-
-    @server.trigger("pty_resize_trigger")
-    def on_pty_resize(session_id, rows, cols):
-        cid = int(session_id)
-        d = _consoles_data.get(cid)
-        if d is None:
-            return
-        pty_sess = d.get("pty")
-        if pty_sess:
-            pty_sess.resize(int(rows), int(cols))
-
-    @state.change("pty_input_seq")
-    def on_pty_input_state(pty_input_seq, **_):
-        """Receive keystroke data sent via window.trame.set() from xterm.js onData."""
-        if not pty_input_seq:
+    @state.change("pty_ensure_seq")
+    def on_pty_ensure(pty_ensure_seq, **_):
+        if not pty_ensure_seq:
             return
         try:
-            cid = int(state.pty_input_cid or 1)
+            cid = int(state.console_active_id or 1)
         except (ValueError, TypeError):
             cid = 1
-        b64 = str(state.pty_input_data or "")
-        if not b64:
+        _ensure_pty(cid)
+
+    @state.change("pty_input_raw")
+    def on_pty_input(pty_input_raw, **_):
+        # Format: "seq:cid:b64data"
+        if not pty_input_raw or ":" not in str(pty_input_raw):
+            return
+        try:
+            raw = str(pty_input_raw)
+            first = raw.index(":")
+            second = raw.index(":", first + 1)
+            cid = int(raw[first + 1 : second])
+            b64 = raw[second + 1 :]
+        except (ValueError, IndexError):
             return
         d = _consoles_data.get(cid)
         if d is None:
             return
-        if d.get("pty") is None or not d["pty"].is_alive():
-            d["pty"] = _PTYSession(cwd=_os.getcwd(), env=dict(_os.environ))
-            _start_pty_reader(cid, d["pty"])
+        _ensure_pty(cid)
         try:
-            data = _base64.b64decode(b64)
-            d["pty"].write(data)
+            d["pty"].write(_base64.b64decode(b64))
         except Exception:
             pass
 
@@ -2607,7 +2635,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # ------------------------------------------------------------------
 
     with v3.VSheet(
-        color="#0d0d1a",
+        color="#000000",
         style=(
             "height:100%;display:flex;flex-direction:column;"
             "color:#e2e8f0;overflow:hidden;"
@@ -2718,7 +2746,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    v3.VSwitch(
+                    v3.VCheckbox(
                         v_model=("halos_visible",), label="Visible",
                         color="#c084fc", hide_details=True, density="compact",
                     )
@@ -2765,7 +2793,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    v3.VSwitch(
+                    v3.VCheckbox(
                         v_model=("galaxies_visible",), label="Visible",
                         color="#FFD700", hide_details=True, density="compact",
                     )
@@ -2854,7 +2882,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_gal_idx", "Galaxy index  (Enter to go)",
+                    _tf("nav_gal_idx", "Galaxy index",
                         on_enter=ctrl.go_to_galaxy_enter,
                         target_id="btn-target-galaxy-go")
                 with v3.VSheet(color="transparent", style=_BTN):
@@ -3238,6 +3266,30 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         ),
                     )
 
+                # Hidden relay inputs — JS dispatches native input events to these
+                # to push PTY state to the server.  window.trame.set() only
+                # updates the local client store; the v-model binding here goes
+                # through Vue's reactivity which is the only path that actually
+                # reaches @state.change handlers on the server.
+                html.Input(
+                    id="sage-pty-input-relay",
+                    v_model=("pty_input_raw",),
+                    type="text",
+                    style=(
+                        "position:fixed;left:-9999px;"
+                        "width:1px;height:1px;opacity:0;pointer-events:none;"
+                    ),
+                )
+                html.Input(
+                    id="sage-pty-ensure-relay",
+                    v_model=("pty_ensure_seq",),
+                    type="text",
+                    style=(
+                        "position:fixed;left:-9999px;"
+                        "width:1px;height:1px;opacity:0;pointer-events:none;"
+                    ),
+                )
+
                 # xterm.js terminal — shown in terminal mode.
                 html.Div(
                     id=("'sage-pty-' + console_active_id",),
@@ -3469,18 +3521,21 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 _FSEC_HALO = (
                     "font-size:0.78rem;font-weight:700;letter-spacing:0.08em;"
                     "color:#c084fc;padding:2px 0 2px;display:block;"
+                    "text-align:center;"
                 )
                 _FSEC_GAL = (
                     "font-size:0.78rem;font-weight:700;letter-spacing:0.08em;"
                     "color:#FFD700;padding:2px 0 2px;display:block;"
+                    "text-align:center;"
                 )
                 _FLBL = (
                     "font-size:0.6rem;color:#9ca3af;display:block;"
-                    "padding:2px 0 0;"
+                    "padding:2px 0 0;text-align:center;"
                 )
                 _FSLD = (
-                    "padding:0;margin-top:-12px;margin-bottom:-12px;"
-                    "transform:scale(0.7);transform-origin:left center;"
+                    "padding:0;margin-top:-14px;margin-bottom:-14px;"
+                    "margin-left:-12.5%;"
+                    "transform:scale(0.65);transform-origin:center center;"
                     "width:125%;"
                 )
                 _FSEL = (
@@ -3489,7 +3544,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 # Explicit heights so each section scrolls independently
                 # while the panel itself never needs an outer scrollbar.
-                _SH = "overflow-y:auto;padding-right:2px;padding-top:18px;"
+                _SH = "overflow-y:auto;overflow-x:hidden;padding-right:2px;padding-top:18px;"
 
                 # ── Halo section ──────────────────────────────
                 v3.VLabel("DARK MATTER HALOES", style=_FSEC_HALO)
@@ -3500,6 +3555,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         min=10.0, max=15.0, step=0.1,
                         thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Rvir  (Mpc/h)", style=_FLBL)
@@ -3508,6 +3564,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         min=0.0, max=3.0, step=0.05,
                         thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Vvir  (km/s)", style=_FLBL)
@@ -3516,6 +3573,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         min=0.0, max=1000.0, step=10.0,
                         thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Vmax  (km/s)", style=_FLBL)
@@ -3525,6 +3583,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.vmax",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Len  (DM particles)", style=_FLBL)
@@ -3534,6 +3593,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.len_particles",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Concentration  (NFW)", style=_FLBL)
@@ -3543,6 +3603,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.concentration",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Spin  (dimensionless)", style=_FLBL)
@@ -3552,6 +3613,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#c084fc",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.spin",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
 
@@ -3567,6 +3629,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("SFR  (log10 Msun/yr,  -6 = quenched)", style=_FLBL)
@@ -3575,6 +3638,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         min=-6.0, max=5.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("sSFR  (log10 yr^-1)", style=_FLBL)
@@ -3583,6 +3647,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         min=-14.0, max=0.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("B / T  (BulgeMass / StellarMass)", style=_FLBL)
@@ -3591,6 +3656,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         min=0.0, max=1.0, step=0.02,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Stellar age  (Gyr, mass-weighted)", style=_FLBL)
@@ -3600,6 +3666,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.mean_age",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     # ── Alphabetical ──────────────────────────────
@@ -3610,6 +3677,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.bh_mass",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Bulge mass  (log10 Msun)", style=_FLBL)
@@ -3618,6 +3686,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Bulge radius  (log10 Mpc/h)", style=_FLBL)
@@ -3627,6 +3696,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.bulge_radius",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("CGM gas  (log10 Msun)", style=_FLBL)
@@ -3636,6 +3706,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.cgm_gas",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Cold gas  (log10 Msun)", style=_FLBL)
@@ -3644,6 +3715,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         min=0.0, max=14.0, step=0.1,
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Cooling  (log10 SAGE units)", style=_FLBL)
@@ -3653,6 +3725,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.cooling",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Disk radius  (log10 Mpc/h)", style=_FLBL)
@@ -3662,6 +3735,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.disk_radius",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Ejected mass  (log10 Msun)", style=_FLBL)
@@ -3671,6 +3745,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.ejected_mass",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("H1 gas  (log10 Msun)", style=_FLBL)
@@ -3680,6 +3755,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.h1_gas",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("H2 gas  (log10 Msun)", style=_FLBL)
@@ -3689,6 +3765,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.h2_mass",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Heating  (log10 SAGE units)", style=_FLBL)
@@ -3698,6 +3775,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.heating",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Hot gas  (log10 Msun)", style=_FLBL)
@@ -3707,6 +3785,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.hot_gas",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Instability bulge mass  (log10 Msun)", style=_FLBL)
@@ -3716,6 +3795,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.instability_bulge_mass",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Instability bulge radius  (log10 Mpc/h)", style=_FLBL)
@@ -3725,6 +3805,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.instability_bulge_radius",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("ICS mass  (log10 Msun)", style=_FLBL)
@@ -3734,6 +3815,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.ics_mass",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Mass loading  (log10 OutflowRate/SFR)", style=_FLBL)
@@ -3743,6 +3825,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.mass_loading",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Merger bulge mass  (log10 Msun)", style=_FLBL)
@@ -3752,6 +3835,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.merger_bulge_mass",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Merger bulge radius  (log10 Mpc/h)", style=_FLBL)
@@ -3761,6 +3845,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.merger_bulge_radius",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Metals — bulge mass  (log10 Msun)", style=_FLBL)
@@ -3770,6 +3855,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_bulge_mass",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Metals — CGM gas  (log10 Msun)", style=_FLBL)
@@ -3779,6 +3865,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_cgm_gas",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Metals — cold gas  (log10 Msun)", style=_FLBL)
@@ -3788,6 +3875,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_cold_gas",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Metals — ejected mass  (log10 Msun)", style=_FLBL)
@@ -3797,6 +3885,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_ejected_mass",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Metals — hot gas  (log10 Msun)", style=_FLBL)
@@ -3806,6 +3895,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_hot_gas",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Metals — ICS  (log10 Msun)", style=_FLBL)
@@ -3815,6 +3905,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_ics",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Metals — stellar mass  (log10 Msun)", style=_FLBL)
@@ -3824,6 +3915,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.metals_stellar_mass",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("Outflow rate  (log10 Msun/yr)", style=_FLBL)
@@ -3833,6 +3925,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.outflow_rate",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("SFR bulge  (log10 Msun/yr)", style=_FLBL)
@@ -3842,6 +3935,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.sfr_bulge",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("SFR bulge Z  (log10 dimensionless)", style=_FLBL)
@@ -3851,6 +3945,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.sfr_bulge_z",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("SFR disk  (log10 Msun/yr)", style=_FLBL)
@@ -3860,6 +3955,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.sfr_disk",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
                     v3.VLabel("SFR disk Z  (log10 dimensionless)", style=_FLBL)
@@ -3869,6 +3965,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_label=True, color="#FFD700",
                         density="compact", hide_details=True,
                         disabled=("!model_fields.sfr_disk_z",),
+                        thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
 
@@ -3944,7 +4041,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 ):
                     v3.VTextField(
                         v_model=("screenshot_label",),
-                        label="Label (optional)  (Enter to take screenshot)",
+                        label="Label (optional)",
                         hide_details=True, variant="outlined",
                         bg_color="#1a1a2e", density="compact",
                         style="padding-bottom:8px;",
@@ -4000,7 +4097,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 ):
                     v3.VTextField(
                         v_model=("movie_label",),
-                        label="Label (optional)  (Enter to start recording)",
+                        label="Label (optional)",
                         hide_details=True, variant="outlined",
                         bg_color="#1a1a2e", density="compact",
                         style="padding-bottom:8px;",

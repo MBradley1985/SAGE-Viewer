@@ -36,6 +36,7 @@ Show / hide (filters):
   show all  /  reset filters    reset every filter
   show only groups | clusters | isolated | field | pair
   show groups, clusters         (combine — checkboxes additive)
+  hide clusters | field | isolated | group  (deselect env checkboxes)
   show centrals  /  show satellites
   hide haloes  /  show haloes
   hide galaxies  /  show galaxies
@@ -116,6 +117,16 @@ def _h_show_env_add(m, ctx) -> str:
     for c in classes:
         setattr(ctx.state, f"env_show_{c}", True)
     return f"Now showing: {', '.join(sorted(classes))}"
+
+
+def _h_hide_env(m, ctx) -> str:
+    """`hide clusters` / `hide field, isolated` — deselect env checkboxes."""
+    classes = _parse_env_classes(m.group("kinds"))
+    if not classes:
+        return f"Unknown environment class in: {m.group('kinds')!r}"
+    for c in classes:
+        setattr(ctx.state, f"env_show_{c}", False)
+    return f"Hidden: {', '.join(sorted(classes))}"
 
 
 def _h_show_all(_m, ctx) -> str:
@@ -251,13 +262,17 @@ def _h_screenshot(m, ctx) -> str:
 
 
 def _h_galaxy_info(_m, ctx) -> str:
+    ctx.state.nav_active_tab = "target"
+    ctx.state.flush()
     ctx.ctrl.show_galaxy_info()
-    return "Galaxy info shown."
+    return "Galaxy info panel opened (Target tab)."
 
 
 def _h_group_info(_m, ctx) -> str:
+    ctx.state.nav_active_tab = "environment"
+    ctx.state.flush()
     ctx.ctrl.show_group_info()
-    return "Group info shown."
+    return "Group info panel opened (Environment tab)."
 
 
 def _h_highlight_galaxy(_m, ctx) -> str:
@@ -324,15 +339,11 @@ def _h_colormap(m, ctx) -> str:
 
 def _h_switch_model(m, ctx) -> str:
     name = m.group("name").strip()
-    if not ctx.scene.has_model(name):
-        # Try server controller path that auto-loads the model
-        try:
-            ctx.ctrl.switch_model(name)
-            return f"Switched primary to {name}."
-        except Exception as e:
-            return f"Couldn't switch to {name}: {e}"
-    ctx.scene.switch_primary(name)
-    return f"Switched primary to {name}."
+    try:
+        ctx.ctrl.switch_model(name)
+        return f"Switching primary model to {name!r}…"
+    except Exception as e:
+        return f"Couldn't switch to {name!r}: {e}"
 
 
 def _h_overlay(m, ctx) -> str:
@@ -397,6 +408,7 @@ _COMMANDS: list[tuple[re.Pattern, Handler]] = [
     (re.compile(r"^hide everything$"),                          _h_hide_everything),
     (re.compile(r"^show only (?P<kinds>.+)$"),                  _h_show_only_env),
     (re.compile(r"^show (?P<kinds>(?:field|isolated|group|groups|cluster|clusters|pair|pairs)(?:\s*,?\s*(?:and\s+)?(?:field|isolated|group|groups|cluster|clusters|pair|pairs))*)$"), _h_show_env_add),
+    (re.compile(r"^hide (?P<kinds>(?:field|isolated|group|groups|cluster|clusters|pair|pairs)(?:\s*,?\s*(?:and\s+)?(?:field|isolated|group|groups|cluster|clusters|pair|pairs))*)$"), _h_hide_env),
     (re.compile(r"^(?P<verb>show|hide) (?P<layer>haloe?s?|galax(?:y|ies))$"), _h_layer_visibility),
     (re.compile(r"^(?:show only |only )?(?P<type>centrals?|satellites?)$"),  _h_type_filter),
 

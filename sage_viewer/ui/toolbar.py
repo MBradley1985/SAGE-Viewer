@@ -4,7 +4,6 @@ import asyncio
 import base64
 import io
 import os as _os
-import signal as _signal
 
 import numpy as np
 from trame.widgets import html, vuetify3 as v3
@@ -712,6 +711,6 @@ def build_toolbar(server, scene: Scene) -> None:
 
     @ctrl.set("close_app")
     def on_close_app():
-        _os.kill(_os.getpid(), _signal.SIGINT)
+        asyncio.ensure_future(server.stop())
 
     # (theme selector removed — DOS Blue is the only palette)

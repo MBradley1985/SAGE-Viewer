@@ -392,7 +392,7 @@ def create_app(
 
         with layout.toolbar as tb:
             tb.density = "compact"
-            tb.color = "#1a1a2e"
+            tb.color = "#000000"
 
             # ── Launch Mode button — wizard + models ───────────────────────
             with v3.VMenu(close_on_content_click=False):
@@ -411,7 +411,7 @@ def create_app(
                                 "object-fit:cover;border-radius:50%;"
                             ),
                         )
-                with v3.VList(density="compact", bg_color="#1a1a2e"):
+                with v3.VList(density="compact", bg_color="transparent"):
                     # ── Launch Mode at the top ─────────────────────────────
                     v3.VListSubheader(
                         "LAUNCH MODE",
@@ -419,10 +419,10 @@ def create_app(
                     )
                     v3.VListItem(
                         title="Setup Wizard",
-                        subtitle="Add a model or run SAGE26",
                         prepend_icon="mdi-console",
                         click="wiz_active = true",
                         color="cyan",
+                        density="compact",
                     )
                     v3.VDivider(style="margin:4px 0;")
                     # ── Models (switch rows) ───────────────────────────────
@@ -440,15 +440,13 @@ def create_app(
                     ):
                         v3.VListItem(
                             title=("m.name",),
-                            subtitle=(
-                                "m.primary ? 'primary' : 'click to switch'",
-                            ),
                             prepend_icon=(
                                 "m.primary ? 'mdi-check-circle' : 'mdi-circle-outline'",
                             ),
                             click=(server.controller.switch_model, "[m.name]"),
                             active=("m.primary",),
                             color="cyan",
+                            density="compact",
                         )
                     # ── Divider + overlay rows ─────────────────────────────
                     v3.VDivider(
@@ -471,9 +469,6 @@ def create_app(
                                 "? '✓ ' + m.name "
                                 ": '+ ' + m.name",
                             ),
-                            subtitle=(
-                                "m.overlay ? 'overlay on' : 'add as overlay'",
-                            ),
                             prepend_icon=(
                                 "m.overlay ? 'mdi-layers' : 'mdi-layers-plus'",
                             ),
@@ -486,10 +481,10 @@ def create_app(
                     v3.VDivider(style="margin:4px 0;")
                     v3.VListItem(
                         title="Close Everything",
-                        subtitle="Quit SAGE-Viewer",
                         prepend_icon="mdi-close-box-outline",
                         click=server.controller.close_app,
                         color="#ef4444",
+                        density="compact",
                     )
 
             # ── Explore Mode menu (hamburger) — tabs only ──────────────────
@@ -502,7 +497,7 @@ def create_app(
                         v_bind="props",
                         title="Explore Mode",
                     )
-                with v3.VList(density="compact", bg_color="#1a1a2e"):
+                with v3.VList(density="compact", bg_color="transparent"):
                     v3.VListSubheader(
                         "EXPLORE MODE",
                         style="color:#06b6d4;font-size:0.65rem;",
@@ -577,7 +572,9 @@ def create_app(
                 persistent=False,
             ):
                 with v3.VCard(
-                    style="background:#1a1a2e;border:1px solid #06b6d4;color:#e2e8f0;",
+                    style="background:transparent !important;border:1px solid #06b6d4;color:#e2e8f0;",
+                    color="transparent",
+                    elevation=0,
                     rounded=False,
                 ):
                     with html.Div(
@@ -636,7 +633,7 @@ def create_app(
                                     v3.VBtn(
                                         _fi["title"],
                                         value=_fi["value"],
-                                        style="flex:1;font-family:monospace;",
+                                        style="flex:1;font-family:monospace;background:#000000;",
                                     )
                         # Optional filename
                         v3.VTextField(
@@ -843,7 +840,7 @@ def create_app(
                             ):
                                 v3.VTextField(
                                     v_model=("console_input",),
-                                    label="SAGE Commands  (Enter to run)",
+                                    label="SAGE Commands",
                                     hide_details=True, variant="outlined",
                                     bg_color="#1a1a2e", density="compact",
                                     style="font-family:monospace;",
@@ -984,6 +981,7 @@ def create_app(
                         style=(
                             "position:absolute;top:32px;right:24px;"
                             "min-width:320px;max-width:540px;"
+                            "resize:both;overflow:auto;"
                             "background:rgba(17,24,39,0.92);"
                             "backdrop-filter:blur(6px);"
                             "border:1px solid #374151;"
@@ -1080,15 +1078,15 @@ def create_app(
                         "height:100%;box-sizing:border-box;"
                         "overflow:hidden;"
                     ),
-                    color="#0d0d1a",
+                    color="#000000",
                     rounded=False,
                     elevation=0,
                 ):
                     build_navigation_panel(server, scene)
 
         with layout.footer as footer:
-            footer.color = "#0d0d1a"
-            footer.height = 36
+            footer.height = 0
+            footer.style = "display:none;"
             build_info_panel(server, scene)
 
     return server, scene

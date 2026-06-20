@@ -66,13 +66,10 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 <!-- ![Console streaming](docs/images/console.gif) -->
 
 ### Embedded console (Console tab)
-- A real shell terminal — every command runs through `$SHELL` with a per-session `cwd` + `env`, so pipes, globs, `&` backgrounding, redirects, and `$VAR` expansion all work
-- **Streaming output** — long-running commands update the history entry line-by-line as they run, not after the process exits
-- Built-in `cd`, `pwd`, `export` are sticky between commands
-- Type `python` to drop into an embedded Python REPL (locals: `scene`, `state`, `ctrl`, `server`, `plotter`, `np`); `exit` returns to shell — REPL execution is threaded so the UI stays responsive during long scripts
-- Type `sage` to enter natural-language SAGE command mode (`show only clusters`, `go to halo 42`, etc.)
-- **Multiple sessions** with a `+` button — each console has its own history, cwd, env, and interpreter
-- **Load Script** button reads a `.py` file from disk and executes it in the active session — perfect for plotting and analysis scripts on HPC
+- **Terminal mode** — a live xterm.js terminal backed by a real PTY (`$SHELL -l`); supports interactive programs, ANSI colours, `cd`, `export`, pipes, globs, `&` backgrounding, and any shell feature
+- **Python REPL mode** — embedded interpreter with special locals: `scene`, `state`, `ctrl`, `server`, `plotter`, `np`; switch via the "Python REPL" button, `exit` or `terminal` returns to the shell
+- **SAGE command mode** — natural-language SAGE commands (`show only clusters`, `go to halo 42`, `snap 30`, `screenshot`, …); switch via the "SAGE Cmds" button
+- **Multiple sessions** with a `+` button — each console has its own PTY process, Python interpreter, and command history
 - **Pop-out** floats a movable / resizable console card over the viewport so you can keep typing while watching the render
 
 ### Self-contained metadata
@@ -169,7 +166,7 @@ Full documentation at [mbradley1985.github.io/SAGE-Viewer](https://mbradley1985.
 | Environment| Halo selector, environment-class checkboxes, Group Info, Highlight Members |
 | Coords     | Fly to arbitrary (x, y, z) — "Use Current Position" populates from camera; **Draw Sphere** places an interactive two-handle sphere (drag centre ball to translate, drag edge ball to resize); **Lock Sphere** commits it as the focus region |
 | Box        | Zoom to axis-aligned sub-box — "Use Current View" populates from camera; **Draw Box** places a resizable interactive box; **Lock Box** commits it as the focus region |
-| Console    | Shell terminal + Python REPL + SAGE natural-language commands. Multiple sessions, load scripts, pop-out window |
+| Console    | Live xterm.js shell terminal (PTY-backed) + Python REPL + SAGE natural-language commands. Multiple sessions, pop-out window |
 | Library    | Browse stored screenshots / movies; double-click a row to open as a movable floating card over the viewport (multiple items open simultaneously); per-row delete button removes the file from disk immediately |
 
 ![Draw Sphere](docs/images/draw_sphere.gif)

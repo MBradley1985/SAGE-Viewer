@@ -251,9 +251,9 @@
   (function () {
     var _xterms    = {};  // sid → { term, fit }  (panel)
     var _xtermsOut = {};  // sid → { term, fit }  (pop-out)
-    var _lastPtySeq     = -1;
     var _lastConsoleKey = null;
     var _lastPopoutKey  = null;
+    var _ptyListenerInstalled = false;
 
     function _getState(key) {
       try { return window.trame.state.get(key); } catch (e) { return undefined; }
@@ -274,6 +274,23 @@
         term.write(bytes);
       } catch (e) {}
     }
+
+    // Push a value to a hidden <input v-model="key"> via native DOM events.
+    // This is the ONLY reliable path from external JS to server @state.change
+    // handlers in Trame 3 — window.trame.set() only updates local client state
+    // and window.trame.trigger() does not reach server triggers from external JS.
+    var _nativeValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, 'value'
+    ).set;
+    function _vueInput(id, value) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      _nativeValueSetter.call(el, value);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    var _ptyInputSeq  = 0;
+    var _ptyEnsureSeq = 0;
 
     function _makeTerm(container, sid, isPopout) {
       if (typeof Terminal === 'undefined') return null;
@@ -297,25 +314,12 @@
 
       term.onData(function (data) {
         var bytes = new TextEncoder().encode(data);
-        var b64 = _uint8ToB64(bytes);
-        // Use state mutation (window.trame.set) which is the same mechanism as
-        // v-model bindings — guaranteed to reach the server state change handler.
-        try {
-          window.trame.set('pty_input_data', b64);
-          window.trame.set('pty_input_cid',  String(sid));
-          window.trame.set('pty_input_seq',  (_ptyInputSeq = (_ptyInputSeq + 1) % 1e9));
-        } catch (e) {
-          // Fallback: direct trigger
-          _trigger('pty_write_trigger', [sid, b64]);
-        }
-      });
-      term.onResize(function (dims) {
-        _trigger('pty_resize_trigger', [sid, dims.rows, dims.cols]);
+        var seq = (_ptyInputSeq = (_ptyInputSeq + 1) % 1e9);
+        // Format "seq:cid:b64" — single string so the state change is atomic.
+        _vueInput('sage-pty-input-relay', seq + ':' + sid + ':' + _uint8ToB64(bytes));
       });
       return { term: term, fit: fitAddon };
     }
-
-    var _ptyInputSeq = 0;
 
     function _initTerm(sid, attempt) {
       if (_xterms[sid]) {
@@ -334,8 +338,8 @@
       _xterms[sid] = t;
       // Auto-focus so the user can type immediately without clicking.
       try { t.term.focus(); } catch (e) {}
-      // Tell the server to start the PTY now that xterm.js is ready.
-      _trigger('pty_ensure_trigger', [sid]);
+      // Tell the server to start the PTY via the hidden input relay.
+      _vueInput('sage-pty-ensure-relay', String((_ptyEnsureSeq = (_ptyEnsureSeq + 1) % 1e9)));
     }
 
     function _initPopout(sid, attempt) {
@@ -354,21 +358,49 @@
       _xtermsOut[sid] = t;
     }
 
-    // Poll at 50 ms — feed PTY output + detect mode/popout changes.
+    // Install a state listener for immediate PTY output delivery.
+    // window.trame.state.addListener fires synchronously for EVERY server push —
+    // unlike the 50 ms poll which only sees the latest pty_out_seq value and
+    // silently drops every intermediate chunk.
+    var _lastRenderedSeq = -1;
+
+    function _writePtyOutput() {
+      var seq = _getState('pty_out_seq');
+      if (seq === undefined || seq === _lastRenderedSeq) return;
+      var b64 = _getState('pty_out_data');
+      if (!b64) return;
+      _lastRenderedSeq = seq;
+      var sid = _getState('console_active_id');
+      if (sid === undefined) return;
+      if (_xterms[sid])    _writePtyData(_xterms[sid].term, b64);
+      if (_xtermsOut[sid]) _writePtyData(_xtermsOut[sid].term, b64);
+    }
+
+    function _installPtyListener() {
+      if (_ptyListenerInstalled) return;
+      if (!window.trame || !window.trame.state ||
+          typeof window.trame.state.addListener !== 'function') return;
+      _ptyListenerInstalled = true;
+      // Catch any output that arrived before the listener was installed.
+      _writePtyOutput();
+      window.trame.state.addListener(function (ev) {
+        if (!ev || ev.type !== 'dirty-state') return;
+        var keys = ev.keys || [];
+        for (var i = 0; i < keys.length; i++) {
+          if (keys[i] === 'pty_out_seq' || keys[i] === 'pty_out_data') {
+            _writePtyOutput();
+            break;
+          }
+        }
+      });
+    }
+
+    // Poll at 50 ms — install PTY listener once + detect mode/popout changes.
     setInterval(function () {
       if (!window.trame) return;
 
-      // Feed PTY output into panel and pop-out terminals.
-      var seq = _getState('pty_out_seq');
-      if (seq !== undefined && seq !== _lastPtySeq) {
-        _lastPtySeq = seq;
-        var sid  = _getState('console_active_id');
-        var b64  = _getState('pty_out_data');
-        if (b64) {
-          if (sid !== undefined && _xterms[sid])    _writePtyData(_xterms[sid].term, b64);
-          if (sid !== undefined && _xtermsOut[sid]) _writePtyData(_xtermsOut[sid].term, b64);
-        }
-      }
+      // Install state listener the first time trame.state is ready.
+      _installPtyListener();
 
       // Detect terminal mode becoming active — mount or re-focus panel terminal.
       var tab  = _getState('nav_active_tab');
