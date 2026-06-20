@@ -47,19 +47,25 @@ SAGE-Viewer/
 │   │   ├── halo_layer.py            # 3-layer NFW gaussian splats; _combined_mask() guard
 │   │   ├── galaxy_layer.py          # outer envelope + cold-gas envelope + outer property; _combined_mask() guard
 │   │   ├── fof_layer.py             # filter-aware FoF satellite→central gold lines
+│   │   ├── heatmap_layer.py         # 2D projected halo density heatmap (number/mass, 256 bins)
 │   │   └── camera.py                # fly-to / sphere & box wireframe indicators
 │   ├── ui/
 │   │   ├── toolbar.py               # transport + slider + speed/rotation
-│   │   ├── navigation_panel.py      # right panel: tabs + console + filters + ...
+│   │   ├── navigation_panel.py      # right panel: tabs + PTY console + filters + ...
 │   │   └── info_panel.py            # footer + double-click galaxy selection
 │   ├── utils/
 │   │   ├── colormap.py
 │   │   ├── sizing.py
-│   │   ├── command_parser.py        # natural-language SAGE commands (Console "sage" mode)
+│   │   ├── command_parser.py        # natural-language SAGE commands (Console "SAGE Commands" mode)
 │   │   ├── galaxy_info.py           # builds Galaxy Info card rows
 │   │   └── group_info.py            # builds Group Info card rows
+│   ├── wizard/
+│   │   ├── controller.py            # async step machine; state vars; par template
+│   │   ├── launch.py                # entry point called from app.py
+│   │   └── ui.py                    # Trame/Vuetify wizard layout
 │   └── static/
-│       └── sage_viewer.js           # pop-out drag handler + Enter-to-click handler
+│       ├── sage_viewer.js           # pop-out drag handler + Enter-to-click handler
+│       └── sage_theme.css           # global CSS overrides (served via enable_module → page <head>)
 ├── tests/                           # unit tests
 ├── docs/                            # MkDocs Material site
 ├── CHANGELOG.md
@@ -119,14 +125,19 @@ SAGE-Viewer/
 - Pause / Stop interrupt cleanly (asyncio.Event + cancellable Task).
 
 ### Console tab
-- **Default mode = terminal** — every command runs through `$SHELL` with persistent `cwd` + `env`. `cd`, `pwd`, `export` are in-process built-ins.
-- Type `python` → embedded REPL (locals: `scene`, `state`, `ctrl`, `server`, `plotter`, `np`).
-- Type `command` (or `cmd`) → SAGE-Viewer natural-language command mode.
-- `exit` / `quit` / `terminal` from any non-default mode returns to terminal.
-- Multi-session: `+` button creates new sessions; each has its own history, mode, cwd, env, Python interpreter.
-- **Load Script** button reads a `.py` path and `exec`s it in the active session.
+- **Terminal mode** — real PTY (`pty.openpty()`) backed by `$SHELL -l`; output pushed to browser via `state.pty_out_seq` / `pty_out_data` (base64); rendered by xterm.js. Full ANSI colour, cursor movement, interactive programs (`vim`, `top`, `htop`, `less`) all work.
+- **SAGE Commands mode** — natural-language SAGE commands; switch via the **SAGE Cmds** button, type `terminal` to return.
+- Multi-session: `+` button creates new sessions; each has its own PTY process and history.
 - **Pop-out** button floats a movable + resizable card over the viewport mirroring the active session.
-- Console fills most of the right panel; inputs + 4 buttons anchored at the bottom.
+- Python REPL mode removed — use the shell for scripting.
+
+### Launch Mode wizard (`sage_viewer/wizard/`)
+- Guided setup flow for configuring and launching SAGE26.
+- Step chips track progress; **Rescan** button restarts the environment scan.
+- **Create config file** writes a new `.par` from the built-in millennium.par template; user chooses filename.
+- Par file editor opens side-by-side with the terminal when a `.par` needs editing.
+- Opened from the Launch Mode dropdown or Explore Mode hamburger menu.
+- `open_wizard` controller (in `app.py`) always calls `_wiz_ctrl.reset_and_start()` then sets `wiz_active = True` — this unconditional reset avoids Trame's `@state.change` which only fires when the value actually changes.
 
 ### Galaxy filters — active-only
 - Range sliders are **inert at their full-range defaults** — no galaxies are filtered unless the user moves a slider. This guarantees every galaxy with detectable mass is shown at startup.
@@ -194,37 +205,36 @@ Vue 3 silently strips `<script>` tags from templates, so any client JS must come
 server.enable_module({
     "serve":   {"sage_static": "<package>/static"},
     "scripts": ["sage_static/sage_viewer.js"],
+    "styles":  ["sage_static/sage_theme.css"],
 })
 ```
 
 `sage_viewer/static/sage_viewer.js` currently contains:
 - Pop-out drag handler (delegated `mousedown` on `.sage-popout-handle`).
 - Enter-to-click handler (capture-phase `keydown` on `<input>` / `<textarea>`).
+- xterm.js PTY relay: polls `pty_out_seq` / `pty_out_data` at 50 ms, writes to the xterm Terminal instance; sends keystrokes back via a hidden `<input v-model>` + native DOM setter.
+
+`sage_viewer/static/sage_theme.css` contains global CSS overrides (black backgrounds, shadow removal) loaded via `enable_module` so they land in the page `<head>` rather than inside the Vue template where root-level selectors don't reliably apply.
 
 Add new client-side helpers to the same file (or add new files + extend `scripts`).
 
 ### Per-session console state
-`navigation_panel.py` keeps a Python-side dict:
+`navigation_panel.py` keeps a Python-side dict per console session. Each session now wraps a real PTY:
 
 ```python
 _consoles_data: dict[int, dict] = {
     1: {
         "history":   [...],
         "input":     "",
-        "mode":      "shell",  # "shell" | "python" | "sage"
-        "prompt":    "$",
-        "cwd":       "/home/me",
-        "env":       {...},
-        "py_buffer": [],                    # multi-line REPL accumulator
-        "py_interp": code.InteractiveInterpreter(...),
-        "py_locals": {"scene": ..., ...},
+        "mode":      "terminal",  # "terminal" | "sage"
+        "pty":       {"master_fd": int, "pid": int, "seq": int},
         "counter":   0,
     },
     ...
 }
 ```
 
-The single set of Vue-bound `state.console_*` vars always reflects the *active* session. On `console_switch` we `_save_active()` then `_load_console(new_id)` to snap the bindings into the new session's data.
+The single set of Vue-bound `state.console_*` / `state.pty_*` vars always reflects the *active* session. On `console_switch` we `_save_active()` then `_load_console(new_id)` to snap the bindings into the new session's data.
 
 ### Layered rendering
 Both halo and galaxy layers use `vtkPointGaussianMapper` with a per-point `radius` array in Mpc/h (world space). In-place data updates on snap change when the point count matches; full rebuild when it doesn't (avoids heap corruption from VTK's array-reuse).
@@ -265,21 +275,20 @@ FoF links are gated on `halos_visible AND fof_links_on` — `fl.visible` is only
 - VTK is single-threaded — all rendering / camera mutation must run on the Trame event loop.
 - After PyVista picker callbacks, call `state.flush()` to push state to the client (they run outside the normal event dispatch).
 - Relative paths in `.par` files resolve against `parent.parent` of the par file (the SAGE root, not the par file's dir).
-- Console shell mode has no pty — `vim`, `top`, `less` won't render. For HPC workflows (`sbatch`, `python plot.py`, `ls`, `tail file.log`) this is fine.
-- `code.compile_command` returns `None` for incomplete Python input; in the REPL we buffer the line and show `...`. A blank line force-executes the buffer.
+- Console PTY: each session forks a real shell process — clean up with `os.kill(pid, SIGKILL)` on session close or app exit if not already handled.
+- `@state.change("wiz_active")` only fires when the value changes; it won't re-run if `wiz_active` is already `True`. Use a dedicated controller (`open_wizard`) for any "always reset on open" behaviour.
 
 ---
 
 ## Likely next-up things
 
-- **PTY-backed shell mode** so `vim`, `top`, `less`, and other terminal apps work — would need a JS terminal emulator (xterm.js) and a websocket pty bridge.
-- **Streaming command output** — current `subprocess.run` blocks until the command finishes; long-running scripts go silent until completion. Switch to `Popen` + async readline + state push.
-- **Threading for long Python REPL execs** — currently blocks the event loop. Wrap in `asyncio.to_thread`?
 - **Stress-test microUchuu** at higher `--max-halos` / `--max-galaxies` once perf is stable.
 - **Density colour mode** still does KDE per snapshot — could be cached or precomputed.
 - **Camera bookmarks UI** lives in a tab; could surface as a hover-out menu in the toolbar.
-- **Library tab** multi-item pop-outs done; deletion, renaming, and inline thumbnails for movies still pending.
+- **Library tab** — deletion and renaming done; inline thumbnails for movies still pending.
 - **`HALO_CB` / `GAL_CB` colour-by descriptors** still hard-coded — could be derived from `model_fields` so unsupported fields don't even appear in the dropdown.
+- **Heatmap layer** (`heatmap_layer.py`) — implemented but not yet wired into the UI.
+- **PTY session cleanup** — orphaned shell processes on browser disconnect or app shutdown.
 
 ---
 
@@ -294,23 +303,11 @@ FoF links are gated on `halos_visible AND fof_links_on` — `fl.visible` is only
 
 ## Status at handoff
 
-- All UI-polish requests from the 0.3.0 cycle implemented.
-- Enter-to-run wired everywhere via the global JS handler.
-- Pop-out console is draggable + resizable.
-- Console modes renamed: **terminal** (was shell) and **command** (was sage). Type `command` or `python` from terminal mode to switch; type `terminal` to return.
+- Console upgraded to real PTY + xterm.js — `vim`, `top`, `htop`, `less` all work. Python REPL mode removed.
+- Launch Mode wizard implemented (`sage_viewer/wizard/`): step tracking, rescan, create config file, side-by-side par editor.
+- UI polish: black toolbar + right panel, scaled-down filter sliders (0.65×) centred in panel, Structure tab checkboxes, transparent export dialog, dropdown menus auto-close, footer hidden, "Enter to…" hint labels removed.
+- Library pop-out cards are browser-resizable.
+- `sage_theme.css` served via `enable_module` for reliable global CSS injection.
+- All UI-polish requests from the 0.3.0 cycle remain implemented (Enter-to-run, pop-out console, draw widgets, etc.).
 - `sage-viewer` launcher script at repo root — run `./sage-viewer --par ...` without needing Python bin in PATH.
-- Snapshot slider now has `<` / `>` step buttons; slider `max` is reactive and updates on model switch.
-- Model switching now also refreshes the slider bounds, snap label, and pre-rendered frame cache.
-- Environment filter has 5 categories: Field / Isolated / **Pairs** / Groups / Clusters (mass labels removed; Pairs detects 2-member FOF groups).
-- WASD/arrow camera drift on key-release reduced: inner-loop re-check + push on final release.
-- High-res screenshots/recordings use PIL LANCZOS upscaling instead of VTK tiling — no more 2×2 / 4×4 grid artifact at the end of videos.
-- Star-scatter + BH-disk render layers removed — Structure mode is back to fast core layers only.
-- Right panel is locked at 300 px and never scrolls.
-- Playback frame cache invalidates correctly on any filter / focus / visibility / color-mode change.
-- `_combined_mask()` shape-mismatch crash fixed in both `halo_layer.py` and `galaxy_layer.py`.
-- FoF links are fully filter-aware: respect focus regions, halo filter masks, and the halos-visible toggle; sync during playback and recording.
-- Galaxy filter sliders widened + **active-only** gate — all galaxies with mass now visible at startup; sliders only filter when moved away from endpoints.
-- B/T clamped to [0, 1] before filter comparison — SAGE satellites with BulgeMass > StellarMass no longer falsely excluded.
-- Double-click selection restricted to visible galaxies only (`_combined_mask()`).
-- Highlight Members / Highlight Galaxy indicators now use **CGM/Hot regime colours** (dodgerblue / tomato / cyan); selected galaxy shows a white border ring + regime fill.
-- Library tab redesigned: **multi-item draggable pop-outs** over the viewport, **double-click** to open, per-item × close, "Close all" button; GIF/video always starts from frame 0.
+- Heatmap layer exists (`scene/heatmap_layer.py`) but is not yet wired into the UI.

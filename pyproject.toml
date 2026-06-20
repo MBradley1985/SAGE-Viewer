@@ -33,15 +33,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.24",
+    "mkdocs-macros-plugin>=1.0",
+]
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
     "ruff>=0.3",
     "black>=24.0",
     "pre-commit>=3.6",
-    "mkdocs-material>=9.5",
-    "mkdocstrings[python]>=0.24",
-    "mkdocs-macros-plugin>=1.0",
+    "sage-viewer[docs]",
 ]
 
 [project.scripts]
@@ -49,7 +52,7 @@ sage-viewer = "sage_viewer.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/MBradley1985/SAGE-Viewer"
-Documentation = "https://mbradley1985.github.io/SAGE-Viewer"
+Documentation = "https://sage-viewer.readthedocs.io/en/latest/"
 Repository = "https://github.com/MBradley1985/SAGE-Viewer"
 Issues = "https://github.com/MBradley1985/SAGE-Viewer/issues"
 

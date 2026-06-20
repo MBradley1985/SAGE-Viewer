@@ -4,6 +4,58 @@ All notable changes to SAGE-Viewer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — post-0.3.0 (PTY terminal + Launch wizard + UI polish)
+
+### Added
+
+#### PTY-backed xterm.js terminal (Console tab)
+- Terminal mode replaced with a real PTY (`pty.openpty()`) + daemon reader thread; output is pushed to the browser via `state.pty_out_seq` / `pty_out_data` (base64) and rendered by xterm.js
+- Full ANSI colour, cursor movement, and interactive programs (`vim`, `top`, `htop`, `less`) all work
+- JS → server relay uses a hidden `<input v-model>` + native DOM setter to trigger Vue reactivity — the only reliable keypress path in Trame 3
+- Python REPL mode removed; terminal mode covers all scripting needs via the shell
+- Console command mode renamed: **SAGE Commands** (was "sage" / "nl")
+
+#### Launch Mode wizard (`sage_viewer/wizard/`)
+- New wizard package: `controller.py` (async step machine + state), `launch.py` (entry point), `ui.py` (Trame/Vuetify layout)
+- Step chips in the header track progress — cyan = current, green = done, white = pending
+- **Rescan** button restarts the environment scan from the beginning
+- **Create config file** option writes a new `.par` from the built-in millennium.par template; user chooses the output filename via an inline text field
+- Par file editor appears in a side-by-side panel alongside the terminal when a `.par` needs editing; panels share the available width equally; terminal remains centered when the par panel is hidden
+- Wizard always resets cleanly when opened from Explore Mode (dedicated `open_wizard` controller — avoids Trame's value-reactive `@state.change` limitation that would skip the reset if `wiz_active` was already `True`)
+- SAGE26 logo pinned to the bottom-right corner of the wizard screen
+
+#### Heatmap layer (`scene/heatmap_layer.py`)
+- 2D projected density heatmap of haloes; number/mass mode; 256-bin grid; configurable projection axis
+
+### Changed
+
+#### UI — global
+- Toolbar background forced black (`tb.color = "#000000"`, `tb.elevation = 0`)
+- Right panel outer VSheet background black (`#000000`)
+- Footer hidden entirely (`height=0`, `display:none`) — `build_info_panel` is still called for the double-click picker wiring
+- Both VMenu dropdowns (Launch Mode, Explore Mode) auto-dismiss after a selection (`close_on_content_click=True`)
+- Dropdown list backgrounds transparent (`bg_color="transparent"`)
+- Theme CSS now served via `server.enable_module` (`sage_static/sage_theme.css`) for reliable page-head injection
+
+#### UI — Filters tab
+- All 42 range sliders scaled down (`transform:scale(0.65)`) to reduce vertical space, with `margin-left:-12.5%` to re-centre each slider within its panel column
+- Filter section scroll container has `overflow-x:hidden` to prevent horizontal scrollbar from appearing
+- Slider labels and section headings centred (`text-align:center`)
+
+#### UI — Structure tab
+- Halo and galaxy visibility toggles changed from `VSwitch` to `VCheckbox`
+
+#### UI — Export catalogue dialog
+- Card background transparent; CSV / HDF5 / FITS / TXT format buttons have black backgrounds
+
+#### UI — input fields
+- "Enter to…" hint suffix removed from all input labels (Galaxy idx, screenshot label, recording label, console command mode label)
+
+#### Library tab
+- Pop-out cards are browser-resizable (`resize:both; overflow:auto` on the card container)
+
+---
+
 ## [Unreleased] — post-0.3.0 (continued)
 
 ### Added

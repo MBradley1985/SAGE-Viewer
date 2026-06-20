@@ -249,11 +249,19 @@
 
   // ── xterm.js terminal integration ────────────────────────────────────
   (function () {
-    var _xterms    = {};  // sid → { term, fit }  (panel)
-    var _xtermsOut = {};  // sid → { term, fit }  (pop-out)
+    var _xterms    = {};  // sid → { term, fit }  (console panel)
+    var _xtermsOut = {};  // sid → { term, fit }  (console pop-out)
     var _lastConsoleKey = null;
     var _lastPopoutKey  = null;
     var _ptyListenerInstalled = false;
+
+    // Wizard terminal
+    var _wizTerm         = null;
+    var _wizFit          = null;
+    var _wizLastSeq      = -1;
+    var _wizListenerInstalled = false;
+    var _wizPending      = false;
+    var _lastWizActive   = null;
 
     function _getState(key) {
       try { return window.trame.state.get(key); } catch (e) { return undefined; }
@@ -379,6 +387,80 @@
     var _lastRenderedSeq  = -1;
     var _pendingPtyWrite  = false;
 
+    // ── Wizard xterm ─────────────────────────────────────────────────────
+    function _initWizTerm(attempt) {
+      if (_wizTerm) return;
+      var container = document.getElementById('sage-wiz-pty');
+      if (!container || container.offsetWidth === 0) {
+        if ((attempt || 0) < 20) {
+          setTimeout(function () { _initWizTerm((attempt || 0) + 1); }, 100);
+        }
+        return;
+      }
+      if (typeof Terminal === 'undefined') return;
+      var term = new Terminal({
+        theme: {
+          background: '#000000', foreground: '#e2e8f0',
+          cursor: '#06b6d4', selectionBackground: 'rgba(6,182,212,0.25)',
+        },
+        fontSize: 12,
+        fontFamily: '"Menlo","Monaco","Consolas","DejaVu Sans Mono",monospace',
+        scrollback: 10000, convertEol: false, allowTransparency: false,
+        cursorBlink: false, disableStdin: true,
+      });
+      var FitCtor = (typeof FitAddon !== 'undefined') ? FitAddon.FitAddon : null;
+      var fitAddon = FitCtor ? new FitCtor() : null;
+      if (fitAddon) term.loadAddon(fitAddon);
+      term.open(container);
+      if (fitAddon) fitAddon.fit();
+      _wizTerm = term;
+      _wizFit  = fitAddon;
+      // Replay full session buffer so late-mounting xterm shows all prior output.
+      var buf = _getState('wiz_pty_buf');
+      if (buf) {
+        _writePtyData(term, buf);
+      }
+      // Mark the current seq as rendered so _writeWizNow doesn't double-write.
+      var seq = _getState('wiz_pty_seq');
+      if (seq !== undefined) _wizLastSeq = seq;
+    }
+
+    function _destroyWizTerm() {
+      if (_wizTerm) { try { _wizTerm.dispose(); } catch (e) {} }
+      _wizTerm    = null;
+      _wizFit     = null;
+      _wizLastSeq = -1;
+    }
+
+    function _writeWizNow() {
+      var seq = _getState('wiz_pty_seq');
+      if (seq === undefined || seq === _wizLastSeq) return;
+      var b64 = _getState('wiz_pty_data');
+      if (!b64) return;
+      _wizLastSeq = seq;
+      if (_wizTerm) _writePtyData(_wizTerm, b64);
+    }
+
+    function _installWizListener() {
+      if (_wizListenerInstalled) return;
+      if (!window.trame || !window.trame.state ||
+          typeof window.trame.state.addListener !== 'function') return;
+      _wizListenerInstalled = true;
+      window.trame.state.addListener(function (ev) {
+        if (!ev || ev.type !== 'dirty-state') return;
+        var keys = ev.keys || [];
+        for (var i = 0; i < keys.length; i++) {
+          if (keys[i] === 'wiz_pty_seq' || keys[i] === 'wiz_pty_data') {
+            if (!_wizPending) {
+              _wizPending = true;
+              Promise.resolve().then(function () { _wizPending = false; _writeWizNow(); });
+            }
+            break;
+          }
+        }
+      });
+    }
+
     function _writePtyNow() {
       _pendingPtyWrite = false;
       var seq = _getState('pty_out_seq');
@@ -414,12 +496,24 @@
       });
     }
 
-    // Poll at 50 ms — install PTY listener once + detect mode/popout changes.
+    // Poll at 50 ms — install listeners once + detect mode/wizard/popout changes.
     setInterval(function () {
       if (!window.trame) return;
 
-      // Install state listener the first time trame.state is ready.
+      // Install state listeners the first time trame.state is ready.
       _installPtyListener();
+      _installWizListener();
+
+      // Mount or destroy wizard xterm when wiz_active changes.
+      var wizActive = _getState('wiz_active');
+      if (wizActive !== _lastWizActive) {
+        _lastWizActive = wizActive;
+        if (wizActive) {
+          setTimeout(function () { _initWizTerm(); }, 120);
+        } else {
+          _destroyWizTerm();
+        }
+      }
 
       // Detect terminal mode becoming active — mount or re-focus panel terminal.
       var tab  = _getState('nav_active_tab');

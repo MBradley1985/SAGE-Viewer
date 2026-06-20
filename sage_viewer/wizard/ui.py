@@ -128,25 +128,14 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                     elevation=0,
                     rounded=False,
                 ):
-                    # Terminal output
-                    with v3.VSheet(
-                        classes="sage-console-scroll wiz-console-scroll",
-                        color="#000000",
+                    # xterm.js terminal — receives raw PTY bytes from the server
+                    html.Div(
+                        id="sage-wiz-pty",
                         style=(
-                            "flex:1;min-height:0;overflow-y:auto;"
-                            "padding:14px 18px;"
-                            "font-size:0.82rem;line-height:1.55;"
+                            "flex:1;min-height:0;overflow:hidden;"
+                            "background:#000000;"
                         ),
-                    ):
-                        with html.Div(
-                            v_for="(line, idx) in wiz_lines",
-                            key="idx",
-                        ):
-                            html.Div(
-                                v_html=("line.html || '&nbsp;'",),
-                                classes=("'wiz-' + line.kind",),
-                                style="white-space:pre-wrap;",
-                            )
+                    )
 
                     # Action bar
                     with html.Div(

@@ -62,14 +62,20 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - Configurable FPS (1 – 60) and resolution (Native / 2× / 4× supersampled)
 - Optional user-typed label per capture; everything goes into a single session folder per app launch
 
-<!-- Console GIF: drop docs/images/console.gif here once captured -->
-<!-- ![Console streaming](docs/images/console.gif) -->
+### Launch Mode wizard
+- Guided setup flow for configuring and launching SAGE26, accessible from the top-left Launch Mode menu or the Explore Mode hamburger
+- Step chips in the header track progress (cyan = current step, green = done, white = pending)
+- **Rescan** button re-runs the environment scan from scratch at any point
+- **Create config file** option generates a new `.par` from the built-in millennium.par template; choose a custom filename before writing
+- Par file editor opens side-by-side with the terminal when a `.par` file needs editing — both panels visible simultaneously
+- Wizard always resets cleanly when reopened from Explore Mode
+
+<!-- Console screenshot: drop docs/images/console.png here once captured -->
 
 ### Embedded console (Console tab)
-- **Terminal mode** — a live xterm.js terminal backed by a real PTY (`$SHELL -l`); supports interactive programs, ANSI colours, `cd`, `export`, pipes, globs, `&` backgrounding, and any shell feature
-- **Python REPL mode** — embedded interpreter with special locals: `scene`, `state`, `ctrl`, `server`, `plotter`, `np`; switch via the "Python REPL" button, `exit` or `terminal` returns to the shell
-- **SAGE command mode** — natural-language SAGE commands (`show only clusters`, `go to halo 42`, `snap 30`, `screenshot`, …); switch via the "SAGE Cmds" button
-- **Multiple sessions** with a `+` button — each console has its own PTY process, Python interpreter, and command history
+- **Terminal mode** — a live xterm.js terminal backed by a real PTY (`$SHELL -l`); full ANSI colour, cursor control, and interactive programs (`vim`, `top`, `htop`, `less`) all work
+- **SAGE command mode** — natural-language SAGE commands (`show only clusters`, `go to halo 42`, `snap 30`, `screenshot`, …); switch via the **SAGE Cmds** button, `terminal` returns to the shell
+- **Multiple sessions** with a `+` button — each console has its own PTY process and command history
 - **Pop-out** floats a movable / resizable console card over the viewport so you can keep typing while watching the render
 
 ### Self-contained metadata
@@ -153,7 +159,7 @@ Requires Python ≥ 3.10. Movie recording in MOV format requires `ffmpeg` in you
 
 ## Documentation
 
-Full documentation at [mbradley1985.github.io/SAGE-Viewer](https://mbradley1985.github.io/SAGE-Viewer).
+Full documentation at [sage-viewer.readthedocs.io](https://sage-viewer.readthedocs.io/en/latest/).
 
 ## Tabs at a glance
 
@@ -166,13 +172,12 @@ Full documentation at [mbradley1985.github.io/SAGE-Viewer](https://mbradley1985.
 | Environment| Halo selector, environment-class checkboxes, Group Info, Highlight Members |
 | Coords     | Fly to arbitrary (x, y, z) — "Use Current Position" populates from camera; **Draw Sphere** places an interactive two-handle sphere (drag centre ball to translate, drag edge ball to resize); **Lock Sphere** commits it as the focus region |
 | Box        | Zoom to axis-aligned sub-box — "Use Current View" populates from camera; **Draw Box** places a resizable interactive box; **Lock Box** commits it as the focus region |
-| Console    | Live xterm.js shell terminal (PTY-backed) + Python REPL + SAGE natural-language commands. Multiple sessions, pop-out window |
-| Library    | Browse stored screenshots / movies; double-click a row to open as a movable floating card over the viewport (multiple items open simultaneously); per-row delete button removes the file from disk immediately |
+| Console    | Live xterm.js shell terminal (PTY-backed) + SAGE natural-language command mode. Multiple sessions, pop-out window |
+| Library    | Browse stored screenshots / movies; double-click a row to open as a movable, resizable floating card over the viewport (multiple items open simultaneously); per-row delete button removes the file from disk immediately |
 
 ![Draw Sphere](docs/images/draw_sphere.gif)
 
-<!-- Library pop-out GIF: drop docs/images/library_popup.gif here once captured -->
-<!-- ![Library pop-out](docs/images/library_popup.gif) -->
+<!-- Library pop-out screenshot: drop docs/images/library_popup.png here once captured -->
 
 The **Focus button** (top of the right panel) is tab-aware: it focuses on whatever's active in the current tab (target galaxy, environment halo, coords point, or box region).
 

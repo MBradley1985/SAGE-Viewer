@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64 as _b64
 import os
 import shutil
 import sys
@@ -11,9 +12,20 @@ _SAGE26_REPO = "https://github.com/MBradley1985/SAGE26.git"
 import html as _html_mod
 import re as _re
 
-# ── ANSI → HTML converter ─────────────────────────────────────────────────────
-# Converts ANSI SGR color codes to inline <span> tags so colored output
-# (e.g. SAGE26's progress bar) renders correctly in the wizard terminal.
+# ANSI SGR codes for each wizard message kind — used when writing directly to
+# the xterm.js terminal instead of the old HTML line list.
+_KIND_ANSI: dict[str, str] = {
+    "title": "\x1b[1;36m",    # bold cyan
+    "ok":    "\x1b[32m",      # green
+    "warn":  "\x1b[33m",      # yellow
+    "err":   "\x1b[1;31m",    # bold red
+    "cmd":   "\x1b[36m",      # cyan
+    "out":   "\x1b[90m",      # dark gray
+    "sep":   "\x1b[38;5;240m",# darker gray
+    "info":  "",               # default
+}
+
+# ── legacy ANSI → HTML converter (kept for reference, no longer used) ─────────
 _ANSI_CSI   = _re.compile(r'\x1b\[([0-9;]*)([A-Za-z])')   # all CSI sequences
 _ANSI_OTHER = _re.compile(r'\x1b[^[]')                      # ESC + non-[
 
@@ -219,9 +231,11 @@ class WizardController:
         self._sage26_dir: Path | None = None
         self._par_path:   Path | None = None
         self._models:     list[dict]  = []
+        self._wiz_seq:    int         = 0
+        self._wiz_buf:    bytearray   = bytearray()  # replay buffer for late-mounting xterm
 
         self._st.wiz_step          = 0
-        self._st.wiz_lines         = []
+        self._st.wiz_lines         = []   # kept for compat; no longer populated
         self._st.wiz_choices       = []
         self._st.wiz_busy          = True
         self._st.wiz_par_show      = False
@@ -229,6 +243,9 @@ class WizardController:
         self._st.wiz_filename_show = False
         self._st.wiz_filename      = "millennium"
         self._st.wiz_kind_colors   = _KIND_COLORS
+        self._st.wiz_pty_data      = ""   # base64 PTY chunk → xterm.js
+        self._st.wiz_pty_seq       = 0    # monotonically increasing
+        self._st.wiz_pty_buf       = ""   # base64 full replay buffer
 
         server.controller.set("wiz_choose")(self._on_choice)
         server.controller.set("wiz_close")(self._on_close)
@@ -242,6 +259,7 @@ class WizardController:
         self._sage26_dir = None
         self._par_path   = None
         self._models     = []
+        self._wiz_buf    = bytearray()
         self._st.wiz_step          = 0
         self._st.wiz_lines         = []
         self._st.wiz_choices       = []
@@ -250,6 +268,10 @@ class WizardController:
         self._st.wiz_par_text      = ""
         self._st.wiz_filename_show = False
         self._st.wiz_filename      = "millennium"
+        self._st.wiz_pty_buf       = ""
+        # Push a clear sequence as the first "chunk" so a late-mounting xterm
+        # clears itself before replaying buffered output.
+        self._push_bytes(b"\x1b[2J\x1b[H")
         self._st.flush()
         asyncio.ensure_future(self._step_scan())
 
@@ -262,26 +284,28 @@ class WizardController:
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
-    def _emit(self, text: str, kind: str = "info") -> None:
-        lines = list(self._st.wiz_lines)
-        lines.append({"text": text, "html": _ansi_to_html(text), "kind": kind})
-        self._st.wiz_lines = lines
-        self._st.flush()
+    _WIZ_BUF_CAP = 512 * 1024  # 512 KB replay buffer cap
 
-    def _emit_progress(self, text: str) -> None:
-        """Overwrite the last line if it was also a progress update, else append.
+    def _push_bytes(self, data: bytes) -> None:
+        """Push raw bytes to the wizard xterm.js terminal.
 
-        Used for \\r-terminated progress bars so they animate in place rather
-        than flooding the terminal with a new line per tick.
+        Maintains a rolling replay buffer (wiz_pty_buf) so a late-mounting
+        xterm can reconstruct the full session history on first paint.
         """
-        lines = list(self._st.wiz_lines)
-        entry = {"text": text, "html": _ansi_to_html(text), "kind": "out", "prog": True}
-        if lines and lines[-1].get("prog"):
-            lines[-1] = entry
-        else:
-            lines.append(entry)
-        self._st.wiz_lines = lines
+        self._wiz_buf.extend(data)
+        if len(self._wiz_buf) > self._WIZ_BUF_CAP:
+            # Keep the most recent half so the display stays coherent.
+            self._wiz_buf = self._wiz_buf[len(self._wiz_buf) // 2:]
+        self._wiz_seq = (self._wiz_seq + 1) % 10 ** 9
+        self._st.wiz_pty_data = _b64.b64encode(data).decode()
+        self._st.wiz_pty_seq  = self._wiz_seq
+        self._st.wiz_pty_buf  = _b64.b64encode(bytes(self._wiz_buf)).decode()
         self._st.flush()
+
+    def _emit(self, text: str, kind: str = "info") -> None:
+        code = _KIND_ANSI.get(kind, "")
+        line = (code + text + ("\x1b[0m" if code else "") + "\r\n").encode()
+        self._push_bytes(line)
 
     def _set_choices(self, choices: list[dict]) -> None:
         self._st.wiz_choices = choices
@@ -296,60 +320,84 @@ class WizardController:
         self._st.flush()
 
     async def _run_cmd(self, cmd: list[str], cwd: Path | None = None) -> int:
-        self._emit("$ " + " ".join(str(c) for c in cmd), "cmd")
-        self._st.flush()
+        """Run a command in a PTY so ANSI colors and \\r progress bars work."""
+        import pty as _pty, select as _select, subprocess as _subprocess
+        import fcntl as _fcntl, struct as _struct, termios as _termios
+
+        self._push_bytes(
+            ("\x1b[36m$ " + " ".join(str(c) for c in cmd) + "\x1b[0m\r\n").encode()
+        )
+
+        master_fd = slave_fd = -1
         try:
-            proc = await asyncio.create_subprocess_exec(
-                *[str(c) for c in cmd],
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
+            master_fd, slave_fd = _pty.openpty()
+            try:
+                _fcntl.ioctl(slave_fd, _termios.TIOCSWINSZ,
+                             _struct.pack('HHHH', 24, 220, 0, 0))
+            except Exception:
+                pass
+
+            proc = _subprocess.Popen(
+                [str(c) for c in cmd],
+                stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+                close_fds=True,
                 cwd=str(cwd) if cwd else None,
+                preexec_fn=os.setsid,
             )
-            buf = b""
-            while True:
-                chunk = await proc.stdout.read(512)
+            os.close(slave_fd)
+            slave_fd = -1
+
+            loop = asyncio.get_running_loop()
+
+            def _read_chunk() -> bytes | None:
+                try:
+                    r, _, _ = _select.select([master_fd], [], [], 1.0)
+                except (OSError, ValueError):
+                    return b""
+                if not r:
+                    return None   # timeout
+                try:
+                    chunk = os.read(master_fd, 4096)
+                except OSError:
+                    return b""
                 if not chunk:
-                    if buf.strip():
-                        self._emit(buf.decode(errors="replace").rstrip(), "out")
-                    break
-                buf += chunk
-                # Drain all complete segments from the buffer.
-                # \r\n  → regular newline  (normal emit)
-                # \n    → regular newline  (normal emit)
-                # \r    → carriage return  (progress overwrite, in-place)
-                # Lone \r at end of buffer: wait for next chunk — it might
-                # be the \n of a \r\n pair.
+                    return b""
+                buf = bytearray(chunk)
                 while True:
-                    ri = buf.find(b'\r')
-                    ni = buf.find(b'\n')
-                    if ri == -1 and ni == -1:
+                    try:
+                        r2, _, _ = _select.select([master_fd], [], [], 0)
+                        if not r2:
+                            break
+                        more = os.read(master_fd, 4096)
+                        if not more:
+                            break
+                        buf.extend(more)
+                    except OSError:
                         break
-                    # \r\n together: regular line
-                    if ri != -1 and ni == ri + 1:
-                        text = buf[:ri].decode(errors="replace").rstrip()
-                        buf = buf[ri + 2:]
-                        if text.strip():
-                            self._emit(text, "out")
-                    # \n before any \r: regular line
-                    elif ni != -1 and (ri == -1 or ni < ri):
-                        text = buf[:ni].decode(errors="replace").rstrip()
-                        buf = buf[ni + 1:]
-                        if text.strip():
-                            self._emit(text, "out")
-                    # \r alone, not the very last byte: progress overwrite
-                    elif ri != -1 and ri < len(buf) - 1:
-                        text = buf[:ri].decode(errors="replace").rstrip()
-                        buf = buf[ri + 1:]
-                        if text.strip():
-                            self._emit_progress(text)
-                    else:
-                        # \r is the last byte — wait for the next chunk
+                return bytes(buf)
+
+            while True:
+                data = await loop.run_in_executor(None, _read_chunk)
+                if data is None:
+                    if proc.poll() is not None:
                         break
-            await proc.wait()
-            return proc.returncode
+                    continue
+                if not data:
+                    break
+                self._push_bytes(data)
+
+            proc.wait()
+            return proc.returncode or 0
         except Exception as exc:
-            self._emit(f"Error: {exc}", "err")
+            self._push_bytes(f"\x1b[1;31mError: {exc}\x1b[0m\r\n".encode())
             return 1
+        finally:
+            for fd in (master_fd, slave_fd):
+                if fd >= 0:
+                    try:
+                        os.close(fd)
+                    except OSError:
+                        pass
 
     # ── discovery ────────────────────────────────────────────────────────────
 
