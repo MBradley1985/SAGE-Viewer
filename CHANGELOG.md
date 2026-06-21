@@ -4,6 +4,48 @@ All notable changes to SAGE-Viewer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — post-0.3.0 (side-by-side multi-box comparison)
+
+### Added
+
+#### Side-by-side multi-box comparison
+- Load two or more SAGE models side-by-side via `+SBS` in the hamburger Models section
+- Boxes are laid out along the X axis with a 30 % gap between them
+- Each box is fully independent: its own snapshot, filters, colormaps, opacity, layer visibility, and rendering settings are saved and restored whenever the active box changes (`BOX_PROFILE_KEYS` — 56 keys in `scene/box_profile.py`)
+- A **box strip** at the bottom of the viewport shows all loaded boxes; clicking a box makes it active (green label) and routes the entire right panel to it
+- Active box label rendered with `vtkBillboardTextActor3D` (always faces camera, no anchor dot) — green for active, white for idle; format: `{model name}  z={redshift:.2f}`
+- Play, step, and snapshot slider advance **only the active box's snapshot** — other boxes stay at their current snapshot
+- Rotation selector greyed out in multi-box mode; any active rotation is cancelled when a second box is added (all boxes share one camera — independent rotation is not supported)
+- Toolbar snap-count cache synced to the active model on every box switch so step/play use the correct range
+- Adjacent boxes always initialise with defaults (Mvir / viridis for halos, Structure / plasma for galaxies) so they don't inherit the primary box's settings
+
+#### Halo Mvir colormap lock
+- Selecting Mvir as the halo colour mode forces the colormap to **Viridis** and greys out the colormap selector — Mvir always uses the same scale for visual consistency across boxes
+
+#### Background snapshot preloading
+- All snapshots are preloaded into memory in background threads immediately on startup and whenever a model is added as an adjacent box or overlay
+- KDTree for nearest-halo search is pre-built per snapshot in the background loader thread; stored in `_tree_cache` and passed directly to `update_halo_index()` — eliminates per-click KDTree build delay
+
+### Fixed
+
+#### Double-click galaxy selection accuracy
+- Two-stage selection: find 50 nearest galaxies in 3D (KDTree), then project to screen pixels and pick the visually closest — eliminates the off-by-one click that selected a galaxy behind the cursor
+- Environment checkbox state is respected: when `_combined_mask()` returns `None` mid-transition, falls back to `_filter_mask` instead of querying all galaxies
+- Halo search uses the selected galaxy's world position as the query point (not raw click coordinates), and respects `halo_layer._combined_mask()` — keeps halo + galaxy from the same environment
+
+#### Launch Mode wizard terminal
+- xterm.js CDN (xterm 5.3.0 + FitAddon 0.10.0) was missing from `launch.py` — terminal appeared blank when launched via `./sage-viewer` with no `--par` flag; fixed by adding `server.enable_module` CDN entries
+- `wiz_active` state was never set in `launch.py`; xterm JS polls for this variable changing to `True` to mount — fixed by explicitly setting `server.state.wiz_active = True` after `WizardController` creation
+- Wizard terminal text colour changed from dark grey to white
+
+#### Trame / rendering
+- CLR button in box strip used `$ctrl.clear_box()` (not accessible in Trame 3 Vue templates via `raw_attrs`); replaced with `click=(server.controller.clear_box, "[b.name]")` binding
+- `shape="none"` (string) in `add_point_labels` raises `ValueError`; labels replaced with `vtkBillboardTextActor3D` which has no shape artifact
+- After `plotter.render()` in box-switch and toggle-adjacent handlers, `server.controller.view_update()` is now called so the new frame reaches the browser immediately (was invisible until the next mouse event)
+- `on_set_active_box` signature change (added `extend` bool) broke `info_panel.py`'s direct `ctrl.set_active_box(name)` call — fixed by keeping signature as `on_set_active_box(name)` after multi-select was removed
+
+---
+
 ## [Unreleased] — post-0.3.0 (PTY terminal + Launch wizard + UI polish)
 
 ### Added

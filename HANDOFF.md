@@ -1,6 +1,6 @@
 # SAGE-Viewer Handoff
 
-Snapshot of the project so a new chat can pick up cleanly. Reflects state at the close of the 0.3.0 work cycle.
+Snapshot of the project so a new chat can pick up cleanly. Reflects state at the close of the post-0.3.0 multi-box cycle.
 
 ---
 
@@ -42,13 +42,14 @@ SAGE-Viewer/
 │   │   └── galaxy_reader.py         # SAGE HDF5 reader; cgm_gas + hot_gas added
 │   ├── parallel/loader.py           # prefetch + LRU snapshot cache
 │   ├── scene/
-│   │   ├── scene.py                 # Plotter, layers, focus state, interactor
+│   │   ├── scene.py                 # Plotter, layers, focus state, interactor; multi-box layout
 │   │   ├── model.py                 # one SAGE model (loader + layers + cfg)
+│   │   ├── box_profile.py           # BOX_PROFILE_KEYS (56); save_profile / load_profile per active box
 │   │   ├── halo_layer.py            # 3-layer NFW gaussian splats; _combined_mask() guard
 │   │   ├── galaxy_layer.py          # outer envelope + cold-gas envelope + outer property; _combined_mask() guard
 │   │   ├── fof_layer.py             # filter-aware FoF satellite→central gold lines
 │   │   ├── heatmap_layer.py         # 2D projected halo density heatmap (number/mass, 256 bins)
-│   │   └── camera.py                # fly-to / sphere & box wireframe indicators
+│   │   └── camera.py                # fly-to / sphere & box wireframe indicators; focus_on_boxes()
 │   ├── ui/
 │   │   ├── toolbar.py               # transport + slider + speed/rotation
 │   │   ├── navigation_panel.py      # right panel: tabs + PTY console + filters + ...
@@ -73,6 +74,46 @@ SAGE-Viewer/
 ├── HANDOFF.md                       # this file
 └── pyproject.toml
 ```
+
+---
+
+## Recent changes (post-0.3.0 multi-box cycle)
+
+### Side-by-side multi-box comparison
+
+#### Architecture
+- `scene.py` maintains a `_models: dict[str, Model]` and `_active_box_name: str`. All boxes share one plotter, one renderer, one camera.
+- Boxes are placed along the X axis. The first box is at offset 0; each successive box is at `prev_offset + prev_box_size + gap`, where `gap = _BOX_GAP_FRACTION (0.30) × box_size`.
+- `toggle_adjacent(path, remove=False)` adds or removes a side-by-side box. On add, it initialises the new Model with `halo_colormap="viridis"` and calls `view_update()` so the new box is immediately visible.
+- `set_active_box(name)` updates `_active_box_name`, calls `_update_labels()`, and calls `plotter.render()`. The caller (`app.py`) must also call `view_update()` afterwards.
+- `_add_label(name)` uses `vtkBillboardTextActor3D` (always faces camera, no anchor-point artifact). Active label = green `(0.2, 1.0, 0.4)`; idle = white `(1.0, 1.0, 1.0)`. Label text: `{model name}  z={redshift:.2f}`. Position: `(cx, -box_size * 0.22, cz)` — below the box floor.
+- `box_name_at(world_x)` maps a world X coordinate to the owning box name; used by `info_panel.py` to switch the active box on single click.
+
+#### Per-box state — `scene/box_profile.py`
+- `BOX_PROFILE_KEYS`: 56 trame state keys (snapshot, all layer settings, all filter sliders) that belong to one box.
+- `save_profile(state) → dict` — snapshot current state values into a plain dict.
+- `load_profile(state, profile)` — write a saved profile back into state; call `state.dirty(*BOX_PROFILE_KEYS)` + `state.flush()` after.
+- `_LAYER_DEFAULTS` includes `"halo_colormap": "viridis"` (intentionally viridis so adjacent boxes start consistent with Mvir mode).
+
+#### App wiring (`app.py`)
+- `_profiles: dict[str, dict]` stores one saved profile per box name.
+- `on_set_active_box(name)`: saves the old box profile, calls `scene.set_active_box(name)`, loads the new box profile, dirtys all 56 keys, calls `sync_active_snap_count` + `view_update`.
+- Box strip built by `_build_box_strip_items()`: `[{"name": n, "active": n == active_name} for n in models]`.
+- When adjacent box is added, any active rotation is cancelled: `state.rotate_mode = "off"`.
+
+#### Toolbar rotation disable (`toolbar.py`)
+- Rotation VSelect has `disabled=("box_strip_items && box_strip_items.length > 1",)` and `title="Rotation disabled in multi-box mode"`.
+- `sync_active_snap_count` controller: called after every active-box switch to update `_snap_count[0]` and invalidate the frame cache (`_frames["key"] = None; _frames["data"] = {}`).
+
+#### Halo Mvir colormap lock (`navigation_panel.py`)
+- `on_halo_mode` forces `state.halo_colormap = "viridis"` whenever `halo_color_mode == "mvir"`.
+- The halo colormap VSelect has `disabled=("halo_color_mode === 'mvir'",)`.
+
+#### Draw Box widget handle fix (`navigation_panel.py`)
+VTK's built-in box handles scale with world-space (grow enormous when zoomed in). Fixed by:
+1. Hiding VTK handles: `rep.GetHandleProperty().SetOpacity(0.0)` and `rep.GetSelectedHandleProperty().SetOpacity(0.0)`.
+2. Drawing a custom `_box_corner_actor` — a PyVista PolyData of 8 corner points with fixed `point_size=12` — rebuilt in `_box_cb` on every drag and in all 4 clear paths.
+`_rescale_box_handles`, `_attach_box_cam_observer`, `_detach_box_cam_observer`, `_box_cam_obs` have all been removed.
 
 ---
 
@@ -112,6 +153,13 @@ SAGE-Viewer/
 ---
 
 ## What works today
+
+### Side-by-side multi-box comparison
+- Load two or more SAGE models side-by-side via `+SBS` in the hamburger Models section.
+- Each box is fully independent: its own snapshot, filters, colormaps, opacity, layer visibility (all 56 `BOX_PROFILE_KEYS` in `scene/box_profile.py`).
+- Box strip at the bottom of the viewport; clicking a box makes it active (green label).
+- Play, step, and snapshot slider advance only the active box. Rotation is disabled in multi-box mode.
+- Halo Mvir mode locks colormap to Viridis; selector is greyed out.
 
 ### Rendering
 - Haloes: 3-layer NFW-style gaussian splats (envelope + mid + core), single colormap, sized by mass/Rvir/Vmax.
@@ -268,6 +316,25 @@ FoF links are gated on `halos_visible AND fof_links_on` — `fl.visible` is only
 
 ---
 
+### Multi-box architecture notes
+
+**Single shared camera** — all boxes orbit together. Independent rotation per box would require one VTK renderer + camera per box. This is a large refactor; current workaround is to disable rotation in multi-box mode.
+
+**`view_update()` after `plotter.render()`** — `plotter.render()` updates the VTK scene server-side but does not push a new frame to the browser. After any box-switch or box-add/remove, always call `server.controller.view_update()`. Missing this call causes the new box to be invisible until the next mouse event.
+
+**Profile save/load order in `on_set_active_box`**:
+1. Save old box profile (`save_profile(state)` → `_profiles[old_name]`).
+2. Call `scene.set_active_box(name)` (updates VTK label colours, renders).
+3. Resolve new profile: `_profiles.get(name, default_profile)`.
+4. `load_profile(state, incoming)`.
+5. `state.dirty(*BOX_PROFILE_KEYS); state.flush()`.
+6. `sync_active_snap_count()` + `view_update()`.
+Do not re-order steps 1–6 or the old box's state leaks into the new one.
+
+**`box_name_at(world_x)` in `info_panel.py`** — every single click checks which box the user clicked by world-X coordinate. This runs before the double-click threshold check, so single-clicking a non-active box always switches it. This is intentional.
+
+---
+
 ## Known quirks worth knowing
 
 - `state.focus_active` is a Trame proxy — always coerce with `bool(state.focus_active)` inside callbacks.
@@ -277,17 +344,17 @@ FoF links are gated on `halos_visible AND fof_links_on` — `fl.visible` is only
 - Relative paths in `.par` files resolve against `parent.parent` of the par file (the SAGE root, not the par file's dir).
 - Console PTY: each session forks a real shell process — clean up with `os.kill(pid, SIGKILL)` on session close or app exit if not already handled.
 - `@state.change("wiz_active")` only fires when the value changes; it won't re-run if `wiz_active` is already `True`. Use a dedicated controller (`open_wizard`) for any "always reset on open" behaviour.
+- `plotter.render()` alone does **not** push a new frame to the browser in Trame 3. Always follow it with `server.controller.view_update()`. This applies everywhere, but especially in box-switch, toggle-adjacent, and any background-thread-triggered scene update.
+- Controller signatures: grep all call sites before changing. `info_panel.py` calls `ctrl.set_active_box(name)` directly from a PyVista pick callback — it is outside the normal Trame event dispatch and easy to miss.
+- `_snap_count[0]` in `toolbar.py` is a module-level cache for the primary model's snap count. Call `sync_active_snap_count` controller after every active-box switch or the step/play buttons use the wrong range.
 
 ---
 
 ## Likely next-up things
 
-- **Stress-test microUchuu** at higher `--max-halos` / `--max-galaxies` once perf is stable.
-- **Density colour mode** still does KDE per snapshot — could be cached or precomputed.
 - **Camera bookmarks UI** lives in a tab; could surface as a hover-out menu in the toolbar.
 - **Library tab** — deletion and renaming done; inline thumbnails for movies still pending.
 - **`HALO_CB` / `GAL_CB` colour-by descriptors** still hard-coded — could be derived from `model_fields` so unsupported fields don't even appear in the dropdown.
-- **Heatmap layer** (`heatmap_layer.py`) — implemented but not yet wired into the UI.
 - **PTY session cleanup** — orphaned shell processes on browser disconnect or app shutdown.
 
 ---
@@ -303,6 +370,8 @@ FoF links are gated on `halos_visible AND fof_links_on` — `fl.visible` is only
 
 ## Status at handoff
 
+- **Multi-box side-by-side comparison** fully implemented: box strip, per-box profile, active-box label (green/white), rotation disabled in multi-box, snap-count sync on switch, `view_update()` after every box operation.
+- **Halo Mvir colormap lock**: Viridis forced + colormap selector greyed out when Mvir is active.
 - Console upgraded to real PTY + xterm.js — `vim`, `top`, `htop`, `less` all work. Python REPL mode removed.
 - Launch Mode wizard implemented (`sage_viewer/wizard/`): step tracking, rescan, create config file, side-by-side par editor.
 - UI polish: black toolbar + right panel, scaled-down filter sliders (0.65×) centred in panel, Structure tab checkboxes, transparent export dialog, dropdown menus auto-close, footer hidden, "Enter to…" hint labels removed.
@@ -310,4 +379,5 @@ FoF links are gated on `halos_visible AND fof_links_on` — `fl.visible` is only
 - `sage_theme.css` served via `enable_module` for reliable global CSS injection.
 - All UI-polish requests from the 0.3.0 cycle remain implemented (Enter-to-run, pop-out console, draw widgets, etc.).
 - `sage-viewer` launcher script at repo root — run `./sage-viewer --par ...` without needing Python bin in PATH.
-- Heatmap layer exists (`scene/heatmap_layer.py`) but is not yet wired into the UI.
+- Draw Box widget handles fixed: VTK built-in handles hidden (`SetOpacity(0.0)`), replaced with fixed-pixel PyVista corner-point overlay (`_box_corner_actor`, `_rebuild_box_corners`) that stays constant size at any zoom level.
+- `heatmap_layer.py` removed (was never wired to UI; density colour mode also already removed).

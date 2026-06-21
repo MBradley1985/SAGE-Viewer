@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math as _math
 
 from trame.widgets import html
 from trame.widgets import vuetify3 as v3
@@ -767,66 +768,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # Interactive draw-widget storage (one slot each; only one active at a time)
     # ------------------------------------------------------------------
 
-    _draw_sphere_widget: list = [None]   # vtkSphereWidget or None
-    _draw_sphere_actor:  list = [None]   # custom 5-ring mesh actor or None
-    _draw_box_widget:    list = [None]   # vtkBoxWidget2 or None
-    _box_cam_obs:        list = [None]   # camera observer tag for handle rescaling
-
-    _BOX_HANDLE_PIXELS = 8   # target handle radius in screen pixels
-
-    def _rescale_box_handles():
-        """Rescale box widget handles to a constant screen-space pixel size.
-
-        vtkBoxRepresentation sizes handles as a fraction of the bounding-box
-        diagonal, so they grow with the box and with camera zoom.  This
-        function converts _BOX_HANDLE_PIXELS into the correct world fraction
-        for the current camera position and FOV using VTK's own coordinate
-        transforms, then calls SetHandleSize so the result is always the
-        same number of pixels on screen regardless of zoom level or box size.
-        """
-        widget = _draw_box_widget[0]
-        if widget is None:
-            return
-        try:
-            rep = widget.GetRepresentation()
-            bounds = rep.GetBounds()
-            dx = bounds[1] - bounds[0]
-            dy = bounds[3] - bounds[2]
-            dz = bounds[5] - bounds[4]
-            diag = (dx**2 + dy**2 + dz**2) ** 0.5
-            if diag < 1e-10:
-                return
-            ren = scene.plotter.renderer
-            cx = (bounds[0] + bounds[1]) * 0.5
-            cy = (bounds[2] + bounds[3]) * 0.5
-            cz = (bounds[4] + bounds[5]) * 0.5
-            ren.SetWorldPoint(cx, cy, cz, 1.0)
-            ren.WorldToDisplay()
-            sx, sy, sz_d = ren.GetDisplayPoint()
-            ren.SetDisplayPoint(sx + _BOX_HANDLE_PIXELS, sy, sz_d)
-            ren.DisplayToWorld()
-            wx, wy, wz, ww = ren.GetWorldPoint()
-            if abs(ww) < 1e-10:
-                return
-            world_r = ((wx/ww - cx)**2 + (wy/ww - cy)**2 + (wz/ww - cz)**2) ** 0.5
-            rep.SetHandleSize(world_r / diag)
-        except Exception:
-            pass
-
-    def _attach_box_cam_observer():
-        _detach_box_cam_observer()
-        cam = scene.plotter.renderer.GetActiveCamera()
-        _box_cam_obs[0] = cam.AddObserver(
-            "ModifiedEvent", lambda *_: _rescale_box_handles()
-        )
-
-    def _detach_box_cam_observer():
-        if _box_cam_obs[0] is not None:
-            try:
-                scene.plotter.renderer.GetActiveCamera().RemoveObserver(_box_cam_obs[0])
-            except Exception:
-                pass
-            _box_cam_obs[0] = None
+    _draw_sphere_widget:  list = [None]   # vtkSphereWidget or None
+    _draw_sphere_actor:   list = [None]   # custom 5-ring mesh actor or None
+    _draw_box_widget:     list = [None]   # vtkBoxWidget or None
+    _box_cam_obs_tag:     list = [None]   # (widget, w_tag, cam, cam_tag) or None
+    _handle_world_r:      list = [None]   # fixed world-space handle radius
+    _box_handle_sources:  list = [[]]     # vtkSphereSource objects for the 7 handle spheres
 
     def _remove_sphere_actor() -> None:
         if _draw_sphere_actor[0] is not None:
@@ -835,6 +782,55 @@ def build_navigation_panel(server, scene: Scene) -> None:
             except Exception:
                 pass
             _draw_sphere_actor[0] = None
+
+    # ------------------------------------------------------------------
+    # Box widget handle sizing — keep handles world-space constant.
+    #
+    # PyVista uses vtkBoxWidget (not vtkBoxWidget2).  Internally, VTK
+    # calls SizeHandles() (C++, not Python-accessible) on every Scale /
+    # Translate interaction, which recomputes handle sphere radii based
+    # on the CURRENT camera distance.  SetHandleSize() has no visual
+    # effect in VTK 9.5 — it is not wired to the sphere geometry.
+    #
+    # Direct fix: capture the vtkSphereSource objects that back the 7
+    # handle actors at placement time, snapshot their initial radius, and
+    # restore it in an EndInteractionEvent observer (which fires AFTER
+    # SizeHandles() but BEFORE the following Render()).  The camera
+    # ModifiedEvent observer covers zoom changes for the same reason.
+    # ------------------------------------------------------------------
+
+    def _rescale_box_handles(*_) -> None:
+        r = _handle_world_r[0]
+        sources = _box_handle_sources[0]
+        if r is None or not sources:
+            return
+        try:
+            for src in sources:
+                src.SetRadius(r)
+                src.Modified()
+        except Exception:
+            pass
+
+    def _attach_box_cam_observer(widget) -> None:
+        w_tag = widget.AddObserver("EndInteractionEvent", _rescale_box_handles)
+        cam = scene.plotter.renderer.GetActiveCamera()
+        cam_tag = cam.AddObserver("ModifiedEvent", _rescale_box_handles)
+        _box_cam_obs_tag[0] = (widget, w_tag, cam, cam_tag)
+
+    def _detach_box_cam_observer() -> None:
+        if _box_cam_obs_tag[0] is not None:
+            widget, w_tag, cam, cam_tag = _box_cam_obs_tag[0]
+            try:
+                widget.RemoveObserver(w_tag)
+            except Exception:
+                pass
+            try:
+                cam.RemoveObserver(cam_tag)
+            except Exception:
+                pass
+            _box_cam_obs_tag[0] = None
+        _handle_world_r[0] = None
+        _box_handle_sources[0] = []
 
     def _rebuild_sphere_rings(center, radius: float) -> None:
         """Draw 5 great-circle rings identical to _add_sphere_indicator."""
@@ -885,6 +881,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 scene.plotter.clear_box_widgets()
             except Exception:
                 pass
+            _detach_box_cam_observer()
             _draw_box_widget[0] = None
             state.draw_box_active = False
 
@@ -1879,10 +1876,18 @@ def build_navigation_panel(server, scene: Scene) -> None:
             #   index 1 = edge ball    (resizes: distance from centre = radius)
             # A custom 5-ring mesh (identical to the Coords indicator sphere)
             # is drawn between them and rebuilt whenever either ball moves.
-            cx = float(state.nav_x)
-            cy = float(state.nav_y)
-            cz = float(state.nav_z)
-            r  = max(0.5, min(float(state.nav_distance) * 0.25, 3.0))
+            import numpy as _np_ds
+            _cam_ds  = scene.plotter.camera
+            _fp_ds   = _cam_ds.focal_point
+            cx, cy, cz = float(_fp_ds[0]), float(_fp_ds[1]), float(_fp_ds[2])
+            _cam_d_ds = float(_np_ds.linalg.norm(
+                _np_ds.array(_cam_ds.position) - _np_ds.array(_fp_ds)))
+            r = max(0.5, _cam_d_ds * float(_np_ds.tan(
+                _np_ds.deg2rad(_cam_ds.view_angle) / 2.0)) * 0.25)
+            state.nav_x = round(cx, 3)
+            state.nav_y = round(cy, 3)
+            state.nav_z = round(cz, 3)
+            state.nav_distance = round(r, 3)
 
             # Mutable centre/radius shared by the callback closure.
             _sc = [cx, cy, cz]
@@ -2007,28 +2012,24 @@ def build_navigation_panel(server, scene: Scene) -> None:
             state.flush()
             on_zoom_to_box()
         else:
-            # Start — place an interactive box at the current bound values.
-            xmin = float(state.nav_box_xmin)
-            xmax = float(state.nav_box_xmax)
-            ymin = float(state.nav_box_ymin)
-            ymax = float(state.nav_box_ymax)
-            zmin = float(state.nav_box_zmin)
-            zmax = float(state.nav_box_zmax)
-            # Ensure a non-degenerate box (all dims > 0)
-            if xmax <= xmin: xmax = xmin + 5.0
-            if ymax <= ymin: ymax = ymin + 5.0
-            if zmax <= zmin: zmax = zmin + 5.0
-            # Start at 50% of the field extents (centred) so the widget
-            # is visually manageable; dragging handles grows it to taste.
-            _cx = (xmin + xmax) / 2
-            _cy = (ymin + ymax) / 2
-            _cz = (zmin + zmax) / 2
-            _hx = max(1.0, (xmax - xmin) * 0.25)
-            _hy = max(1.0, (ymax - ymin) * 0.25)
-            _hz = max(1.0, (zmax - zmin) * 0.25)
-            xmin, xmax = _cx - _hx, _cx + _hx
-            ymin, ymax = _cy - _hy, _cy + _hy
-            zmin, zmax = _cz - _hz, _cz + _hz
+            # Start — place an interactive box centred on the current view.
+            import numpy as _np_db
+            _cam_db  = scene.plotter.camera
+            _fp_db   = _cam_db.focal_point
+            _cx, _cy, _cz = float(_fp_db[0]), float(_fp_db[1]), float(_fp_db[2])
+            _cam_d_db = float(_np_db.linalg.norm(
+                _np_db.array(_cam_db.position) - _np_db.array(_fp_db)))
+            _h = max(1.0, _cam_d_db * float(_np_db.tan(
+                _np_db.deg2rad(_cam_db.view_angle) / 2.0)) * 0.5)
+            xmin, xmax = _cx - _h, _cx + _h
+            ymin, ymax = _cy - _h, _cy + _h
+            zmin, zmax = _cz - _h, _cz + _h
+            state.nav_box_xmin = round(xmin, 3)
+            state.nav_box_xmax = round(xmax, 3)
+            state.nav_box_ymin = round(ymin, 3)
+            state.nav_box_ymax = round(ymax, 3)
+            state.nav_box_zmin = round(zmin, 3)
+            state.nav_box_zmax = round(zmax, 3)
 
             def _box_cb(planes):
                 pts = planes.GetPoints()
@@ -2038,16 +2039,38 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 xs = [pts.GetPoint(i)[0] for i in range(n)]
                 ys = [pts.GetPoint(i)[1] for i in range(n)]
                 zs = [pts.GetPoint(i)[2] for i in range(n)]
-                state.nav_box_xmin = round(min(xs), 2)
-                state.nav_box_xmax = round(max(xs), 2)
-                state.nav_box_ymin = round(min(ys), 2)
-                state.nav_box_ymax = round(max(ys), 2)
-                state.nav_box_zmin = round(min(zs), 2)
-                state.nav_box_zmax = round(max(zs), 2)
+                bxmin = round(min(xs), 2)
+                bxmax = round(max(xs), 2)
+                bymin = round(min(ys), 2)
+                bymax = round(max(ys), 2)
+                bzmin = round(min(zs), 2)
+                bzmax = round(max(zs), 2)
+                state.nav_box_xmin = bxmin
+                state.nav_box_xmax = bxmax
+                state.nav_box_ymin = bymin
+                state.nav_box_ymax = bymax
+                state.nav_box_zmin = bzmin
+                state.nav_box_zmax = bzmax
                 state.flush()
-                _rescale_box_handles()
 
             try:
+                # Snapshot sphere sources that exist BEFORE the widget
+                # so we can identify the 7 new handle sources afterward.
+                def _sphere_src_ids():
+                    _ids = set()
+                    _a = scene.plotter.renderer.GetActors()
+                    _a.InitTraversal()
+                    for _ in range(_a.GetNumberOfItems()):
+                        _ac = _a.GetNextActor()
+                        _mp = _ac.GetMapper()
+                        if _mp:
+                            _s = _mp.GetInputAlgorithm()
+                            if _s and hasattr(_s, 'SetRadius'):
+                                _ids.add(id(_s))
+                    return _ids
+
+                _pre_ids = _sphere_src_ids()
+
                 _draw_box_widget[0] = scene.plotter.add_box_widget(
                     _box_cb,
                     bounds=[xmin, xmax, ymin, ymax, zmin, zmax],
@@ -2055,8 +2078,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     rotation_enabled=False,
                 )
                 state.draw_box_active = True
-                _rescale_box_handles()
-                _attach_box_cam_observer()
+
+                # Capture the new sphere sources (= handle spheres)
+                _new_srcs = []
+                _a2 = scene.plotter.renderer.GetActors()
+                _a2.InitTraversal()
+                for _ in range(_a2.GetNumberOfItems()):
+                    _ac2 = _a2.GetNextActor()
+                    _mp2 = _ac2.GetMapper()
+                    if _mp2:
+                        _s2 = _mp2.GetInputAlgorithm()
+                        if (_s2 and id(_s2) not in _pre_ids
+                                and hasattr(_s2, 'SetRadius')
+                                and hasattr(_s2, 'GetRadius')):
+                            _new_srcs.append(_s2)
+                _box_handle_sources[0] = _new_srcs
+                _handle_world_r[0] = (
+                    _new_srcs[0].GetRadius() if _new_srcs else None
+                )
+                _attach_box_cam_observer(_draw_box_widget[0])
             except Exception:
                 pass
             state.flush()

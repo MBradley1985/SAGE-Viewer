@@ -50,7 +50,17 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - **FoF links are filter-aware** — satellite→central gold lines are only drawn for halos that pass the active filter mask, focus sphere/box, and the halos-visible toggle; they stay correct during playback and recording
 - **Playback respects all scene state** — the pre-render frame cache is keyed on filter values, focus region, layer visibility/opacity/color-mode, and FoF state; changing any of these and pressing Play again always produces fresh frames
 
-### Multi-model
+### Side-by-side multi-box comparison
+- Load two or more SAGE models side-by-side in a single viewport with `+SBS` in the Models section of the hamburger menu
+- Each box is fully independent: its own snapshot, filters, colormaps, opacity, and visibility settings
+- A box strip at the bottom of the viewport shows all loaded boxes; click any box label to make it active — the entire right panel (Structure, Filters, Target, Console, …) then controls that box
+- Active box label is **green**; idle boxes are **white**
+- Play, step, and the snapshot slider advance only the active box's snapshot
+- Rotation is disabled in multi-box mode (all boxes share one camera; independent rotation is not supported)
+- Halo Mvir colour mode is always locked to Viridis; the colormap selector is greyed out when Mvir is selected
+- CLR button in the box strip resets that box to its defaults without affecting others
+
+### Multi-model (overlays)
 - Auto-scans `<sage_root>/output/` for SAGE model subfolders
 - Switch the primary model from the hamburger menu (any box size)
 - Overlay a second compatible model on top (same box size + snap count)
@@ -162,6 +172,8 @@ Requires Python ≥ 3.10. Movie recording in MOV format requires `ffmpeg` in you
 Full documentation at [sage-viewer.readthedocs.io](https://sage-viewer.readthedocs.io/en/latest/).
 
 ## Tabs at a glance
+
+When multiple boxes are loaded a **box strip** appears at the bottom of the viewport. Click any box to make it active (green label). All tab controls then target that box.
 
 | Tab | Purpose |
 |---|---|
