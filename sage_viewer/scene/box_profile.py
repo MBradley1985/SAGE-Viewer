@@ -139,7 +139,7 @@ _LAYER_DEFAULTS: dict[str, Any] = {
     "galaxies_visible": True,
     "halo_opacity":     0.12,
     "halo_color_mode":  "mvir",
-    "halo_colormap":    "plasma",
+    "halo_colormap":    "viridis",
     "galaxy_colormap":  "plasma",
     "galaxy_color_mode":"structure",
     "galaxy_opacity":   1.0,

@@ -12,7 +12,7 @@ from sage_viewer.scene.halo_layer import HaloLayer
 from sage_viewer.scene.model import Model
 
 # Gap between adjacent boxes as a fraction of the primary box size.
-_BOX_GAP_FRACTION = 0.20
+_BOX_GAP_FRACTION = 0.30
 
 
 class Scene:
@@ -216,7 +216,7 @@ class Scene:
             # Always start adjacent boxes with default color/colormap so they
             # don't inherit whatever the primary box had been set to.
             model.halo_layer.color_mode  = "mvir"
-            model.halo_layer.colormap    = "plasma"
+            model.halo_layer.colormap    = "viridis"
             model.galaxy_layer.color_mode = "structure"
             model.galaxy_layer.colormap   = "plasma"
             model.set_snapshot(model.snap_count - 1)
@@ -262,50 +262,42 @@ class Scene:
         bs  = m.box_size
         return float(off[0] + bs / 2), 0.0, float(off[2] + bs / 2)
 
-    def _label_position(self, name: str) -> np.ndarray:
+    def _label_position(self, name: str) -> tuple[float, float, float]:
         cx, _, cz = self._box_center_xz(name)
         m = self._models[name]
-        return np.array([[cx, -m.box_size * 0.12, cz]])
+        return cx, -m.box_size * 0.22, cz
 
     def _label_text(self, name: str) -> str:
         m = self._models[name]
         snap = max(0, m.current_snap)
-        return f"{m.name}  {m.snap_table.label(snap)}"
+        z = m.snap_table.snap_to_z(snap)
+        return f"{m.name}  z={z:.2f}"
 
     def _remove_label(self, name: str) -> None:
         for actor in self._label_actors.pop(name, []):
-            self._plotter.remove_actor(actor, render=False)
+            self._plotter.renderer.RemoveActor(actor)
 
     def _add_label(self, name: str) -> None:
-        pts  = self._label_position(name)
+        from vtkmodules.vtkRenderingCore import vtkBillboardTextActor3D
+
+        cx, y, cz = self._label_position(name)
         text = self._label_text(name)
-        raw = self._plotter.add_point_labels(
-            pts, [text],
-            font_size=12,
-            text_color="white",
-            bold=False,
-            always_visible=True,
-            shadow=False,
-            point_size=0,
-            shape=None,
-            render=False,
-            reset_camera=False,
-        )
-        actors = [raw] if not isinstance(raw, list) else raw
-        for a in actors:
-            try:
-                tp = a.GetTextProperty()
-                tp.SetJustificationToCentered()
-                tp.SetBackgroundOpacity(0.0)
-            except Exception:
-                pass
-            try:
-                tp = a.GetMapper().GetLabelTextProperty()
-                tp.SetJustificationToCentered()
-                tp.SetBackgroundOpacity(0.0)
-            except Exception:
-                pass
-        self._label_actors[name] = actors
+
+        actor = vtkBillboardTextActor3D()
+        actor.SetInput(text)
+        actor.SetPosition(cx, y, cz)
+
+        tp = actor.GetTextProperty()
+        tp.SetColor(1.0, 1.0, 1.0)
+        tp.SetFontSize(14)
+        tp.SetJustificationToCentered()
+        tp.SetVerticalJustificationToCentered()
+        tp.SetBackgroundOpacity(0.0)
+        tp.SetBold(False)
+        tp.SetShadow(False)
+
+        self._plotter.renderer.AddActor(actor)
+        self._label_actors[name] = [actor]
 
     def _update_labels(self) -> None:
         """Rebuild labels for all boxes — only when more than one box is loaded."""

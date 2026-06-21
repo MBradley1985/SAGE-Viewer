@@ -729,6 +729,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @state.change("halo_color_mode")
     def on_halo_mode(halo_color_mode, **_):
         scene.halo_layer.color_mode = halo_color_mode
+        if halo_color_mode == "mvir":
+            state.halo_colormap = "viridis"
         _, lo, hi = _HALO_CB[halo_color_mode]
         state.halo_cbar_min = lo
         state.halo_cbar_max = hi
@@ -2796,6 +2798,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         v_model=("halo_colormap",), items=(_CMAPS,),
                         label="Colormap", hide_details=True,
                         variant="outlined", color="#c084fc", density="compact",
+                        disabled=("halo_color_mode === 'mvir'",),
                     )
                 with v3.VSheet(color="transparent", style="padding:4px 0 8px;"):
                     with v3.VSheet(
