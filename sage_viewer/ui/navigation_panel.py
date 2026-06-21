@@ -926,13 +926,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 # first movement is immediate).  The task cancel in
                 # on_cam_release fires here if the key is released mid-sleep.
                 if not first_tick:
-                    await asyncio.sleep(0.031)
+                    await asyncio.sleep(0.023)
                 first_tick = False
 
-                # Grace period: localhost WebSocket RTT is ~1-2 ms, so
-                # sleeping 3 ms gives any in-flight keyup message time to
-                # arrive and be processed before we commit to another fly().
-                await asyncio.sleep(0.003)
+                # 10 ms grace: gives any in-flight keyup time to arrive
+                # (localhost WebSocket RTT ~1-2 ms; 10 ms is a very wide margin).
+                await asyncio.sleep(0.010)
                 if not _held_dirs:
                     break
 
