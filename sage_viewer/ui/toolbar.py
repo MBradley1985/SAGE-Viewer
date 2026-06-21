@@ -589,8 +589,7 @@ def build_toolbar(server, scene: Scene) -> None:
         while not _preload_done[0]:
             await asyncio.sleep(0.1)
 
-    if hasattr(ctrl, "on_server_ready"):
-        ctrl.on_server_ready.add(_start_preload)
+    ctrl.add("on_server_ready")(_start_preload)
 
     # ------------------------------------------------------------------
     # Widgets

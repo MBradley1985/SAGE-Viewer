@@ -80,6 +80,14 @@ class Scene:
         self.set_snapshot(self._current_snap)
         self._camera.reset()
 
+        # Start background preloading of all snapshots immediately so
+        # navigation is stall-free by the time the browser opens.
+        # Suppress per-snapshot log lines so they don't bury the server URL.
+        from sage_viewer.io import halo_reader, galaxy_reader
+        halo_reader.VERBOSE = False
+        galaxy_reader.VERBOSE = False
+        self.primary.loader.preload_all()
+
     # ------------------------------------------------------------------
     # Primary model & layer access
     # ------------------------------------------------------------------

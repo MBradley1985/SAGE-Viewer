@@ -137,6 +137,7 @@ def _explore_mode(args) -> None:
     print("[3/4] Building scene and Trame UI...")
     print(f"Snapshot : {scene.snap_label}")
     print(f"[4/4] Starting server on port {args.port}...")
+    print(f"         Background: preloading all {scene.snap_count} snapshots into memory...")
     print(f"\n  --> Open http://localhost:{args.port} in your browser\n")
 
     server.start(port=args.port, open_browser=False)

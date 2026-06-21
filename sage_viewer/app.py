@@ -368,6 +368,8 @@ def create_app(
                     return
                 scene.add_model(entry["par"])
             scene.switch_primary(name)
+            # Preload all snapshots of the new primary in the background.
+            scene.primary.loader.preload_all()
         finally:
             server.state.model_loading = False
             # Force-sync slider and snap chip to z=0 of the new model so the
