@@ -435,10 +435,19 @@ def create_app(
             server.state.model_loading = False
             server.state.box_strip_items = _build_box_strip_items()
             _refresh_models_state()
+            if hasattr(server.controller, "view_update"):
+                server.controller.view_update()
 
     @server.controller.set("set_active_box")
-    def on_set_active_box(name: str):
+    def on_set_active_box(extend, name: str):
         if not scene.has_model(name):
+            return
+        if extend:
+            # Shift+click: expand/contract camera selection, active box unchanged.
+            scene.toggle_camera_box(name)
+            server.state.flush()
+            if hasattr(server.controller, "view_update"):
+                server.controller.view_update()
             return
         old_name = scene.active_box_name
         if old_name == name:
@@ -455,6 +464,8 @@ def create_app(
         server.state.dirty(*BOX_PROFILE_KEYS)
         server.state.box_strip_items = _build_box_strip_items()
         server.state.flush()
+        if hasattr(server.controller, "view_update"):
+            server.controller.view_update()
 
     @server.controller.set("clear_box")
     def on_clear_box(name: str):
@@ -1226,7 +1237,7 @@ def create_app(
                         with html.Div(
                             v_for=("b in box_strip_items",),
                             key=("'bs-' + b.name",),
-                            click=(server.controller.set_active_box, "[b.name]"),
+                            click=(server.controller.set_active_box, "[$event.shiftKey, b.name]"),
                             style=(
                                 "b.active "
                                 "? 'display:flex;align-items:center;gap:6px;"

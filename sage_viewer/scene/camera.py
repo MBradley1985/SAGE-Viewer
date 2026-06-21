@@ -305,6 +305,33 @@ class CameraController:
             (0.0, 1.0, 0.0),
         ]
 
+    def focus_on_boxes(
+        self,
+        regions: list[tuple[float, float, float, float]],
+    ) -> None:
+        """Frame one or more simulation boxes.
+
+        regions: list of (offset_x, offset_y, offset_z, box_size).
+        A single box with zero offset reproduces the same view as reset().
+        """
+        if not regions:
+            return
+        xmin = min(ox      for ox, oy, oz, bs in regions)
+        xmax = max(ox + bs for ox, oy, oz, bs in regions)
+        ymin = min(oy      for ox, oy, oz, bs in regions)
+        ymax = max(oy + bs for ox, oy, oz, bs in regions)
+        zmin = min(oz      for ox, oy, oz, bs in regions)
+        zmax = max(oz + bs for ox, oy, oz, bs in regions)
+        cx = (xmin + xmax) / 2
+        cy = (ymin + ymax) / 2
+        cz = (zmin + zmax) / 2
+        span = max(xmax - xmin, ymax - ymin, zmax - zmin)
+        self._pl.camera_position = [
+            (cx, cy, cz + span * 1.7),
+            (cx, cy, cz),
+            (0.0, 1.0, 0.0),
+        ]
+
     def go_to_box_center(self) -> None:
         """Place the camera AT the box centre, looking along +z."""
         self._clear_indicator()

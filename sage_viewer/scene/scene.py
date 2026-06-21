@@ -14,6 +14,15 @@ from sage_viewer.scene.model import Model
 # Gap between adjacent boxes as a fraction of the primary box size.
 _BOX_GAP_FRACTION = 0.30
 
+# Floor-ring radii as fractions of the box size.
+_RING_INNER = 0.32
+_RING_OUTER = 0.42
+# Active box = cyan glow; idle boxes = dim grey.
+_RING_ACTIVE_COLOR   = "#00ffff"
+_RING_ACTIVE_OPACITY = 0.65
+_RING_IDLE_COLOR     = "#2d3748"
+_RING_IDLE_OPACITY   = 0.25
+
 
 class Scene:
     """Owner of the PyVista plotter and a dict of Models.
@@ -63,6 +72,13 @@ class Scene:
         # Adjacent-box state
         self._adjacent_order: list[str] = []   # names in placement order
         self._active_box_name: str = primary.name
+
+        # Floor-ring actors and camera-selection tracking.
+        # _camera_names is the set of boxes the camera frames; it is always a
+        # subset of loaded models.  Normal click → {clicked box}.  Shift+click
+        # toggles a box in/out of the set without changing the active box.
+        self._ring_actors:  dict[str, object] = {}
+        self._camera_names: set[str]          = {primary.name}
 
         # Label actors keyed by model name (only shown when multiple boxes are loaded)
         self._label_actors: dict[str, list] = {}
@@ -165,11 +181,26 @@ class Scene:
         return self._active_box_name
 
     def set_active_box(self, name: str) -> None:
-        """Switch which box the UI controls.  Does NOT save/restore profiles
-        (that is handled by the app layer which owns Trame state)."""
+        """Switch which box the UI controls and refocus the camera on it.
+        Profile save/restore is handled by the app layer."""
         if name not in self._models:
             return
         self._active_box_name = name
+        self._camera_names = {name}
+        self._update_rings()
+        self._focus_camera()
+        self._plotter.render()
+
+    def toggle_camera_box(self, name: str) -> None:
+        """Shift+click: add/remove a box from the camera-view selection."""
+        if name not in self._models:
+            return
+        if name in self._camera_names and len(self._camera_names) > 1:
+            self._camera_names.discard(name)
+        else:
+            self._camera_names.add(name)
+        self._focus_camera()
+        self._plotter.render()
 
     # ------------------------------------------------------------------
     # Adjacent-box management
@@ -199,12 +230,17 @@ class Scene:
             self._adjacent_order.remove(name)
             if self._active_box_name == name:
                 self._active_box_name = self._primary_name
+            self._camera_names.discard(name)
+            if not self._camera_names:
+                self._camera_names = {self._active_box_name}
             model.offset = np.zeros(3)
             model.visible = False
+            self._remove_ring(name)
             self._remove_label(name)
             self._recompute_offsets()
             self._update_labels()
-            self._plotter.reset_camera()
+            self._update_rings()
+            self._focus_camera()
             self._plotter.render()
             for cb in self._on_model_change:
                 cb()
@@ -222,7 +258,8 @@ class Scene:
             model.set_snapshot(model.snap_count - 1)
             model.visible = True
             self._update_labels()
-            self._plotter.reset_camera()
+            self._update_rings()
+            self._focus_camera()
             self._plotter.render()
             for cb in self._on_model_change:
                 cb()
@@ -328,6 +365,66 @@ class Scene:
             self._plotter.render()
 
     # ------------------------------------------------------------------
+    # Floor rings (active = cyan, idle = dim grey)
+    # Shown only when multiple boxes are loaded.
+    # ------------------------------------------------------------------
+
+    def _make_ring_mesh(self, name: str) -> pv.PolyData:
+        cx, _, cz = self._box_center_xz(name)
+        bs = self._models[name].box_size
+        return pv.Disc(
+            center=(cx, 0.0, cz), normal=(0, 1, 0),
+            inner=bs * _RING_INNER, outer=bs * _RING_OUTER,
+            c_res=64, r_res=1,
+        )
+
+    def _add_ring(self, name: str, active: bool) -> None:
+        mesh  = self._make_ring_mesh(name)
+        color   = _RING_ACTIVE_COLOR   if active else _RING_IDLE_COLOR
+        opacity = _RING_ACTIVE_OPACITY if active else _RING_IDLE_OPACITY
+        actor = self._plotter.add_mesh(
+            mesh, color=color, opacity=opacity, style="surface",
+            lighting=False, show_scalar_bar=False,
+            render=False, reset_camera=False,
+        )
+        self._ring_actors[name] = actor
+
+    def _remove_ring(self, name: str) -> None:
+        actor = self._ring_actors.pop(name, None)
+        if actor is not None:
+            self._plotter.remove_actor(actor, render=False)
+
+    def _update_rings(self) -> None:
+        """Rebuild all floor rings; remove all if in single-box mode."""
+        if len(self._adjacent_order) == 0:
+            for name in list(self._ring_actors):
+                self._remove_ring(name)
+            return
+        ring_names = [self._primary_name] + list(self._adjacent_order)
+        for name in list(self._ring_actors):
+            if name not in ring_names:
+                self._remove_ring(name)
+        for name in ring_names:
+            self._remove_ring(name)
+            self._add_ring(name, active=(name == self._active_box_name))
+
+    # ------------------------------------------------------------------
+    # Camera selection focus
+    # ------------------------------------------------------------------
+
+    def _focus_camera(self) -> None:
+        """Reposition the camera to frame the current camera-selection boxes."""
+        names = [n for n in self._camera_names if n in self._models]
+        if not names:
+            names = [self._active_box_name]
+        regions = []
+        for n in names:
+            m = self._models[n]
+            off = m.offset
+            regions.append((float(off[0]), float(off[1]), float(off[2]), float(m.box_size)))
+        self._camera.focus_on_boxes(regions)
+
+    # ------------------------------------------------------------------
     # Overlay model management (unchanged from before)
     # ------------------------------------------------------------------
 
@@ -359,7 +456,11 @@ class Scene:
         model.shutdown()
         if name in self._adjacent_order:
             self._adjacent_order.remove(name)
+        self._remove_ring(name)
         self._remove_label(name)
+        self._camera_names.discard(name)
+        if not self._camera_names:
+            self._camera_names = {self._active_box_name}
         for cb in self._on_model_change:
             cb()
 
@@ -379,6 +480,7 @@ class Scene:
         # If old primary was active, transfer focus to new primary
         if self._active_box_name == self._primary_name:
             self._active_box_name = name
+            self._camera_names = {name}
 
         self._primary_name = name
 
@@ -404,6 +506,7 @@ class Scene:
         # Recompute adjacent offsets relative to new primary
         self._recompute_offsets()
         self._update_labels()
+        self._update_rings()
 
         if self._focus_region is not None:
             halos, galaxies = self.primary.loader.get(self._current_snap)
