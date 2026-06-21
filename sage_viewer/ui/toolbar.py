@@ -611,11 +611,11 @@ def build_toolbar(server, scene: Scene) -> None:
     # the left.
     v3.VSpacer()
 
-    # Cache warm-up indicator — sits just left of the transport controls and
-    # only shows while snapshots are still loading in the background.
+    # Status chip — shows "Loading galaxies..." during model switch/load/overlay,
+    # or "Loading snapshots... X/Y" while the snapshot cache warms up.
     v3.VChip(
-        "{{ preload_status }}",
-        v_show=("preload_status",),
+        "{{ model_loading ? 'Loading galaxies...' : preload_status }}",
+        v_show=("model_loading || preload_status",),
         size="small",
         color="#FFD700",
         prepend_icon="mdi-database-clock-outline",

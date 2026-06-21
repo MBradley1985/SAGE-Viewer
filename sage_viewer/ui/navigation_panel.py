@@ -1307,7 +1307,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     # Cache the last-highlighted set so re-toggling re-shows the SAME
     # positions even if the snapshot or nav_gal_idx have drifted in between.
-    _highlight_cache: dict = {"positions": None, "regimes": None, "gidx": -1, "snap": -1}
+    _highlight_cache: dict = {
+        "positions": None, "regimes": None, "gidx": -1, "snap": -1, "central_idx": -1,
+    }
 
     @ctrl.set("highlight_group_members")
     def on_highlight_group_members():
@@ -1321,6 +1323,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             _push()
             return
 
+        import numpy as np
         from sage_viewer.utils.group_info import member_indices
         try:
             gidx = int(state.nav_gal_idx)
@@ -1340,23 +1343,38 @@ def build_navigation_panel(server, scene: Scene) -> None:
             members = member_indices(galaxies, gidx)
             if len(members) == 0:
                 return
+            # Find the FOF central (type 0); fall back to first member
+            member_types = galaxies.gal_type[members]
+            central_mask = (member_types == 0)
+            central_idx = int(members[np.argmax(central_mask)]) if central_mask.any() else int(members[0])
+            # others excludes only the selected galaxy (central stays in for regime colouring)
             others = members[members != gidx]
             positions = galaxies.positions[others].copy()
             has_regime = scene.primary.fields_available.get("cgm_regime", False)
             regimes = galaxies.cgm_regime[others].copy() if has_regime else None
-            _highlight_cache["positions"] = positions
-            _highlight_cache["regimes"]   = regimes
-            _highlight_cache["gidx"]      = gidx
-            _highlight_cache["snap"]      = cur_snap
+            _highlight_cache["positions"]   = positions
+            _highlight_cache["regimes"]     = regimes
+            _highlight_cache["gidx"]        = gidx
+            _highlight_cache["snap"]        = cur_snap
+            _highlight_cache["central_idx"] = central_idx
+
+        central_idx = _highlight_cache["central_idx"]
+        # Draw all members (including central) with regime colours
         cam._add_member_indicators(
             _highlight_cache["positions"],
             _highlight_cache["regimes"],
         )
-        # Selected galaxy: white border + regime fill
+        # Paint gold on top of the central's regime dot (larger point wins the depth fight)
+        if 0 <= central_idx < galaxies.count and central_idx != gidx:
+            cam._add_central_gold_indicator(galaxies.positions[central_idx])
+        # Selected galaxy: gold if it IS the central, else regime colour
         if 0 <= gidx < galaxies.count:
-            has_regime = scene.primary.fields_available.get("cgm_regime", False)
-            regime = int(galaxies.cgm_regime[gidx]) if has_regime else None
-            cam._add_selected_indicator(galaxies.positions[gidx], regime)
+            if gidx == central_idx:
+                cam._add_selected_indicator(galaxies.positions[gidx], color="gold")
+            else:
+                has_regime = scene.primary.fields_available.get("cgm_regime", False)
+                regime = int(galaxies.cgm_regime[gidx]) if has_regime else None
+                cam._add_selected_indicator(galaxies.positions[gidx], regime)
         _push()
 
     # ------------------------------------------------------------------
@@ -1784,13 +1802,28 @@ def build_navigation_panel(server, scene: Scene) -> None:
         if fmt == "gif":
             try:
                 import imageio.v2 as imageio
+                import numpy as _np_gif
+                from PIL import Image as _PilGif
                 frames = sorted(frames_dir.glob("frame_*.jpg"))
                 if not frames:
                     _remove_dir(frames_dir)
                     return "ERROR: no frames captured"
-                imgs = [imageio.imread(p) for p in frames]
-                # loop=0 = infinite, loop=1 = play once with no further repeats
-                imageio.mimsave(out_path, imgs, fps=fps, loop=0 if gif_loop else 1)
+                # Determine even crop from the first frame (applied uniformly).
+                _f0 = _PilGif.open(str(frames[0]))
+                _w0, _h0 = _f0.size
+                _f0.close()
+                ew = _w0 if _w0 % 2 == 0 else _w0 - 1
+                eh = _h0 if _h0 % 2 == 0 else _h0 - 1
+                need_crop = (ew != _w0 or eh != _h0)
+                imgs = []
+                for p in frames:
+                    img = _PilGif.open(str(p)).convert("RGB")
+                    if need_crop:
+                        img = img.crop((0, 0, ew, eh))
+                    imgs.append(_np_gif.array(img))  # copy; allows img to be freed
+                    img.close()
+                # loop=0 = infinite, loop=1 = play once
+                imageio.mimsave(str(out_path), imgs, fps=fps, loop=0 if gif_loop else 1)
                 _remove_dir(frames_dir)
                 return str(out_path)
             except Exception as e:
@@ -2227,7 +2260,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             except Exception:
                 pass
             try:
-                self._proc.terminate()
+                self._proc.kill()
             except Exception:
                 pass
 
@@ -2245,6 +2278,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
     _consoles_data: dict[int, dict] = {1: _make_console_data()}
     _active_console = [1]
     _console_id_counter = [1]
+
+    import atexit as _atexit
+
+    def _kill_all_ptys() -> None:
+        for d in _consoles_data.values():
+            pty_sess = d.get("pty")
+            if pty_sess:
+                pty_sess.close()
+
+    _atexit.register(_kill_all_ptys)
 
     def _truncate(text: str, n: int = 4000) -> str:
         if len(text) <= n:
@@ -2539,6 +2582,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.flush()
 
     _lib_id = [0]
+    _lib_items: list[dict] = []   # authoritative list; never read back from state proxy
 
     @ctrl.set("library_open")
     def on_library_open(path: str):
@@ -2552,30 +2596,35 @@ def build_navigation_panel(server, scene: Scene) -> None:
         kind, mime = _MEDIA_EXTS[ext]
         try:
             data = p.read_bytes()
-        except OSError as e:
+        except OSError:
             return
         b64 = base64.b64encode(data).decode("ascii")
         _lib_id[0] += 1
-        new_id = _lib_id[0]
+        idx = len(_lib_items)
         new_item = {
-            "id":       new_id,
+            "id":       _lib_id[0],
             "name":     p.name,
             "kind":     kind,
-            "data_url": f"data:{mime};base64,{b64}",
-            "top_px":   32 + ((new_id - 1) % 8) * 40,
+            "data_url": f"data:{mime};base64,{b64}{'#' + str(_lib_id[0]) if mime == 'image/gif' else ''}",
+            "top_px":   32  + (idx % 6) * 50,
+            "right_px": 24  + (idx % 6) * 44,
         }
-        state.library_items = [*state.library_items, new_item]
+        _lib_items.append(new_item)
+        state.library_items = list(_lib_items)
         state.flush()
         _push()
 
     @ctrl.set("library_close")
     def on_library_close():
+        _lib_items.clear()
         state.library_items = []
         state.flush()
 
     @ctrl.set("library_close_item")
     def on_library_close_item(item_id: int):
-        state.library_items = [x for x in state.library_items if x["id"] != int(item_id)]
+        target = int(item_id)
+        _lib_items[:] = [x for x in _lib_items if x["id"] != target]
+        state.library_items = list(_lib_items)
         state.flush()
 
     @ctrl.set("library_delete")
@@ -2680,9 +2729,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         _, galaxies = scene._loader.get(scene.current_snap)
         if gidx < 0 or gidx >= galaxies.count:
             return
-        has_regime = scene.primary.fields_available.get("cgm_regime", False)
-        regime = int(galaxies.cgm_regime[gidx]) if has_regime else None
-        cam._add_selected_indicator(galaxies.positions[gidx], regime)
+        cam._add_selected_indicator(galaxies.positions[gidx], color="limegreen")
         _push()
 
     @ctrl.set("toggle_focus")

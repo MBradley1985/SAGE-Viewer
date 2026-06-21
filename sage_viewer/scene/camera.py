@@ -61,6 +61,21 @@ class CameraController:
         self._member_actors.clear()
         self._selected_actors.clear()
 
+    def _add_central_gold_indicator(self, position: "np.ndarray") -> None:
+        """Gold splat for the FOF central galaxy — appended to _member_actors so it clears with the group."""
+        cloud = pv.PolyData(np.asarray([position], dtype=np.float64))
+        a = self._pl.add_mesh(
+            cloud,
+            color="gold",
+            point_size=30.0,
+            render_points_as_spheres=True,
+            opacity=0.90,
+            show_scalar_bar=False,
+            render=False,
+            reset_camera=False,
+        )
+        self._member_actors.append(a)
+
     def _add_member_indicators(
         self,
         positions: "np.ndarray",
@@ -100,32 +115,24 @@ class CameraController:
         self,
         position: "np.ndarray",
         regime: "int | None" = None,
+        color: "str | None" = None,
     ) -> None:
-        """Selected galaxy: white border sphere + regime-coloured fill sphere."""
+        """Selected galaxy: white border sphere + coloured fill sphere.
+
+        color: if given, overrides the regime-based fill colour.
+        """
         for a in self._selected_actors:
             self._pl.remove_actor(a, render=False)
         self._selected_actors.clear()
         if position is None:
             return
         cloud = pv.PolyData(np.asarray([position], dtype=np.float64))
-        # White border (rendered first, larger)
-        a_border = self._pl.add_mesh(
-            cloud,
-            color="white",
-            point_size=36.0,
-            render_points_as_spheres=True,
-            opacity=0.90,
-            show_scalar_bar=False,
-            render=False,
-            reset_camera=False,
-        )
-        self._selected_actors.append(a_border)
-        # Regime fill (smaller, layered on top)
-        fill_color = self._REGIME_COLORS.get(regime if regime in (0, 1) else -1, "cyan")
+        if color is None:
+            color = self._REGIME_COLORS.get(regime if regime in (0, 1) else -1, "cyan")
         a_fill = self._pl.add_mesh(
             cloud,
-            color=fill_color,
-            point_size=26.0,
+            color=color,
+            point_size=30.0,
             render_points_as_spheres=True,
             opacity=0.90,
             show_scalar_bar=False,

@@ -1,6 +1,6 @@
 # SAGE-Viewer Handoff
 
-Snapshot of the project so a new chat can pick up cleanly. Reflects state at the close of the post-0.3.0 multi-box cycle.
+Snapshot of the project so a new chat can pick up cleanly. Reflects state at the close of the post-0.3.0 draw-widget + recording cycle.
 
 ---
 
@@ -48,7 +48,6 @@ SAGE-Viewer/
 │   │   ├── halo_layer.py            # 3-layer NFW gaussian splats; _combined_mask() guard
 │   │   ├── galaxy_layer.py          # outer envelope + cold-gas envelope + outer property; _combined_mask() guard
 │   │   ├── fof_layer.py             # filter-aware FoF satellite→central gold lines
-│   │   ├── heatmap_layer.py         # 2D projected halo density heatmap (number/mass, 256 bins)
 │   │   └── camera.py                # fly-to / sphere & box wireframe indicators; focus_on_boxes()
 │   ├── ui/
 │   │   ├── toolbar.py               # transport + slider + speed/rotation
@@ -74,6 +73,75 @@ SAGE-Viewer/
 ├── HANDOFF.md                       # this file
 └── pyproject.toml
 ```
+
+---
+
+## Recent changes (post-0.3.0 wizard + library + HPC)
+
+### HPC install script (`install_hpc.sh`)
+`install_hpc.sh` at repo root. Usage:
+```bash
+module load python/3.12.0          # cluster-specific
+./install_hpc.sh                   # creates .venv and pip installs
+./install_hpc.sh /scratch/$USER/sage-env   # custom venv location
+```
+Checks Python ≥ 3.10, upgrades pip, `pip install -e .` (editable — `git pull` = instant update). Checks for `ffmpeg` separately with a `module load` hint.
+
+### Wizard navigation — `self._back`
+All wizard Back buttons used to hardcode `"back_fresh"`, so **Run SAGE26 → Back** sent the user to the Start Fresh submenu instead of the main menu.
+
+Fix: `self._back: str = "back_fresh"` added to `__init__` and `reset_and_start`. Set to `"back_main"` at the top of `_step_run_sage26_existing`; set to `"back_fresh"` at the top of `_step_fresh_choice`. All Back button `value` fields in `_step_compile`, `_step_pick_par`, `_step_create_par`, `_step_par_edit`, `_step_run_sage26` use `self._back`.
+
+### Wizard — OutputDir mkdir
+`_step_run_sage26` now calls `parse_par(self._par_path)` after saving and does `cfg.output_dir.mkdir(parents=True, exist_ok=True)` before running the binary. SAGE26 won't create the directory itself.
+
+### Wizard — text and layout
+- "Edit the file below" → "Edit the file to the right" (par editor is to the right, not below)
+- "Running SAGE26 — output streams below" → "Running SAGE26 — output follows"
+- Terminal card: `overflow:hidden` added; solo `max-width` widened to `1100px` (was `860px`); side-by-side stays `860px`
+- Choice button area: `max-height:120px; overflow-y:auto` so many buttons don't push terminal out of view
+- Buttons shrink to `x-small` when `wiz_choices.length > 5`
+- Logo shrunk from `140px` to `90px`
+
+### Library pop-out fixes
+Three bugs fixed in `navigation_panel.py` + `app.py`:
+
+**Close reliability** — `on_library_close_item` read `state.library_items` back from the Trame proxy (stale after mutations). Fix: authoritative `_lib_items: list[dict]` Python list; close mutates `_lib_items[:]` directly and rebuilds state from it.
+
+**Stacking** — all cards were hardcoded to `top:32px; right:24px`. Fix: `top_px` and `right_px` computed from `idx = len(_lib_items)` with diagonal cascade (50 px down + 44 px left, wrapping at 6); Vue template style is a JS template literal `` `...${item.top_px}px...${item.right_px}px...` ``.
+
+**GIF restart** — Chrome caches GIF animation state by URL so reopening the same file continued mid-animation. Fix: GIF data URLs get a unique `#N` fragment (e.g. `data:image/gif;base64,...#3`) on each open; fragment makes the URL string distinct so browser discards cached animation.
+
+### Console PTY cleanup
+`atexit` handler `_kill_all_ptys()` registered after `_consoles_data` is created. Iterates all sessions and calls `close()` on any live PTY on app exit / Ctrl+C. `_PTYSession.close()` upgraded from `proc.terminate()` to `proc.kill()` (SIGKILL).
+
+---
+
+## Recent changes (post-0.3.0 draw widgets + recording)
+
+### Draw widget placement — camera focal point
+
+Both Draw Sphere and Draw Box now place the widget centred on the camera focal point (what the user is looking at) when first activated, sized to the current field of view. Previously they used stored `nav_box_*` / `nav_cx/cy/cz` coordinates which could be off-screen.
+
+- **Draw Sphere** (`on_toggle_draw_sphere`): `cx, cy, cz = camera.focal_point`; `r = max(0.5, d * tan(FOV/2) * 0.25)` where `d = norm(camera.position − focal_point)`.
+- **Draw Box** (`on_toggle_draw_box`): centre = `camera.focal_point`; half-extent `h = max(1.0, d * tan(FOV/2) * 0.5)`.
+- Placement also writes the computed values back into `state.nav_x/y/z/distance` (sphere) and `state.nav_box_*` (box) so Locking without dragging still navigates to the correct position.
+
+### Movie recording fixes (`navigation_panel.py`)
+
+Four bugs fixed in `_record_loop` / `on_stop_recording`:
+
+**1. FPS not honoured during playback**
+The loop only wrote a frame when `state.playback_frame` changed (new snapshot). At slow playback speed each snapshot takes many seconds of real time but produced only one frame, making all recordings play back at the same speed regardless of settings. Fix: always write a frame every `1/fps` seconds; the last decoded PIL image is cached in `last_frame` and reused (written as a duplicate) when the playback frame hasn't changed yet.
+
+**2. UI freezes (can't stop) when scene is heavy**
+When frame capture took longer than `1/fps`, the compensated sleep collapsed to `0.0` — no `await` happened, the event loop starved, and Stop/Pause clicks were never processed. Fix: minimum `0.001 s` sleep per tick so the event loop always gets control.
+
+**3. UI freezes on Stop**
+`_finalize_movie()` (imageio GIF encode or `subprocess.run(ffmpeg ...)`) was called synchronously inside the Trame controller, blocking the UI for the full encode duration. Fix: finalize runs in a `daemon=True` thread; UI shows "Encoding…" immediately; `state.last_movie` is updated to the path (or error string) when encoding finishes.
+
+**4. Slow frame capture → low FPS**
+Intermediate frames were saved as PNG (lossless zlib, ~100 ms/frame). At typical viewport sizes 30 FPS was unachievable. Fix: intermediate frames saved as JPEG quality 95 (~10 ms/frame). Output quality is unaffected — both GIF (imageio) and MOV (ffmpeg H.264) are lossy encoders. `_finalize_movie` globs `frame_*.jpg` and passes them to imageio / ffmpeg accordingly.
 
 ---
 
@@ -110,10 +178,18 @@ SAGE-Viewer/
 - The halo colormap VSelect has `disabled=("halo_color_mode === 'mvir'",)`.
 
 #### Draw Box widget handle fix (`navigation_panel.py`)
-VTK's built-in box handles scale with world-space (grow enormous when zoomed in). Fixed by:
-1. Hiding VTK handles: `rep.GetHandleProperty().SetOpacity(0.0)` and `rep.GetSelectedHandleProperty().SetOpacity(0.0)`.
-2. Drawing a custom `_box_corner_actor` — a PyVista PolyData of 8 corner points with fixed `point_size=12` — rebuilt in `_box_cb` on every drag and in all 4 clear paths.
-`_rescale_box_handles`, `_attach_box_cam_observer`, `_detach_box_cam_observer`, `_box_cam_obs` have all been removed.
+VTK's internal `SizeHandles()` (C++, not Python-callable) recomputes handle sphere radii based on camera distance on every Scale/Translate interaction, making the handles jump size after each drag. `SetHandleSize()` has no visual effect in VTK 9.5 — not wired to sphere geometry. `GetRepresentation()` does not exist on `vtkBoxWidget` (only on `vtkBoxWidget2`, which PyVista does not use).
+
+Fix:
+1. Before `add_box_widget`: snapshot all existing `vtkSphereSource` IDs in the renderer.
+2. After `add_box_widget`: collect the new sphere sources (= the 7 handle spheres) via `actor.GetMapper().GetInputAlgorithm()`.
+3. Store `_handle_world_r[0]` = initial radius from `sources[0].GetRadius()`.
+4. Two observers call `_rescale_box_handles()` which does `src.SetRadius(r); src.Modified()` on each source:
+   - `widget.AddObserver("EndInteractionEvent", ...)` — fires after every Scale/Translate (after VTK's own `SizeHandles()` but before `Render()`)
+   - `cam.AddObserver("ModifiedEvent", ...)` — fires on every zoom/pan/orbit
+5. `_detach_box_cam_observer()` removes both observers; called in all 4 clear paths.
+
+Key storage slots: `_draw_box_widget`, `_box_cam_obs_tag`, `_handle_world_r`, `_box_handle_sources` (all `list` wrappers for closure-mutability).
 
 ---
 
@@ -352,10 +428,7 @@ Do not re-order steps 1–6 or the old box's state leaks into the new one.
 
 ## Likely next-up things
 
-- **Camera bookmarks UI** lives in a tab; could surface as a hover-out menu in the toolbar.
-- **Library tab** — deletion and renaming done; inline thumbnails for movies still pending.
 - **`HALO_CB` / `GAL_CB` colour-by descriptors** still hard-coded — could be derived from `model_fields` so unsupported fields don't even appear in the dropdown.
-- **PTY session cleanup** — orphaned shell processes on browser disconnect or app shutdown.
 
 ---
 
@@ -379,5 +452,15 @@ Do not re-order steps 1–6 or the old box's state leaks into the new one.
 - `sage_theme.css` served via `enable_module` for reliable global CSS injection.
 - All UI-polish requests from the 0.3.0 cycle remain implemented (Enter-to-run, pop-out console, draw widgets, etc.).
 - `sage-viewer` launcher script at repo root — run `./sage-viewer --par ...` without needing Python bin in PATH.
-- Draw Box widget handles fixed: VTK built-in handles hidden (`SetOpacity(0.0)`), replaced with fixed-pixel PyVista corner-point overlay (`_box_corner_actor`, `_rebuild_box_corners`) that stays constant size at any zoom level.
-- `heatmap_layer.py` removed (was never wired to UI; density colour mode also already removed).
+- **Draw Box widget handles**: constant world-space size via direct `vtkSphereSource.SetRadius()` in `EndInteractionEvent` + camera `ModifiedEvent` observers (see handle fix section above for full detail).
+- **Draw widget placement**: both widgets now appear centred on the camera focal point, sized to the current FOV.
+- **Movie recording**: FPS now honoured during slow playback; UI stays responsive during recording and on Stop; encoding runs in a background thread; intermediate frames saved as JPEG for ~10× faster capture.
+- `heatmap_layer.py` deleted (was never wired to UI).
+- **PTY session cleanup**: `atexit` handler (`_kill_all_ptys`) registered in `navigation_panel.py` after `_consoles_data` is created; kills all live PTY shell processes on app exit / Ctrl+C. `_PTYSession.close()` upgraded from `proc.terminate()` (SIGTERM) to `proc.kill()` (SIGKILL). Browser-disconnect cleanup is not handled (Trame has no reliable per-client hook) but shutdown covers the common case.
+- **Library pop-out fixes**: close button now reliable (authoritative `_lib_items` Python list as source of truth — never reads back from Trame state proxy); cards no longer open stacked on top of each other (diagonal cascade: 50 px down + 44 px left per card, wrapping at 6; position driven by JS template literal in the Vue style binding).
+- **GIF restart**: GIF data URLs get a unique `#N` fragment on each open so Chrome always starts from frame 0.
+- **HPC install**: `install_hpc.sh` at repo root — creates a venv and editable-installs in one step; designed for module-system clusters.
+- **Wizard navigation**: `self._back` instance variable routes Back buttons correctly from Run SAGE26 flow (`back_main`) vs Start Fresh flow (`back_fresh`).
+- **Wizard OutputDir**: wizard creates `OutputDir` via `parse_par()` + `mkdir` before running SAGE26.
+- **Wizard UI**: terminal card `overflow:hidden`, solo card widened to `1100px`, button area capped at `120px` with scroll, buttons shrink at >5 choices, logo `90px`.
+- **Console PTY cleanup**: `atexit` handler kills all shell sessions on app exit; `close()` upgraded to SIGKILL.

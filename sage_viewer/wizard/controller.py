@@ -233,6 +233,7 @@ class WizardController:
         self._models:     list[dict]  = []
         self._wiz_seq:    int         = 0
         self._wiz_buf:    bytearray   = bytearray()  # replay buffer for late-mounting xterm
+        self._back:       str         = "back_fresh"  # Back target for par/compile steps
 
         self._st.wiz_step          = 0
         self._st.wiz_lines         = []   # kept for compat; no longer populated
@@ -260,6 +261,7 @@ class WizardController:
         self._par_path   = None
         self._models     = []
         self._wiz_buf    = bytearray()
+        self._back       = "back_fresh"
         self._st.wiz_step          = 0
         self._st.wiz_lines         = []
         self._st.wiz_choices       = []
@@ -566,6 +568,7 @@ class WizardController:
 
     async def _step_run_sage26_existing(self) -> None:
         """Run SAGE26 with the existing local installation — no clone step."""
+        self._back = "back_main"
         self._st.wiz_step = 2
         if not self._sage26_dir:
             self._emit("SAGE26 not found locally.", "err")
@@ -604,6 +607,7 @@ class WizardController:
         self._set_choices(choices)
 
     async def _step_fresh_choice(self) -> None:
+        self._back = "back_fresh"
         self._st.wiz_step = 2
         choices: list[dict] = []
 
@@ -639,7 +643,7 @@ class WizardController:
         )
         if rc != 0:
             self._emit("Clone failed. Check internet connection and try again.", "err")
-            self._set_choices([{"label": "Back", "value": "back_fresh",
+            self._set_choices([{"label": "Back", "value": self._back,
                                 "icon": "mdi-arrow-left", "disabled": False}])
             return
         self._sage26_dir = target
@@ -657,7 +661,7 @@ class WizardController:
         rc = await self._run_cmd(["make"], cwd=self._sage26_dir)
         if rc != 0:
             self._emit("Compilation failed. See output above.", "err")
-            self._set_choices([{"label": "Back", "value": "back_fresh",
+            self._set_choices([{"label": "Back", "value": self._back,
                                 "icon": "mdi-arrow-left", "disabled": False}])
             return
         self._emit("Compilation complete!", "ok")
@@ -675,14 +679,14 @@ class WizardController:
         if not par_files:
             self._emit("No .par files found.", "warn")
             self._emit(
-                "Create a millennium.par template below, or add a "
-                "parameter file to SAGE26/input/ and rescan.",
+                "Use 'Create config file' below, or add a .par file "
+                "to SAGE26/input/ and rescan.",
                 "info",
             )
             self._emit("", "info")
             self._set_choices([
                 _create_choice,
-                {"label": "Back", "value": "back_fresh",
+                {"label": "Back", "value": self._back,
                  "icon": "mdi-arrow-left", "disabled": False},
             ])
             return
@@ -698,7 +702,7 @@ class WizardController:
                 for p in par_files
             ]
             choices.append(_create_choice)
-            choices.append({"label": "Back", "value": "back_fresh",
+            choices.append({"label": "Back", "value": self._back,
                             "icon": "mdi-arrow-left", "disabled": False})
             self._set_choices(choices)
 
@@ -714,7 +718,7 @@ class WizardController:
              "value": "do_create_par",
              "icon": "mdi-check", "disabled": False},
             {"label": "Back",
-             "value": "back_fresh",
+             "value": self._back,
              "icon": "mdi-arrow-left", "disabled": False},
         ])
 
@@ -733,7 +737,7 @@ class WizardController:
         self._emit(f"Creating config file: {dest}", "info")
         dest.write_text(_MILLENNIUM_PAR_TEMPLATE)
         self._par_path = dest
-        self._emit("Template written. Edit the paths below, then Save & Run.", "ok")
+        self._emit("Template written. Edit the paths to the right, then Save & Run.", "ok")
         self._emit("", "info")
         await self._step_par_edit()
 
@@ -742,7 +746,7 @@ class WizardController:
         if not self._par_path:
             return
         self._emit(f"Parameter file : {self._par_path}", "info")
-        self._emit("Edit the file below, then click Save & Run.", "info")
+        self._emit("Edit the file to the right, then click Save & Run.", "info")
         self._emit("", "info")
         try:
             text = self._par_path.read_text()
@@ -755,7 +759,7 @@ class WizardController:
         self._set_choices([
             {"label": "Save & Run SAGE26", "value": "save_run_sage26",
              "icon": "mdi-play", "disabled": False},
-            {"label": "Back", "value": "back_fresh",
+            {"label": "Back", "value": self._back,
              "icon": "mdi-arrow-left", "disabled": False},
         ])
 
@@ -772,6 +776,15 @@ class WizardController:
                 self._emit(f"Could not save par file: {exc}", "err")
                 return
 
+            # Create OutputDir before SAGE26 runs — it won't create it itself.
+            try:
+                from sage_viewer.io.par_reader import parse_par
+                cfg = parse_par(self._par_path)
+                cfg.output_dir.mkdir(parents=True, exist_ok=True)
+                self._emit(f"Output dir ready: {cfg.output_dir}", "ok")
+            except Exception as exc:
+                self._emit(f"Warning: could not create OutputDir — {exc}", "warn")
+
         # Find binary
         sage_bin: Path | None = None
         if self._sage26_dir:
@@ -784,19 +797,19 @@ class WizardController:
                     break
         if sage_bin is None:
             self._emit("SAGE26 binary not found (expected bin/sage).", "err")
-            self._set_choices([{"label": "Back", "value": "back_fresh",
+            self._set_choices([{"label": "Back", "value": self._back,
                                 "icon": "mdi-arrow-left", "disabled": False}])
             return
 
         self._emit("", "info")
-        self._emit("Running SAGE26 — output streams below.", "info")
+        self._emit("Running SAGE26 — output follows.", "info")
         self._emit("This may take a while for large simulations.", "info")
         self._emit("", "info")
         rc = await self._run_cmd([str(sage_bin), str(self._par_path)],
                                  cwd=self._sage26_dir)
         if rc != 0:
             self._emit(f"SAGE26 exited with code {rc}. See output above.", "err")
-            self._set_choices([{"label": "Back", "value": "back_fresh",
+            self._set_choices([{"label": "Back", "value": self._back,
                                 "icon": "mdi-arrow-left", "disabled": False}])
             return
 
@@ -805,7 +818,7 @@ class WizardController:
         self._models = self._find_models()
         if not self._models:
             self._emit("No models found after run. Check OutputDir in the par file.", "err")
-            self._set_choices([{"label": "Back", "value": "back_fresh",
+            self._set_choices([{"label": "Back", "value": self._back,
                                 "icon": "mdi-arrow-left", "disabled": False}])
             return
         if len(self._models) == 1:

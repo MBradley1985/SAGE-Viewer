@@ -4,6 +4,84 @@ All notable changes to SAGE-Viewer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — post-0.3.0 (wizard + library + HPC)
+
+### Added
+
+#### HPC install script (`install_hpc.sh`)
+- New `install_hpc.sh` script at the repo root creates a Python venv and pip-installs SAGE-Viewer in editable mode (`-e`) in one step
+- Checks Python ≥ 3.10; prints a clear error if the version is too old or `python3` is not in PATH
+- Accepts an optional positional argument to place the venv on a fast scratch filesystem (`./install_hpc.sh /scratch/$USER/sage-env`)
+- Checks for `ffmpeg` separately and prints a `module load ffmpeg` hint if absent
+- Editable install means `git pull` updates the code immediately with no reinstall
+
+### Fixed
+
+#### Launch Mode wizard — navigation
+- Clicking **Run SAGE26** from the main menu then **Back** from any downstream step (pick par, par edit, compile failure) now correctly returns to the main menu instead of the Start Fresh submenu
+- Fix: `self._back` instance variable set to `"back_main"` at the top of `_step_run_sage26_existing` and `"back_fresh"` at the top of `_step_fresh_choice`; all Back buttons in `_step_compile`, `_step_pick_par`, `_step_create_par`, `_step_par_edit`, and `_step_run_sage26` use `self._back` instead of the hardcoded `"back_fresh"`
+
+#### Launch Mode wizard — OutputDir creation
+- SAGE26 does not create its `OutputDir` itself and will fail if it does not exist
+- Wizard now parses `OutputDir` from the saved par file via `parse_par()` and calls `Path.mkdir(parents=True, exist_ok=True)` before launching the binary; emits `"Output dir ready: <path>"` in green or a yellow warning if mkdir fails (non-fatal)
+
+#### Launch Mode wizard — UI text
+- "Edit the file below" → "Edit the file to the right" (par editor is side-by-side, not below)
+- "Edit the paths below" → "Edit the paths to the right"
+- "Running SAGE26 — output streams below" → "Running SAGE26 — output follows"
+- No-par-files hint reworded to "Use 'Create config file' below, or add a .par file to SAGE26/input/ and rescan"
+
+#### Launch Mode wizard — layout
+- Terminal card has `overflow:hidden` so it never busts out of its `640 px / 80 vh` container
+- Choice button area capped at `max-height:120px; overflow-y:auto` so many buttons never push terminal content out of view
+- Terminal card `max-width` is now dynamic: `1100 px` when the par editor is hidden (solo), `860 px` when side-by-side
+- Choice buttons shrink to `x-small` when there are more than 5 choices (many models), `small` otherwise
+- SAGE logo reduced from `140 px` to `90 px`
+
+#### Library pop-out — close reliability
+- `on_library_close_item` previously read `state.library_items` back from the Trame state proxy, which can be stale after multiple mutations
+- Fix: authoritative `_lib_items: list[dict]` Python list as source of truth; close mutates `_lib_items[:]` directly and rebuilds `state.library_items` from it
+
+#### Library pop-out — stacking
+- All pop-out cards were hardcoded to `top:32px; right:24px` regardless of the `top_px` field calculated in Python — every card opened on top of the previous one
+- Fix: each new card gets `top_px` and `right_px` computed from the current open count (`idx = len(_lib_items)`) with a diagonal cascade (50 px down + 44 px left per card, wrapping at 6); Vue template uses a JS template literal so both values are reactive
+
+#### Library pop-out — GIF restart
+- Browsers (especially Chrome) cache GIF animation state by URL; reopening the same GIF continued mid-animation rather than from frame 0
+- Fix: GIF data URLs get a unique `#N` fragment (`data:image/gif;base64,...#3`) on each open — the fragment makes the URL string distinct so the browser discards the cached animation; PNG/JPG/TIFF/MOV unaffected
+
+#### Console PTY session cleanup
+- Shell processes spawned by console sessions were never killed on app shutdown (Ctrl+C) — left as orphans
+- Fix: `atexit` handler `_kill_all_ptys()` registered in `navigation_panel.py` immediately after `_consoles_data` is created; iterates all sessions and calls `close()` on any live PTY
+- `_PTYSession.close()` upgraded from `proc.terminate()` (SIGTERM, ignorable) to `proc.kill()` (SIGKILL)
+
+---
+
+## [Unreleased] — post-0.3.0 (draw widgets + recording fixes)
+
+### Fixed
+
+#### Draw Box / Draw Sphere widget placement
+- Both widgets now appear centred on the camera focal point (what the user is currently looking at) when first placed, sized to the current field of view — previously they appeared at stored field-bound coordinates which could be off-screen
+- Box half-extent = 50 % of the visible half-width at the focal plane (`d * tan(FOV/2) * 0.5`); sphere radius = 25 % of the same value
+- Placement also updates the corresponding nav state fields (`nav_x/y/z/distance` for sphere, `nav_box_*` for box) so Locking without dragging still navigates to the correct position
+
+#### Draw Box handle size
+- Box widget handles (the seven spheres used to resize/translate the box) were being rescaled by VTK's internal `SizeHandles()` on every Scale/Translate interaction, causing them to jump to a different world-space size after each drag
+- `SetHandleSize()` has no visual effect in VTK 9.5 and is not the fix; `GetRepresentation()` does not exist on `vtkBoxWidget` (only on `vtkBoxWidget2`)
+- Fix: snapshot the `vtkSphereSource` objects backing the handle actors at placement time, then restore their radius directly via `EndInteractionEvent` and camera `ModifiedEvent` observers — handles stay constant-sized at any zoom or after any drag
+
+#### Removed orphaned file
+- `sage_viewer/scene/heatmap_layer.py` deleted — file had no imports and no UI wiring
+
+#### Movie recording
+- Fixed FPS not being honoured: the loop previously wrote one frame per snapshot change regardless of target FPS; slow playback (e.g. 0.25x) produced one frame per snapshot instead of `fps * seconds_per_snapshot` frames, making all recordings play back at the same speed. Fix: write a frame every `1/fps` seconds, reusing the cached decoded image when the playback frame has not changed
+- Fixed UI freezing during recording: when frame capture took longer than `1/fps` the sleep collapsed to zero with no `asyncio.sleep` call, starving the event loop so Stop/Pause clicks were never processed. Fix: minimum 1 ms sleep per tick
+- Fixed UI freezing on Stop: `_finalize_movie()` (imageio GIF encode / ffmpeg MOV encode) was called synchronously inside the Trame controller, blocking the UI for the full encode duration. Fix: finalize now runs in a daemon thread; UI shows "Encoding…" immediately and updates to the output path when done
+- Fixed slow frame capture: intermediate frames were saved as PNG (lossless, ~100 ms per frame) making 30 FPS impossible on typical viewport sizes. Fix: intermediate frames saved as JPEG quality 95 (~10 ms per frame); output quality is unaffected since GIF and H.264 are both lossy encoders
+
+---
+
 ## [Unreleased] — post-0.3.0 (side-by-side multi-box comparison)
 
 ### Added

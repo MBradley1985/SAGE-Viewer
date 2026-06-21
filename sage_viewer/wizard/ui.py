@@ -120,10 +120,11 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                 # ── Left: terminal card ───────────────────────────────────────
                 with v3.VCard(
                     style=(
-                        "flex:1;min-width:0;max-width:860px;"
+                        "`flex:1;min-width:0;"
+                        "max-width:${wiz_par_show ? '860px' : '1100px'};"
                         "background:#000000;border:2px solid #06b6d4;"
                         "display:flex;flex-direction:column;"
-                        "position:relative;"
+                        "overflow:hidden;position:relative;`",
                     ),
                     elevation=0,
                     rounded=False,
@@ -175,7 +176,10 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                             )
                         with html.Div(
                             v_show=("!wiz_busy && wiz_choices.length > 0",),
-                            style="display:flex;flex-wrap:wrap;gap:8px;",
+                            style=(
+                                "display:flex;flex-wrap:wrap;gap:8px;"
+                                "max-height:120px;overflow-y:auto;"
+                            ),
                         ):
                             with html.Div(
                                 v_for="(ch, ci) in wiz_choices",
@@ -186,7 +190,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                                     prepend_icon=("ch.icon",),
                                     color="#06b6d4",
                                     variant="outlined",
-                                    size="small",
+                                    size=("wiz_choices.length > 5 ? 'x-small' : 'small'",),
                                     disabled=("ch.disabled",),
                                     click=(server.controller.wiz_choose, "[ch.value]"),
                                     style="font-family:monospace;text-transform:none;",
@@ -237,8 +241,8 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
         html.Img(
             src="/sage_static/SAGElogo.jpg",
             style=(
-                "position:absolute;bottom:20px;right:20px;"
-                "width:140px;"
+                "position:absolute;bottom:16px;right:16px;"
+                "width:90px;"
                 "pointer-events:none;"
             ),
         )

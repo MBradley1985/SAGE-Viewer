@@ -358,10 +358,12 @@ def create_app(
     scene.register_model_change_callback(_refresh_models_state)
 
     @server.controller.set("switch_model")
-    def on_switch_model(name: str):
+    async def on_switch_model(name: str):
+        import asyncio
+        server.state.model_loading = True
+        server.state.flush()
+        await asyncio.sleep(0)   # yield so the browser receives model_loading=True
         try:
-            server.state.model_loading = True
-            server.state.flush()
             if not scene.has_model(name):
                 entry = discovered_by_name.get(name)
                 if entry is None:
@@ -382,10 +384,12 @@ def create_app(
             _refresh_models_state()
 
     @server.controller.set("toggle_overlay")
-    def on_toggle_overlay(name: str):
+    async def on_toggle_overlay(name: str):
+        import asyncio
+        server.state.model_loading = True
+        server.state.flush()
+        await asyncio.sleep(0)   # yield so the browser receives model_loading=True
         try:
-            server.state.model_loading = True
-            server.state.flush()
             if not scene.has_model(name):
                 entry = discovered_by_name.get(name)
                 if entry is None:
@@ -405,7 +409,8 @@ def create_app(
             _refresh_models_state()
 
     @server.controller.set("toggle_adjacent")
-    def on_toggle_adjacent(name: str):
+    async def on_toggle_adjacent(name: str):
+        import asyncio
         entry = discovered_by_name.get(name)
         if entry is not None:
             par_path = entry["par"]
@@ -413,9 +418,10 @@ def create_app(
             par_path = scene._models[name].path
         else:
             return
+        server.state.model_loading = True
+        server.state.flush()
+        await asyncio.sleep(0)   # yield so the browser receives model_loading=True
         try:
-            server.state.model_loading = True
-            server.state.flush()
             is_now_adj, err = scene.toggle_adjacent(par_path)
             if err:
                 server.state.notice_text  = err
@@ -1134,14 +1140,16 @@ def create_app(
                         key=("item.id",),
                         classes="sage-popout",
                         style=(
-                            "position:absolute;top:32px;right:24px;"
+                            "`position:absolute;"
+                            "top:${item.top_px}px;"
+                            "right:${item.right_px}px;"
                             "min-width:320px;max-width:540px;"
                             "resize:both;overflow:auto;"
                             "background:rgba(17,24,39,0.92);"
                             "backdrop-filter:blur(6px);"
                             "border:1px solid #374151;"
                             "color:#e2e8f0;"
-                            "z-index:5;"
+                            "z-index:5;`",
                         ),
                         elevation=8,
                     ):

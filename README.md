@@ -167,6 +167,31 @@ pip install -e ".[dev]"
 
 Requires Python ≥ 3.10. Movie recording in MOV format requires `ffmpeg` in your `PATH`.
 
+### HPC / supercomputer
+
+A helper script is included for module-system clusters (Slurm, PBS, etc.):
+
+```bash
+# Load a Python module first (name varies by cluster)
+module load python/3.12.0
+
+# Create a venv and install SAGE-Viewer in one step
+./install_hpc.sh
+
+# Optional: place the venv on scratch for faster I/O
+./install_hpc.sh /scratch/$USER/sage-viewer-env
+```
+
+The install is editable (`pip install -e .`) so a `git pull` updates the code immediately with no reinstall. `ffmpeg` is checked separately — load it via your module system if you need MOV recording.
+
+Then in every session:
+
+```bash
+source .venv/bin/activate
+sage-viewer --par /path/to/millennium.par --port 8080
+# SSH-tunnel the port to your local browser
+```
+
 ## Documentation
 
 Full documentation at [sage-viewer.readthedocs.io](https://sage-viewer.readthedocs.io/en/latest/).
