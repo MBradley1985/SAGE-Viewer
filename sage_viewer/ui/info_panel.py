@@ -35,7 +35,7 @@ def build_info_panel(server, scene: Scene) -> None:
                 clicked_box = scene.box_name_at(float(pt[0]))
                 if clicked_box != scene.active_box_name:
                     if hasattr(ctrl, "set_active_box"):
-                        ctrl.set_active_box(False, clicked_box)
+                        ctrl.set_active_box(clicked_box)
 
         if dt > _DOUBLE_CLICK_THRESHOLD:
             # First click — wait for the matching second click.

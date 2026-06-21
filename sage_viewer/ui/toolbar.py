@@ -482,6 +482,17 @@ def build_toolbar(server, scene: Scene) -> None:
         state.flush()
         _push()
 
+    @ctrl.set("sync_active_snap_count")
+    def on_sync_active_snap_count():
+        """Update the toolbar's snap-count cache to the active box.
+
+        Called after an active-box switch so step/play use the correct range
+        for whichever model is currently selected.
+        """
+        _snap_count[0] = scene.active_model.snap_count
+        _frames["key"]  = None
+        _frames["data"] = {}
+
     @ctrl.set("refresh_snap_range")
     def on_refresh_snap_range():
         """Update slider bounds + current snap after a model switch."""
@@ -688,13 +699,15 @@ def build_toolbar(server, scene: Scene) -> None:
         style="max-width:90px;",
     )
 
-    # Rotation selector
+    # Rotation selector — disabled in multi-box mode (shared camera)
     v3.VSelect(
         v_model=("rotate_mode",),
         items=(_ROTATE_ITEMS,),
         density="compact",
         hide_details=True,
         style="max-width:120px;",
+        disabled=("box_strip_items && box_strip_items.length > 1",),
+        title="Rotation disabled in multi-box mode",
     )
 
     # Close application button

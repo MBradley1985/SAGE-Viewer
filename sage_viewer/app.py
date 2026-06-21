@@ -428,6 +428,9 @@ def create_app(
                     _profiles[name] = default_profile(adj_m.snap_count)
                 if adj_m:
                     adj_m.loader.preload_all()
+                # Stop any active rotation — it can't be per-box with a shared camera
+                if getattr(server.state, "rotate_mode", "off") != "off":
+                    server.state.rotate_mode = "off"
             else:
                 _profiles.pop(name, None)
                 server.state.active_box_name = scene.active_box_name
@@ -439,15 +442,8 @@ def create_app(
                 server.controller.view_update()
 
     @server.controller.set("set_active_box")
-    def on_set_active_box(extend, name: str):
+    def on_set_active_box(name: str):
         if not scene.has_model(name):
-            return
-        if extend:
-            # Shift+click: expand/contract camera selection, active box unchanged.
-            scene.toggle_camera_box(name)
-            server.state.flush()
-            if hasattr(server.controller, "view_update"):
-                server.controller.view_update()
             return
         old_name = scene.active_box_name
         if old_name == name:
@@ -464,6 +460,8 @@ def create_app(
         server.state.dirty(*BOX_PROFILE_KEYS)
         server.state.box_strip_items = _build_box_strip_items()
         server.state.flush()
+        if hasattr(server.controller, "sync_active_snap_count"):
+            server.controller.sync_active_snap_count()
         if hasattr(server.controller, "view_update"):
             server.controller.view_update()
 
@@ -1237,7 +1235,7 @@ def create_app(
                         with html.Div(
                             v_for=("b in box_strip_items",),
                             key=("'bs-' + b.name",),
-                            click=(server.controller.set_active_box, "[$event.shiftKey, b.name]"),
+                            click=(server.controller.set_active_box, "[b.name]"),
                             style=(
                                 "b.active "
                                 "? 'display:flex;align-items:center;gap:6px;"
