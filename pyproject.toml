@@ -64,6 +64,9 @@ version = { attr = "sage_viewer._version.__version__" }
 where = ["."]
 include = ["sage_viewer*"]
 
+[tool.setuptools.package-data]
+sage_viewer = ["static/*"]
+
 [tool.ruff]
 line-length = 79
 target-version = "py310"
