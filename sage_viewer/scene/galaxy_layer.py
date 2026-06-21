@@ -124,6 +124,7 @@ class GalaxyLayer:
         self._snapshot: GalaxySnapshot | None = None
         self._focus_mask: np.ndarray | None = None
         self._filter_mask: np.ndarray | None = None
+        self._offset: np.ndarray = np.zeros(3, dtype=np.float32)
 
     # ------------------------------------------------------------------
     # Public API
@@ -167,6 +168,11 @@ class GalaxyLayer:
     @colormap.setter
     def colormap(self, value: str) -> None:
         self._colormap = value
+        if self._snapshot is not None:
+            self._redraw()
+
+    def set_offset(self, offset: "np.ndarray") -> None:
+        self._offset = np.asarray(offset, dtype=np.float32)
         if self._snapshot is not None:
             self._redraw()
 
@@ -279,6 +285,7 @@ class GalaxyLayer:
                 return
 
         radii = galaxy_world_radii(snap.stellar_mass)
+        eff_pos = snap.positions + self._offset
 
         # Every mode shares the same Structure composition (BH core, cold-gas
         # envelope, stellar particles, CGM/Hot outer envelope).  When the
@@ -287,7 +294,7 @@ class GalaxyLayer:
         self._clear_actors()
         self._cloud = None
         self._render_params = ()
-        self._render_structure(snap, radii)
+        self._render_structure(snap, radii, eff_pos)
 
         if self._color_mode == "structure":
             return
@@ -301,12 +308,12 @@ class GalaxyLayer:
                 if not np.any(tmask):
                     continue
                 self._render_outer_property(
-                    snap.positions[tmask], mass_colors[tmask], radii[tmask], cmap,
+                    eff_pos[tmask], mass_colors[tmask], radii[tmask], cmap,
                 )
             return
 
         colors = self._compute_colors(snap)
-        self._render_outer_property(snap.positions, colors, radii, self._colormap)
+        self._render_outer_property(eff_pos, colors, radii, self._colormap)
 
     def _update_in_place(
         self,
@@ -338,6 +345,7 @@ class GalaxyLayer:
         self,
         snap: GalaxySnapshot,
         radii: np.ndarray,
+        positions: "np.ndarray | None" = None,
     ) -> None:
         """Multi-layer physically-suggestive galaxy rendering.
 
@@ -357,7 +365,7 @@ class GalaxyLayer:
         if snap.count == 0:
             return
 
-        pos = snap.positions
+        pos = snap.positions if positions is None else positions
         # ---- Per-galaxy radii (Mpc/h) keyed off the default scaling -----
         r_outer = np.maximum(radii, 1e-4)         # default 0.025–0.25 Mpc/h
         r_cold  = 0.45 * r_outer

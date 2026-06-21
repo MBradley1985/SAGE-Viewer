@@ -3,12 +3,26 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
+import numpy as np
 import pyvista as pv
 
 from sage_viewer.scene.camera import CameraController
 from sage_viewer.scene.galaxy_layer import GalaxyLayer
 from sage_viewer.scene.halo_layer import HaloLayer
 from sage_viewer.scene.model import Model
+
+# Gap between adjacent boxes as a fraction of the primary box size.
+_BOX_GAP_FRACTION = 0.05
+
+# Floor-ring radii as fractions of the box size.
+_RING_INNER = 0.32
+_RING_OUTER = 0.42
+
+# Colours for active vs idle floor rings.
+_RING_ACTIVE_COLOR   = "#00ffff"
+_RING_ACTIVE_OPACITY = 0.65
+_RING_IDLE_COLOR     = "#2d3748"
+_RING_IDLE_OPACITY   = 0.25
 
 
 class Scene:
@@ -17,7 +31,8 @@ class Scene:
     One model is the *primary* (its layers are exposed via `scene.halo_layer` /
     `scene.galaxy_layer` so all existing UI code keeps working). Additional
     models can be loaded and made visible as overlays if they share the same
-    box size and snapshot count.
+    box size and snapshot count, or placed side-by-side as independent
+    adjacent boxes with their own snapshot, filters and render settings.
 
     Playback animation is driven externally by the Trame async event loop
     (see toolbar.py) so that all VTK calls stay on the main thread.
@@ -55,21 +70,29 @@ class Scene:
         self._models[primary.name] = primary
         self._primary_name = primary.name
 
+        # Adjacent-box state
+        self._adjacent_order: list[str] = []   # names in placement order
+        self._active_box_name: str = primary.name
+
+        # Floor ring and label actors keyed by model name
+        self._ring_actors:  dict[str, object] = {}
+        self._label_actors: dict[str, list]   = {}
+
         self._camera = CameraController(self._plotter, primary.box_size)
 
         self._current_snap: int = (
             initial_snap if initial_snap is not None else primary.snap_count - 1
         )
 
-        self._on_snap_change: list[Callable[[int], None]] = []
-        self._on_model_change: list[Callable[[], None]] = []
+        self._on_snap_change:  list[Callable[[int], None]] = []
+        self._on_model_change: list[Callable[[], None]]    = []
         self._focus_region: dict | None = None
 
         self.set_snapshot(self._current_snap)
         self._camera.reset()
 
     # ------------------------------------------------------------------
-    # Primary model & layer access (compatibility surface)
+    # Primary model & layer access
     # ------------------------------------------------------------------
 
     @property
@@ -81,20 +104,26 @@ class Scene:
         return self._primary_name
 
     @property
+    def active_model(self) -> Model:
+        """The model whose settings the UI panel currently controls."""
+        return self._models.get(self._active_box_name, self.primary)
+
+    # halo_layer / galaxy_layer route to the ACTIVE model so all existing
+    # filter and rendering handlers automatically target the right box.
+    @property
     def halo_layer(self) -> HaloLayer:
-        return self.primary.halo_layer
+        return self.active_model.halo_layer
 
     @property
     def galaxy_layer(self) -> GalaxyLayer:
-        return self.primary.galaxy_layer
+        return self.active_model.galaxy_layer
 
     @property
     def fof_links_visible(self) -> bool:
-        return self.primary.fof_layer.visible
+        return self.active_model.fof_layer.visible
 
     def set_fof_links_visible(self, visible: bool) -> None:
-        """Toggle FoF-link lines for the primary model."""
-        self.primary.fof_layer.visible = bool(visible)
+        self.active_model.fof_layer.visible = bool(visible)
 
     @property
     def camera(self) -> CameraController:
@@ -106,13 +135,14 @@ class Scene:
 
     @property
     def current_snap(self) -> int:
-        return self._current_snap
+        return self.active_model.current_snap
 
     @property
     def snap_label(self) -> str:
-        return self.primary.snap_table.label(self._current_snap)
+        m = self.active_model
+        return m.snap_table.label(m.current_snap)
 
-    # Backward-compat — some callers still reach into these
+    # Backward-compat shims used by various callers
     @property
     def _cfg(self):
         return self.primary.cfg
@@ -130,7 +160,205 @@ class Scene:
         return self.primary.snap_count
 
     # ------------------------------------------------------------------
-    # Model management
+    # Active-box management
+    # ------------------------------------------------------------------
+
+    @property
+    def active_box_name(self) -> str:
+        return self._active_box_name
+
+    def set_active_box(self, name: str) -> None:
+        """Switch which box the UI controls.  Does NOT save/restore profiles
+        (that is handled by the app layer which owns Trame state)."""
+        if name not in self._models:
+            return
+        self._active_box_name = name
+        self._update_rings()
+
+    # ------------------------------------------------------------------
+    # Adjacent-box management
+    # ------------------------------------------------------------------
+
+    def is_adjacent(self, name: str) -> bool:
+        return name in self._adjacent_order
+
+    def toggle_adjacent(self, par_path: str | Path) -> tuple[bool, str | None]:
+        """Add or remove a model as an adjacent side-by-side box.
+
+        Returns (is_now_adjacent, error_message_or_None).
+        """
+        # Load the model if not already known
+        if not self.has_model_by_path(par_path):
+            model = Model(par_path, self._plotter, self._loader_kwargs)
+            self._models[model.name] = model
+        else:
+            model = self._model_by_path(par_path)
+
+        name = model.name
+        if name == self._primary_name:
+            return False, "Cannot place the primary model as adjacent."
+
+        if name in self._adjacent_order:
+            # Remove it
+            self._adjacent_order.remove(name)
+            model.offset = np.zeros(3)
+            model.visible = False
+            self._remove_ring(name)
+            self._remove_label(name)
+            self._recompute_offsets()
+            self._update_rings()
+            self._update_labels()
+            self._plotter.reset_camera()
+            self._plotter.render()
+            for cb in self._on_model_change:
+                cb()
+            return False, None
+        else:
+            # Add it
+            self._adjacent_order.append(name)
+            self._recompute_offsets()
+            model.set_snapshot(model.snap_count - 1)
+            model.visible = True
+            self._update_rings()
+            self._update_labels()
+            self._plotter.reset_camera()
+            self._plotter.render()
+            for cb in self._on_model_change:
+                cb()
+            return True, None
+
+    def _recompute_offsets(self) -> None:
+        """Lay adjacent boxes out along +X with a small gap."""
+        gap = self.primary.box_size * _BOX_GAP_FRACTION
+        x = self.primary.box_size + gap
+        for name in self._adjacent_order:
+            m = self._models.get(name)
+            if m is None:
+                continue
+            m.offset = np.array([x, 0.0, 0.0])
+            x += m.box_size + gap
+
+    def has_model_by_path(self, par_path: str | Path) -> bool:
+        p = Path(par_path)
+        return any(m.path == p for m in self._models.values())
+
+    def _model_by_path(self, par_path: str | Path) -> Model:
+        p = Path(par_path)
+        for m in self._models.values():
+            if m.path == p:
+                return m
+        raise KeyError(par_path)
+
+    # ------------------------------------------------------------------
+    # Floor rings (active = cyan glow, idle = dim grey)
+    # ------------------------------------------------------------------
+
+    def _box_center_xz(self, name: str) -> tuple[float, float, float]:
+        """Return (cx, 0, cz) — the floor-centre of the named box."""
+        m = self._models[name]
+        off = m.offset
+        bs  = m.box_size
+        return float(off[0] + bs / 2), 0.0, float(bs / 2)
+
+    def _make_ring_mesh(self, name: str) -> pv.PolyData:
+        cx, _, cz = self._box_center_xz(name)
+        bs = self._models[name].box_size
+        return pv.Disc(
+            center=(cx, 0.0, cz),
+            normal=(0, 1, 0),
+            inner=bs * _RING_INNER,
+            outer=bs * _RING_OUTER,
+            c_res=64,
+            r_res=1,
+        )
+
+    def _add_ring(self, name: str, active: bool) -> None:
+        mesh = self._make_ring_mesh(name)
+        color   = _RING_ACTIVE_COLOR   if active else _RING_IDLE_COLOR
+        opacity = _RING_ACTIVE_OPACITY if active else _RING_IDLE_OPACITY
+        actor = self._plotter.add_mesh(
+            mesh, color=color, opacity=opacity,
+            style="surface", emissive=active,
+            show_scalar_bar=False, render=False, reset_camera=False,
+        )
+        self._ring_actors[name] = actor
+
+    def _remove_ring(self, name: str) -> None:
+        actor = self._ring_actors.pop(name, None)
+        if actor is not None:
+            self._plotter.remove_actor(actor, render=False)
+
+    def _update_rings(self) -> None:
+        """Rebuild all floor rings to reflect the current active box."""
+        # All boxes that should have a ring: primary + adjacent
+        ring_names = [self._primary_name] + list(self._adjacent_order)
+        # Remove rings for boxes no longer in scope
+        for name in list(self._ring_actors):
+            if name not in ring_names:
+                self._remove_ring(name)
+        # Add or update each ring
+        for name in ring_names:
+            self._remove_ring(name)   # always rebuild so position is fresh
+            self._add_ring(name, active=(name == self._active_box_name))
+        self._plotter.render()
+
+    # ------------------------------------------------------------------
+    # 3-D text labels (model name + redshift, below each box)
+    # ------------------------------------------------------------------
+
+    def _label_position(self, name: str) -> np.ndarray:
+        cx, _, cz = self._box_center_xz(name)
+        m = self._models[name]
+        return np.array([[cx, -m.box_size * 0.04, cz]])
+
+    def _label_text(self, name: str) -> str:
+        m = self._models[name]
+        snap = max(0, m.current_snap)
+        return f"{m.name}\n{m.snap_table.label(snap)}"
+
+    def _remove_label(self, name: str) -> None:
+        for actor in self._label_actors.pop(name, []):
+            self._plotter.remove_actor(actor, render=False)
+
+    def _add_label(self, name: str) -> None:
+        pts  = self._label_position(name)
+        text = self._label_text(name)
+        actor = self._plotter.add_point_labels(
+            pts, [text],
+            font_size=11,
+            text_color="white",
+            bold=False,
+            always_visible=True,
+            shadow=True,
+            point_size=0,
+            shape=None,
+            render=False,
+            reset_camera=False,
+        )
+        self._label_actors[name] = [actor] if not isinstance(actor, list) else actor
+
+    def _update_labels(self) -> None:
+        """Rebuild labels for primary + all adjacent boxes."""
+        label_names = [self._primary_name] + list(self._adjacent_order)
+        for name in list(self._label_actors):
+            if name not in label_names:
+                self._remove_label(name)
+        for name in label_names:
+            self._remove_label(name)
+            self._add_label(name)
+        self._plotter.render()
+
+    def refresh_label(self, name: str) -> None:
+        """Refresh just one label (e.g. after a snapshot change)."""
+        if name in self._label_actors or name in (
+            [self._primary_name] + self._adjacent_order
+        ):
+            self._remove_label(name)
+            self._add_label(name)
+            self._plotter.render()
+
+    # ------------------------------------------------------------------
+    # Overlay model management (unchanged from before)
     # ------------------------------------------------------------------
 
     def list_models(self) -> list[Model]:
@@ -152,51 +380,63 @@ class Scene:
         return model
 
     def remove_model(self, name: str) -> None:
-        """Remove a non-primary model from the scene entirely."""
         if name == self._primary_name or name not in self._models:
             return
         model = self._models.pop(name)
         model.visible = False
-        # Drop the layer actors so they don't linger in the plotter
         model.halo_layer._clear_actors()
         model.galaxy_layer._clear_actors()
         model.shutdown()
+        if name in self._adjacent_order:
+            self._adjacent_order.remove(name)
+        self._remove_ring(name)
+        self._remove_label(name)
         for cb in self._on_model_change:
             cb()
 
     def switch_primary(self, name: str) -> None:
         """Switch the active primary model.
 
-        Works for any model regardless of box size / snapshot count.
-        Hides the previous primary; any currently overlaid models that are
-        no longer compatible with the new primary are automatically hidden.
-        Returns silently if `name` is already primary or unknown.
+        Adjacent boxes stay in place; their offsets are recomputed relative
+        to the new primary.  If the active box was the old primary, the
+        active box switches to the new primary.
         """
         if name == self._primary_name or name not in self._models:
             return
         old_primary_box = self.primary.box_size
-        # Hide the old primary (including any FoF links it was showing)
         self._models[self._primary_name].visible = False
         self._models[self._primary_name].fof_layer.visible = False
+
+        # If old primary was active, transfer focus to new primary
+        if self._active_box_name == self._primary_name:
+            self._active_box_name = name
+
         self._primary_name = name
-        # Hide any overlay that is now incompatible with the new primary
+
+        # Hide overlays that are incompatible with the new primary
         for other_name, m in self._models.items():
             if other_name == self._primary_name:
                 continue
+            if other_name in self._adjacent_order:
+                continue   # adjacent boxes are not overlay-checked
             if m.visible and not self.is_compatible_for_overlay(other_name):
                 m.visible = False
-        # Show the new primary
+
         self.primary.visible = True
-        # Always start the new primary at z=0 (its last snapshot).
         snap = self.primary.snap_count - 1
         self._current_snap = snap
         self.primary.set_snapshot(snap)
-        # Camera box may have changed — reset if the box is significantly different
+
         new_box = self.primary.box_size
         self._camera._box_size = new_box
         if abs(new_box - old_primary_box) > 1e-3:
             self._camera.reset()
-        # Re-apply focus mask in new model's coordinates
+
+        # Recompute adjacent offsets relative to new primary
+        self._recompute_offsets()
+        self._update_rings()
+        self._update_labels()
+
         if self._focus_region is not None:
             halos, galaxies = self.primary.loader.get(self._current_snap)
             self._apply_focus_masks_for_layer(
@@ -209,17 +449,12 @@ class Scene:
             cb()
 
     def set_overlay_visible(self, name: str, vis: bool) -> str | None:
-        """Show or hide a non-primary model as an overlay.
-
-        Returns None on success, or an error message string if the request
-        was rejected (e.g. trying to overlay an incompatible model).
-        Turning OFF is always allowed.
-        """
         if name == self._primary_name or name not in self._models:
             return None
+        if name in self._adjacent_order:
+            return "Use the Side-by-Side toggle to manage adjacent boxes."
         m = self._models[name]
         if vis:
-            # Turning ON: enforce compatibility
             if not self.is_compatible_for_overlay(name):
                 primary = self.primary
                 cand = self._models[name]
@@ -237,7 +472,7 @@ class Scene:
                     detail = "incompatible simulation parameters"
                 return (
                     f"Can't overlay '{name}' on '{primary.name}': {detail}. "
-                    f"Use Switch instead."
+                    f"Use Side-by-Side instead."
                 )
             m.set_snapshot(self._current_snap)
         m.visible = vis
@@ -246,7 +481,6 @@ class Scene:
         return None
 
     def is_compatible_for_overlay(self, name: str) -> bool:
-        """Overlay only allowed if box size and snap count match the primary."""
         if name == self._primary_name or name not in self._models:
             return False
         primary = self.primary
@@ -257,23 +491,46 @@ class Scene:
         )
 
     # ------------------------------------------------------------------
-    # Snapshot control (drives every visible model)
+    # Snapshot control
     # ------------------------------------------------------------------
 
     def set_snapshot(self, snap_num: int) -> None:
+        """Update snapshot.
+
+        When the active box is an adjacent model, only that model's snapshot
+        changes.  When the primary is active, the original behaviour applies
+        (primary + compatible overlays all update together).
+        """
+        if (
+            self._active_box_name != self._primary_name
+            and self._active_box_name in self._adjacent_order
+        ):
+            active = self.active_model
+            snap_num = max(0, min(int(snap_num), active.snap_count - 1))
+            active.set_snapshot(snap_num)
+            halos, galaxies = active.loader.get(snap_num)
+            off = active.offset.astype(np.float32)
+            self._camera.update_halo_index(halos.positions + off)
+            self._camera.update_galaxy_positions(galaxies.positions + off)
+            self.refresh_label(self._active_box_name)
+            for cb in self._on_snap_change:
+                cb(snap_num)
+            return
+
+        # Primary is active: original behaviour
         snap_num = max(0, min(int(snap_num), self.primary.snap_count - 1))
         self._current_snap = snap_num
-
-        # Always update the primary so its layer reflects the new data
         self.primary.set_snapshot(snap_num)
-        # Update any visible overlays too (if compatible)
+
+        # Update compatible overlays (not adjacent boxes — they're independent)
         for name, m in self._models.items():
             if name == self._primary_name:
+                continue
+            if name in self._adjacent_order:
                 continue
             if m.visible:
                 m.set_snapshot(min(snap_num, m.snap_count - 1))
 
-        # Camera indices follow primary
         halos, galaxies = self.primary.loader.get(snap_num)
         self._camera.update_halo_index(halos.positions)
         self._camera.update_galaxy_positions(galaxies.positions)
@@ -284,11 +541,29 @@ class Scene:
                 halos.positions, galaxies.positions,
             )
 
+        self.refresh_label(self._primary_name)
         for cb in self._on_snap_change:
             cb(snap_num)
 
     # ------------------------------------------------------------------
-    # Focus / spatial masking (applies to primary only for now)
+    # Click-to-activate: determine which box a 3-D click point belongs to
+    # ------------------------------------------------------------------
+
+    def box_name_at(self, world_x: float) -> str:
+        """Return the model name whose X range contains *world_x*.
+
+        Falls back to the primary if no adjacent box matches.
+        """
+        for name in reversed(self._adjacent_order):
+            m = self._models[name]
+            x0 = float(m.offset[0])
+            x1 = x0 + m.box_size
+            if x0 <= world_x <= x1:
+                return name
+        return self._primary_name
+
+    # ------------------------------------------------------------------
+    # Focus / spatial masking (applies to active model only)
     # ------------------------------------------------------------------
 
     def set_focus_box(
@@ -329,7 +604,6 @@ class Scene:
         halo_pos: "np.ndarray",
         gal_pos: "np.ndarray",
     ) -> None:
-        import numpy as np
         r = self._focus_region
         if r is None:
             return
@@ -354,17 +628,16 @@ class Scene:
             halo_layer.set_mask(_sphere_mask(halo_pos))
             gal_layer.set_mask(_sphere_mask(gal_pos))
 
-    # Back-compat: still used by some callers
     def _apply_focus_masks(self, halo_pos, gal_pos) -> None:
         self._apply_focus_masks_for_layer(
             self.primary.halo_layer, self.primary.galaxy_layer, halo_pos, gal_pos
         )
 
     def next_snap_num(self) -> int:
-        return (self._current_snap + 1) % self.primary.snap_count
+        return (self.active_model.current_snap + 1) % self.active_model.snap_count
 
     def prev_snap_num(self) -> int:
-        return (self._current_snap - 1) % self.primary.snap_count
+        return (self.active_model.current_snap - 1) % self.active_model.snap_count
 
     # ------------------------------------------------------------------
     # Callbacks

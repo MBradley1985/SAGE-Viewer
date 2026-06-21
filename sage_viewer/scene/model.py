@@ -94,6 +94,7 @@ class Model:
         self.fof_layer:    FofLinkLayer = FofLinkLayer(plotter)
         self.fields_available: dict[str, bool] = self._detect_fields()
         self._current_snap: int = -1
+        self._offset: np.ndarray = np.zeros(3, dtype=np.float64)
 
     # ------------------------------------------------------------------
     # Field availability detection
@@ -162,6 +163,18 @@ class Model:
         v = bool(v)
         self.halo_layer.visible   = v
         self.galaxy_layer.visible = v
+
+    @property
+    def offset(self) -> np.ndarray:
+        return self._offset.copy()
+
+    @offset.setter
+    def offset(self, v: "np.ndarray") -> None:
+        self._offset = np.asarray(v, dtype=np.float64)
+        f32 = self._offset.astype(np.float32)
+        self.halo_layer.set_offset(f32)
+        self.galaxy_layer.set_offset(f32)
+        self.fof_layer.set_offset(f32)
 
     def shutdown(self) -> None:
         self.loader.shutdown()

@@ -31,6 +31,7 @@ class FofLinkLayer:
         self._visible = False
         self._actor = None
         self._snapshot: HaloSnapshot | None = None
+        self._offset: np.ndarray = np.zeros(3, dtype=np.float32)
         # Positions of halos currently visible after focus + filter masking.
         # None means "all halos visible" — no position filtering is applied.
         self._visible_halo_positions: np.ndarray | None = None
@@ -58,6 +59,11 @@ class FofLinkLayer:
         """
         self._snapshot = snapshot
         if self._visible:
+            self._rebuild()
+
+    def set_offset(self, offset: "np.ndarray") -> None:
+        self._offset = np.asarray(offset, dtype=np.float32)
+        if self._visible and self._snapshot is not None:
             self._rebuild()
 
     def sync_masks(self, visible_positions: "np.ndarray | None") -> None:
@@ -113,7 +119,7 @@ class FofLinkLayer:
             return
 
         n = len(seg)
-        points = seg.reshape(2 * n, 3).astype(np.float32)
+        points = (seg.reshape(2 * n, 3) + self._offset).astype(np.float32)
         conn = np.empty((n, 3), dtype=np.int64)
         conn[:, 0] = 2
         conn[:, 1] = np.arange(0, 2 * n, 2)
