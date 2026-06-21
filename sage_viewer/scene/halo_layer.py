@@ -38,6 +38,7 @@ class HaloLayer:
         self._snapshot: HaloSnapshot | None = None
         self._focus_mask: np.ndarray | None = None
         self._filter_mask: np.ndarray | None = None
+        self._offset: np.ndarray = np.zeros(3, dtype=np.float32)
 
     # ------------------------------------------------------------------
     # Public API
@@ -81,6 +82,11 @@ class HaloLayer:
     @colormap.setter
     def colormap(self, value: str) -> None:
         self._colormap = value
+        if self._snapshot is not None:
+            self._redraw()
+
+    def set_offset(self, offset: "np.ndarray") -> None:
+        self._offset = np.asarray(offset, dtype=np.float32)
         if self._snapshot is not None:
             self._redraw()
 
