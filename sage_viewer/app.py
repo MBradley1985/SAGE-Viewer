@@ -10,6 +10,12 @@ from trame.widgets import html, vuetify3 as v3
 from trame_vtk.modules.vtk import has_capabilities
 from trame_vtk.widgets.vtk import VtkRemoteView
 
+from sage_viewer.scene.box_profile import (
+    BOX_PROFILE_KEYS,
+    default_profile,
+    save_profile,
+    load_profile,
+)
 from sage_viewer.scene.scene import Scene
 from sage_viewer.utils.discover import find_models
 
@@ -208,6 +214,29 @@ def create_app(
     # Index by model name for fast lookup
     discovered_by_name: dict[str, dict] = {m["name"]: m for m in discovered}
 
+    # Per-box profile storage (Python side only; keys = model names).
+    _profiles: dict = {}
+
+    def _build_box_strip_items() -> list[dict]:
+        """Build the reactive list for the viewport box strip."""
+        strip = []
+        pm = scene.primary
+        s_lbl = pm.snap_table.label(max(0, pm.current_snap))
+        strip.append({
+            "name": pm.name, "label": f"{pm.name}  {s_lbl}",
+            "active": scene.active_box_name == pm.name, "primary": True,
+        })
+        for adj_name in scene._adjacent_order:
+            m = scene._models.get(adj_name)
+            if m is None:
+                continue
+            al = m.snap_table.label(max(0, m.current_snap))
+            strip.append({
+                "name": adj_name, "label": f"{adj_name}  {al}",
+                "active": scene.active_box_name == adj_name, "primary": False,
+            })
+        return strip
+
     def _build_models_list() -> list[dict]:
         """Build the reactive list of model entries for the menu."""
         loaded = {m.name: m for m in scene.list_models()}
@@ -216,8 +245,9 @@ def create_app(
             name = entry["name"]
             is_loaded   = name in loaded
             is_primary  = (name == scene.primary_name)
+            is_adjacent = is_loaded and scene.is_adjacent(name)
             compatible  = is_loaded and scene.is_compatible_for_overlay(name)
-            overlay_on  = is_loaded and not is_primary and loaded[name].visible
+            overlay_on  = is_loaded and not is_primary and not is_adjacent and loaded[name].visible
             out.append({
                 "name":       name,
                 "path":       str(entry["par"]),
@@ -225,19 +255,24 @@ def create_app(
                 "primary":    is_primary,
                 "compatible": compatible,
                 "overlay":    overlay_on,
+                "adjacent":   is_adjacent,
             })
         # Loaded-but-not-on-disk (e.g. primary model whose output dir wasn't scanned)
         for name, m in loaded.items():
             if not any(e["name"] == name for e in out):
+                is_adjacent = scene.is_adjacent(name)
                 out.append({
                     "name": name, "path": str(m.path), "loaded": True,
                     "primary": name == scene.primary_name,
                     "compatible": scene.is_compatible_for_overlay(name),
-                    "overlay": m.visible and name != scene.primary_name,
+                    "overlay": m.visible and name != scene.primary_name and not is_adjacent,
+                    "adjacent": is_adjacent,
                 })
         return out
 
     server.state.models_list      = _build_models_list()
+    server.state.active_box_name  = scene.primary_name
+    server.state.box_strip_items  = []
     server.state.model_loading    = False
     # Rotating quip shown on the "switching models" overlay. Updated by
     # an asyncio task that runs while model_loading is True.
@@ -301,20 +336,23 @@ def create_app(
         out = {}
         for entry in discovered:
             n = entry["name"]
+            is_adjacent = scene.is_adjacent(n) if n in loaded else False
             out[n] = {
                 "primary":     n == scene.primary.name,
                 "loaded":      n in loaded,
-                "overlay":     n in loaded and loaded[n].visible and n != scene.primary.name,
+                "overlay":     n in loaded and loaded[n].visible and n != scene.primary.name and not is_adjacent,
                 "compatible":  scene.is_compatible_for_overlay(n) if n in loaded else True,
+                "adjacent":    is_adjacent,
             }
         return out
     server.state.model_flags = _model_flags()
 
     def _refresh_models_state() -> None:
-        server.state.models_list   = _build_models_list()
-        server.state.model_fields  = scene.primary.fields_available
-        server.state.primary_model = scene.primary.name
-        server.state.model_flags   = _model_flags()
+        server.state.models_list     = _build_models_list()
+        server.state.model_fields    = scene.primary.fields_available
+        server.state.primary_model   = scene.primary.name
+        server.state.model_flags     = _model_flags()
+        server.state.box_strip_items = _build_box_strip_items()
         server.state.flush()
 
     scene.register_model_change_callback(_refresh_models_state)
@@ -361,6 +399,75 @@ def create_app(
         finally:
             server.state.model_loading = False
             _refresh_models_state()
+
+    @server.controller.set("toggle_adjacent")
+    def on_toggle_adjacent(name: str):
+        entry = discovered_by_name.get(name)
+        if entry is not None:
+            par_path = entry["par"]
+        elif scene.has_model(name):
+            par_path = scene._models[name].path
+        else:
+            return
+        try:
+            server.state.model_loading = True
+            server.state.flush()
+            is_now_adj, err = scene.toggle_adjacent(par_path)
+            if err:
+                server.state.notice_text  = err
+                server.state.notice_color = "warning"
+                server.state.notice_show  = True
+                return
+            if is_now_adj:
+                adj_m = scene._models.get(name)
+                if adj_m and name not in _profiles:
+                    _profiles[name] = default_profile(adj_m.snap_count)
+            else:
+                _profiles.pop(name, None)
+                server.state.active_box_name = scene.active_box_name
+        finally:
+            server.state.model_loading = False
+            server.state.box_strip_items = _build_box_strip_items()
+            _refresh_models_state()
+
+    @server.controller.set("set_active_box")
+    def on_set_active_box(name: str):
+        if not scene.has_model(name):
+            return
+        old_name = scene.active_box_name
+        if old_name == name:
+            return
+        _profiles[old_name] = save_profile(server.state)
+        scene.set_active_box(name)
+        server.state.active_box_name = name
+        incoming = _profiles.get(name)
+        if incoming is None:
+            m = scene._models.get(name)
+            incoming = default_profile(m.snap_count) if m else {}
+            _profiles[name] = incoming
+        load_profile(server.state, incoming)
+        server.state.dirty(*BOX_PROFILE_KEYS)
+        server.state.box_strip_items = _build_box_strip_items()
+        server.state.flush()
+
+    @server.controller.set("clear_box")
+    def on_clear_box(name: str):
+        m = scene._models.get(name)
+        if m is None:
+            return
+        fresh = default_profile(m.snap_count)
+        _profiles[name] = fresh
+        m.set_snapshot(m.snap_count - 1)
+        m.halo_layer.set_filter_mask(None)
+        m.galaxy_layer.set_filter_mask(None)
+        if name == scene.active_box_name:
+            load_profile(server.state, fresh)
+            server.state.dirty(*BOX_PROFILE_KEYS)
+            server.state.box_strip_items = _build_box_strip_items()
+            server.state.flush()
+        else:
+            server.state.box_strip_items = _build_box_strip_items()
+            server.state.flush()
 
     # ── Launch Mode wizard (embedded overlay) ────────────────────────────────
     from sage_viewer.wizard.controller import WizardController
@@ -483,6 +590,35 @@ def create_app(
                             ),
                             click=(server.controller.toggle_overlay, "[m.name]"),
                             active=("m.overlay",),
+                            color="cyan",
+                            density="compact",
+                        )
+                    # ── Side by side rows ─────────────────────────────────
+                    v3.VDivider(
+                        v_show=("models_list && models_list.length > 1",),
+                        style="margin:4px 0;",
+                    )
+                    v3.VListSubheader(
+                        "SIDE BY SIDE",
+                        style="color:#06b6d4;font-size:0.65rem;",
+                        v_show=("models_list && models_list.length > 1",),
+                    )
+                    with html.Div(
+                        v_for=("m in models_list",),
+                        key=("'sb-' + m.name",),
+                        v_show=("!m.primary",),
+                    ):
+                        v3.VListItem(
+                            title=(
+                                "m.adjacent ? '✓ ' + m.name : '⊞ ' + m.name",
+                            ),
+                            prepend_icon=(
+                                "m.adjacent "
+                                "? 'mdi-check-circle-outline' "
+                                ": 'mdi-view-split-vertical'",
+                            ),
+                            click=(server.controller.toggle_adjacent, "[m.name]"),
+                            active=("m.adjacent",),
                             color="cyan",
                             density="compact",
                         )
@@ -1068,6 +1204,51 @@ def create_app(
                                     "text-align:center;font-style:italic;"
                                     "min-height:1.4em;"
                                 ),
+                            )
+
+                    # Box strip — shown when at least one adjacent box is loaded
+                    with html.Div(
+                        v_show=("box_strip_items && box_strip_items.length > 1",),
+                        style=(
+                            "position:absolute;bottom:0;left:0;right:0;"
+                            "z-index:10;height:44px;"
+                            "background:rgba(0,0,0,0.85);"
+                            "display:flex;align-items:center;gap:6px;padding:0 10px;"
+                            "border-top:1px solid rgba(255,255,255,0.08);"
+                        ),
+                    ):
+                        with html.Div(
+                            v_for=("b in box_strip_items",),
+                            key=("'bs-' + b.name",),
+                            click=(server.controller.set_active_box, "[b.name]"),
+                            style=(
+                                "b.active "
+                                "? 'display:flex;align-items:center;gap:6px;"
+                                "padding:4px 10px;border-radius:4px;cursor:pointer;"
+                                "border:1px solid #00ffff;"
+                                "background:rgba(0,255,255,0.08)' "
+                                ": 'display:flex;align-items:center;gap:6px;"
+                                "padding:4px 10px;border-radius:4px;cursor:pointer;"
+                                "border:1px solid #374151'",
+                            ),
+                        ):
+                            html.Span(
+                                "{{ b.label }}",
+                                style=(
+                                    "b.active "
+                                    "? 'color:#00ffff;font-weight:700;"
+                                    "font-size:0.7rem;font-family:monospace' "
+                                    ": 'color:#9ca3af;"
+                                    "font-size:0.7rem;font-family:monospace'",
+                                ),
+                            )
+                            v3.VBtn(
+                                "CLR",
+                                v_if=("!b.primary",),
+                                size="x-small",
+                                variant="text",
+                                style="font-size:0.6rem;min-width:28px;color:#6b7280;",
+                                raw_attrs=['@click.stop="$ctrl.clear_box(b.name)"'],
                             )
 
                 # Right panel — layers + navigation tabs.

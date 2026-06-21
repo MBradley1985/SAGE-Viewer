@@ -201,6 +201,8 @@ class Scene:
         if name in self._adjacent_order:
             # Remove it
             self._adjacent_order.remove(name)
+            if self._active_box_name == name:
+                self._active_box_name = self._primary_name
             model.offset = np.zeros(3)
             model.visible = False
             self._remove_ring(name)

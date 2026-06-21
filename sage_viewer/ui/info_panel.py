@@ -26,6 +26,16 @@ def build_info_panel(server, scene: Scene) -> None:
         """Fires on every left-click; only selects on a fast second click."""
         now = time.monotonic()
         dt, _last_click[0] = now - _last_click[0], now
+
+        # Box activation: every click checks which box was clicked by world-X coord.
+        if point is not None:
+            pt = np.asarray(point, dtype=np.float64)
+            if not np.all(np.abs(pt) < 1e-10):
+                clicked_box = scene.box_name_at(float(pt[0]))
+                if clicked_box != scene.active_box_name:
+                    if hasattr(server.controller, "set_active_box"):
+                        server.controller.set_active_box(clicked_box)
+
         if dt > _DOUBLE_CLICK_THRESHOLD:
             # First click — ignore; wait for the matching second click.
             return
@@ -40,11 +50,15 @@ def build_info_panel(server, scene: Scene) -> None:
         if np.all(np.abs(point) < 1e-10):
             return
 
-        halos, galaxies = scene._loader.get(scene.current_snap)
+        # Use the active model so double-click selection works in any box.
+        active = scene.active_model
+        halos, galaxies = active.loader.get(active.current_snap)
+        off = active.offset.astype(np.float64)
         lines = [f"({point[0]:.2f}, {point[1]:.2f}, {point[2]:.2f}) Mpc/h"]
 
         # Nearest halo — record into nav_halo_idx so the Environment tab's
         # halo selector reflects what the user just double-clicked.
+        # Camera halo index is built in world coords so point is used directly.
         if halos.count > 0:
             hidx = scene.camera._halo_index.nearest(tuple(point))
             hm = halos.masses[hidx]
@@ -64,7 +78,9 @@ def build_info_panel(server, scene: Scene) -> None:
             if len(visible) == 0:
                 gidx = None
             else:
-                _, hit = KDTree(galaxies.positions[visible]).query(point)
+                # Galaxy positions are model-local; add offset for world coords.
+                gal_world = galaxies.positions[visible] + off
+                _, hit = KDTree(gal_world).query(point)
                 gidx = int(visible[hit])
 
             if gidx is not None:
@@ -76,7 +92,7 @@ def build_info_panel(server, scene: Scene) -> None:
                     f"({gt})  →  idx {gidx} selected"
                 )
                 state.nav_gal_idx = gidx
-                gpos = galaxies.positions[gidx]
+                gpos = galaxies.positions[gidx] + off
                 scene.camera._add_circle_indicator(
                     (float(gpos[0]), float(gpos[1]), float(gpos[2])), 0.0
                 )

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import h5py
+import numpy as np
 import pyvista as pv
 
 from sage_viewer.config import SimConfig

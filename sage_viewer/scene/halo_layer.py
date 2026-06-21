@@ -154,7 +154,7 @@ class HaloLayer:
         # three actors per halo population so the in-place fast-path
         # doesn't apply (the same trade-off galaxies make for Structure).
         self._clear_actors()
-        self._render_layered(snap.positions, colors, radii)
+        self._render_layered(snap.positions + self._offset, colors, radii)
 
     # ------------------------------------------------------------------
     # Layered NFW-style halo rendering — 3 stacked gaussian splats per
