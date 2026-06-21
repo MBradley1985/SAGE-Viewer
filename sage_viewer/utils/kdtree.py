@@ -16,9 +16,9 @@ class NearestHaloIndex:
         if positions is not None and len(positions) > 0:
             self.update(positions)
 
-    def update(self, positions: np.ndarray) -> None:
+    def update(self, positions: np.ndarray, tree: KDTree | None = None) -> None:
         self._positions = positions
-        self._tree = KDTree(positions)
+        self._tree = tree if tree is not None else KDTree(positions)
 
     def nearest(self, point: tuple[float, float, float]) -> int:
         """Return index of the closest halo/point to the given (x, y, z)."""

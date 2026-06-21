@@ -31,9 +31,9 @@ class CameraController:
     # Index updates (called by Scene on snapshot change)
     # ------------------------------------------------------------------
 
-    def update_halo_index(self, positions: np.ndarray) -> None:
+    def update_halo_index(self, positions: np.ndarray, tree=None) -> None:
         if len(positions) > 0:
-            self._halo_index.update(positions)
+            self._halo_index.update(positions, tree=tree)
 
     def update_galaxy_positions(self, positions: np.ndarray) -> None:
         self._galaxy_positions = positions

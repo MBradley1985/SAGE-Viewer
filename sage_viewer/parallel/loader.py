@@ -6,6 +6,8 @@ from functools import lru_cache
 from threading import Lock
 from typing import Optional
 
+from scipy.spatial import KDTree
+
 from sage_viewer.config import SimConfig
 from sage_viewer.io.galaxy_reader import GalaxySnapshot, load_galaxy_snapshot
 from sage_viewer.io.halo_reader import HaloSnapshot, load_halo_snapshot
@@ -55,6 +57,7 @@ class SnapshotLoader:
         self._executor = ThreadPoolExecutor(max_workers=max(2, prefetch_radius * 2))
         self._futures: dict[int, Future] = {}
         self._lock = Lock()
+        self._tree_cache: dict[int, KDTree] = {}
 
         # Wrap the actual load call in an LRU cache so repeated requests
         # for the same snapshot skip disk entirely. Size the cache to hold
@@ -89,7 +92,15 @@ class SnapshotLoader:
             omega_m=self._cfg.omega,
             omega_l=self._cfg.omega_lambda,
         )
+        # Build the spatial index while still on the background thread so
+        # snap navigation never blocks on KDTree construction (~50 ms / snap).
+        if len(halos.positions) > 0:
+            self._tree_cache[snap_num] = KDTree(halos.positions)
         return halos, galaxies
+
+    def get_tree(self, snap_num: int) -> KDTree | None:
+        """Return the pre-built KDTree for snap_num, or None if not ready."""
+        return self._tree_cache.get(snap_num)
 
     def get(self, snap_num: int) -> tuple[HaloSnapshot, GalaxySnapshot]:
         """Return (HaloSnapshot, GalaxySnapshot) for snap_num.

@@ -287,18 +287,22 @@ class Scene:
             always_visible=True,
             shadow=False,
             point_size=0,
-            shape="none",
+            shape=None,
             render=False,
             reset_camera=False,
         )
         actors = [raw] if not isinstance(raw, list) else raw
         for a in actors:
             try:
-                a.GetTextProperty().SetJustificationToCentered()
+                tp = a.GetTextProperty()
+                tp.SetJustificationToCentered()
+                tp.SetBackgroundOpacity(0.0)
             except Exception:
                 pass
             try:
-                a.GetMapper().GetLabelTextProperty().SetJustificationToCentered()
+                tp = a.GetMapper().GetLabelTextProperty()
+                tp.SetJustificationToCentered()
+                tp.SetBackgroundOpacity(0.0)
             except Exception:
                 pass
         self._label_actors[name] = actors
@@ -482,7 +486,9 @@ class Scene:
             active.set_snapshot(snap_num)
             halos, galaxies = active.loader.get(snap_num)
             off = active.offset.astype(np.float32)
-            self._camera.update_halo_index(halos.positions + off)
+            self._camera.update_halo_index(
+                halos.positions + off, tree=active.loader.get_tree(snap_num)
+            )
             self._camera.update_galaxy_positions(galaxies.positions + off)
             self.refresh_label(self._active_box_name)
             for cb in self._on_snap_change:
@@ -504,7 +510,9 @@ class Scene:
                 m.set_snapshot(min(snap_num, m.snap_count - 1))
 
         halos, galaxies = self.primary.loader.get(snap_num)
-        self._camera.update_halo_index(halos.positions)
+        self._camera.update_halo_index(
+            halos.positions, tree=self.primary.loader.get_tree(snap_num)
+        )
         self._camera.update_galaxy_positions(galaxies.positions)
 
         if self._focus_region is not None:
