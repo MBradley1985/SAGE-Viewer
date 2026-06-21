@@ -922,23 +922,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
         try:
             first_tick = True
             while True:
-                # Main tick sleep (skipped on the very first iteration so the
-                # first movement is immediate).  The task cancel in
-                # on_cam_release fires here if the key is released mid-sleep.
                 if not first_tick:
+                    # (A) Main sleep — cancel from on_cam_release fires here.
                     await asyncio.sleep(0.023)
-                first_tick = False
+                    # (B) Expensive sync ops run AFTER the cancel window, so a
+                    # keyup that arrives during clip/push is queued and caught
+                    # at the grace sleep (C) below — not after fly().
+                    scene.plotter.renderer.ResetCameraClippingRange()
 
-                # 10 ms grace: gives any in-flight keyup time to arrive
-                # (localhost WebSocket RTT ~1-2 ms; 10 ms is a very wide margin).
+                # (C) Grace sleep — catches any keyup that arrived during (B)
+                # or that was in-flight when (A) woke up (localhost RTT ~1-2 ms).
                 await asyncio.sleep(0.010)
                 if not _held_dirs:
                     break
 
+                first_tick = False
                 for d in list(_held_dirs):
                     if d in _held_dirs:
                         scene.camera.fly(d, step_frac=0.008)
-                scene.plotter.renderer.ResetCameraClippingRange()
+                # Synchronous window is now only fly() + _push() (~1 ms total).
                 _push()
         except asyncio.CancelledError:
             pass
