@@ -32,7 +32,7 @@ def read_sage_header(hdf5_path: str | Path) -> dict:
     try:
         with h5py.File(str(hdf5_path), "r") as f:
             sim = f.get("Header/Simulation", None)
-            run = f.get("Header/Runtime",    None)
+            run = f.get("Header/Runtime", None)
 
             def _g(grp, k, default=None):
                 if grp is None or k not in grp.attrs:
@@ -42,19 +42,26 @@ def read_sage_header(hdf5_path: str | Path) -> dict:
                     return v.decode("utf-8", errors="replace")
                 return v
 
-            out["hubble_h"]    = float(_g(sim, "hubble_h",    0.73))
-            out["omega_m"]     = float(_g(sim, "omega_matter", 0.25))
-            out["omega_l"]     = float(_g(sim, "omega_lambda", 0.75))
-            out["box_size"]    = float(_g(sim, "box_size",     62.5))
-            out["n_snapshots"] = int(_g(sim, "SimMaxSnaps",
-                                        _g(sim, "LastSnapshotNr", 64) + 1))
-            out["tree_dir"]    = _g(sim, "SimulationDir", "")
-            out["tree_name"]   = _g(sim, "TreeName",
-                                    _g(sim, "FileWithSnapList", ""))
-            out["first_file"]  = int(_g(run, "FirstFile", 0))
-            out["last_file"]   = int(_g(run, "LastFile",
-                                        int(_g(sim, "num_simulation_tree_files", 1)) - 1))
-            out["h2_radial"]   = bool(int(_g(run, "H2RadialIntegrationOn", 0)))
+            out["hubble_h"] = float(_g(sim, "hubble_h", 0.73))
+            out["omega_m"] = float(_g(sim, "omega_matter", 0.25))
+            out["omega_l"] = float(_g(sim, "omega_lambda", 0.75))
+            out["box_size"] = float(_g(sim, "box_size", 62.5))
+            out["n_snapshots"] = int(
+                _g(sim, "SimMaxSnaps", _g(sim, "LastSnapshotNr", 64) + 1)
+            )
+            out["tree_dir"] = _g(sim, "SimulationDir", "")
+            out["tree_name"] = _g(
+                sim, "TreeName", _g(sim, "FileWithSnapList", "")
+            )
+            out["first_file"] = int(_g(run, "FirstFile", 0))
+            out["last_file"] = int(
+                _g(
+                    run,
+                    "LastFile",
+                    int(_g(sim, "num_simulation_tree_files", 1)) - 1,
+                )
+            )
+            out["h2_radial"] = bool(int(_g(run, "H2RadialIntegrationOn", 0)))
 
             # Per-snapshot tables (preferred — bypasses the .a_list file)
             if "Header/snapshot_redshifts" in f:
@@ -70,8 +77,8 @@ def read_sage_header(hdf5_path: str | Path) -> dict:
                     else np.arange(len(a_sorted))
                 )
                 out["scale_factors"] = a_sorted.astype(np.float64)
-                out["redshifts"]     = z_sorted.astype(np.float64)
-                out["snap_list"]     = snap_sorted.astype(np.int32)
+                out["redshifts"] = z_sorted.astype(np.float64)
+                out["snap_list"] = snap_sorted.astype(np.int32)
     except Exception:
         pass
     return out

@@ -54,7 +54,9 @@ class SnapshotLoader:
         self._max_halos = max_halos
         self._max_galaxies = max_galaxies
 
-        self._executor = ThreadPoolExecutor(max_workers=max(2, prefetch_radius * 2))
+        self._executor = ThreadPoolExecutor(
+            max_workers=max(2, prefetch_radius * 2)
+        )
         self._futures: dict[int, Future] = {}
         self._lock = Lock()
         self._tree_cache: dict[int, KDTree] = {}
@@ -67,9 +69,7 @@ class SnapshotLoader:
             maxsize=max(cache_size, snap_table.count)
         )(self._load)
 
-    def _load(
-        self, snap_num: int
-    ) -> tuple[HaloSnapshot, GalaxySnapshot]:
+    def _load(self, snap_num: int) -> tuple[HaloSnapshot, GalaxySnapshot]:
         halos = load_halo_snapshot(
             tree_dir=self._cfg.tree_dir,
             tree_name=self._cfg.tree_name,
@@ -119,6 +119,7 @@ class SnapshotLoader:
         # Silence per-snapshot load chatter so it doesn't bury the startup
         # browser URL in the terminal.
         from sage_viewer.io import halo_reader, galaxy_reader
+
         halo_reader.VERBOSE = False
         galaxy_reader.VERBOSE = False
         n = self._snap_table.count

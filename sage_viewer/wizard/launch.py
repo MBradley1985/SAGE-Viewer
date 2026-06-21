@@ -16,22 +16,28 @@ def create_launch_app(port: int):
     server = get_server(client_type="vue3")
     server.enable_module(has_capabilities)
 
-    _sage_static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
-    server.enable_module({
-        "serve":   {"sage_static": _sage_static_dir},
-        "scripts": ["sage_static/sage_viewer.js"],
-    })
+    _sage_static_dir = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "static"
+    )
+    server.enable_module(
+        {
+            "serve": {"sage_static": _sage_static_dir},
+            "scripts": ["sage_static/sage_viewer.js"],
+        }
+    )
 
     # xterm.js — required for the wizard terminal in Launch Mode.
-    server.enable_module({
-        "styles":  [
-            "https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css",
-        ],
-        "scripts": [
-            "https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js",
-            "https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js",
-        ],
-    })
+    server.enable_module(
+        {
+            "styles": [
+                "https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css",
+            ],
+            "scripts": [
+                "https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js",
+                "https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js",
+            ],
+        }
+    )
 
     _vuetify_config = {
         "theme": {
@@ -40,11 +46,11 @@ def create_launch_app(port: int):
                 "dos_blue": {
                     "dark": True,
                     "colors": {
-                        "primary":       "#ffff55",
-                        "secondary":     "#ffffff",
-                        "background":    "#0000aa",
-                        "surface":       "#0000aa",
-                        "on-surface":    "#ffffff",
+                        "primary": "#ffff55",
+                        "secondary": "#ffffff",
+                        "background": "#0000aa",
+                        "surface": "#0000aa",
+                        "on-surface": "#ffffff",
                         "on-background": "#ffffff",
                     },
                 },
@@ -64,7 +70,7 @@ def create_launch_app(port: int):
         vuetify_config=_vuetify_config,
     ) as layout:
         layout.title.style = "display:none;"
-        layout.icon.style  = "display:none;"
+        layout.icon.style = "display:none;"
 
         with layout.toolbar as tb:
             tb.style = "display:none;"

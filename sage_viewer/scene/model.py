@@ -14,53 +14,52 @@ from sage_viewer.scene.fof_layer import FofLinkLayer
 from sage_viewer.scene.galaxy_layer import GalaxyLayer
 from sage_viewer.scene.halo_layer import HaloLayer
 
-
 # HDF5 field names probed for availability, keyed by the filter UI state name
 _OPTIONAL_FIELDS: dict[str, str] = {
     # Already-handled optionals
-    "bh_mass":        "BlackHoleMass",
-    "ics_mass":       "IntraClusterStars",
-    "ffb_regime":     "FFBRegime",
-    "cgm_regime":     "Regime",
-    "central_mvir":   "CentralMvir",
-    "h2_mass":        "H2gas",
-    "cgm_gas":        "CGMgas",
-    "hot_gas":        "HotGas",
-    "galaxy_id":      "GalaxyIndex",
-    "central_id":     "CentralGalaxyIndex",
+    "bh_mass": "BlackHoleMass",
+    "ics_mass": "IntraClusterStars",
+    "ffb_regime": "FFBRegime",
+    "cgm_regime": "Regime",
+    "central_mvir": "CentralMvir",
+    "h2_mass": "H2gas",
+    "cgm_gas": "CGMgas",
+    "hot_gas": "HotGas",
+    "galaxy_id": "GalaxyIndex",
+    "central_id": "CentralGalaxyIndex",
     "time_of_infall": "TimeOfInfall",
     # Halo structural (written per-galaxy by SAGE)
-    "len_particles":  "Len",
-    "vmax":           "Vmax",
-    "concentration":  "Concentration",
-    "spin":           "Spin",
+    "len_particles": "Len",
+    "vmax": "Vmax",
+    "concentration": "Concentration",
+    "spin": "Spin",
     # Galaxy structural
-    "disk_radius":              "DiskRadius",
-    "bulge_radius":             "BulgeRadius",
-    "merger_bulge_mass":        "MergerBulgeMass",
-    "merger_bulge_radius":      "MergerBulgeRadius",
-    "instability_bulge_mass":   "InstabilityBulgeMass",
+    "disk_radius": "DiskRadius",
+    "bulge_radius": "BulgeRadius",
+    "merger_bulge_mass": "MergerBulgeMass",
+    "merger_bulge_radius": "MergerBulgeRadius",
+    "instability_bulge_mass": "InstabilityBulgeMass",
     "instability_bulge_radius": "InstabilityBulgeRadius",
     # Gas / outflows
-    "h1_gas":        "H1gas",
-    "ejected_mass":  "EjectedMass",
-    "outflow_rate":  "OutflowRate",
-    "mass_loading":  "MassLoading",
-    "cooling":       "Cooling",
-    "heating":       "Heating",
+    "h1_gas": "H1gas",
+    "ejected_mass": "EjectedMass",
+    "outflow_rate": "OutflowRate",
+    "mass_loading": "MassLoading",
+    "cooling": "Cooling",
+    "heating": "Heating",
     # SFR components
-    "sfr_bulge":   "SfrBulge",
-    "sfr_disk":    "SfrDisk",
+    "sfr_bulge": "SfrBulge",
+    "sfr_disk": "SfrDisk",
     "sfr_bulge_z": "SfrBulgeZ",
-    "sfr_disk_z":  "SfrDiskZ",
+    "sfr_disk_z": "SfrDiskZ",
     # Metals
-    "metals_cold_gas":     "MetalsColdGas",
+    "metals_cold_gas": "MetalsColdGas",
     "metals_stellar_mass": "MetalsStellarMass",
-    "metals_bulge_mass":   "MetalsBulgeMass",
-    "metals_hot_gas":      "MetalsHotGas",
+    "metals_bulge_mass": "MetalsBulgeMass",
+    "metals_hot_gas": "MetalsHotGas",
     "metals_ejected_mass": "MetalsEjectedMass",
-    "metals_ics":          "MetalsIntraClusterStars",
-    "metals_cgm_gas":      "MetalsCGMgas",
+    "metals_ics": "MetalsIntraClusterStars",
+    "metals_cgm_gas": "MetalsCGMgas",
 }
 
 # Age availability requires BOTH SFH arrays — checked separately
@@ -82,7 +81,7 @@ class Model:
         loader_kwargs: dict,
     ) -> None:
         self.path: Path = Path(par_path)
-        self.name: str  = self.path.stem
+        self.name: str = self.path.stem
         self.cfg: SimConfig = parse_par(par_path)
         self.snap_table: SnapshotTable = SnapshotTable(self.cfg.snap_list_path)
         self.loader: SnapshotLoader = SnapshotLoader(
@@ -90,9 +89,9 @@ class Model:
             snap_table=self.snap_table,
             **loader_kwargs,
         )
-        self.halo_layer:   HaloLayer   = HaloLayer(plotter)
+        self.halo_layer: HaloLayer = HaloLayer(plotter)
         self.galaxy_layer: GalaxyLayer = GalaxyLayer(plotter)
-        self.fof_layer:    FofLinkLayer = FofLinkLayer(plotter)
+        self.fof_layer: FofLinkLayer = FofLinkLayer(plotter)
         self.fields_available: dict[str, bool] = self._detect_fields()
         self._current_snap: int = -1
         self._offset: np.ndarray = np.zeros(3, dtype=np.float64)
@@ -162,7 +161,7 @@ class Model:
     @visible.setter
     def visible(self, v: bool) -> None:
         v = bool(v)
-        self.halo_layer.visible   = v
+        self.halo_layer.visible = v
         self.galaxy_layer.visible = v
 
     @property

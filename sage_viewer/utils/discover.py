@@ -44,7 +44,5 @@ def find_models(
             # needs it for tree paths.  Could be lifted once SimConfig can
             # be derived from the HDF5 alone.
             continue
-        found.append(
-            {"name": sub.name, "par": par_candidate, "hdf5": hdf5}
-        )
+        found.append({"name": sub.name, "par": par_candidate, "hdf5": hdf5})
     return found

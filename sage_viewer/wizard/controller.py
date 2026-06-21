@@ -15,34 +15,44 @@ import re as _re
 # ANSI SGR codes for each wizard message kind — used when writing directly to
 # the xterm.js terminal instead of the old HTML line list.
 _KIND_ANSI: dict[str, str] = {
-    "title": "\x1b[1;36m",    # bold cyan
-    "ok":    "\x1b[32m",      # green
-    "warn":  "\x1b[33m",      # yellow
-    "err":   "\x1b[1;31m",    # bold red
-    "cmd":   "\x1b[36m",      # cyan
-    "out":   "",               # white (default)
-    "sep":   "",               # white (default)
-    "info":  "",               # default
+    "title": "\x1b[1;36m",  # bold cyan
+    "ok": "\x1b[32m",  # green
+    "warn": "\x1b[33m",  # yellow
+    "err": "\x1b[1;31m",  # bold red
+    "cmd": "\x1b[36m",  # cyan
+    "out": "",  # white (default)
+    "sep": "",  # white (default)
+    "info": "",  # default
 }
 
 # ── legacy ANSI → HTML converter (kept for reference, no longer used) ─────────
-_ANSI_CSI   = _re.compile(r'\x1b\[([0-9;]*)([A-Za-z])')   # all CSI sequences
-_ANSI_OTHER = _re.compile(r'\x1b[^[]')                      # ESC + non-[
+_ANSI_CSI = _re.compile(r"\x1b\[([0-9;]*)([A-Za-z])")  # all CSI sequences
+_ANSI_OTHER = _re.compile(r"\x1b[^[]")  # ESC + non-[
 
 _ANSI_FG = {
-    '30': '#4a4a4a', '31': '#ef4444', '32': '#22c55e',
-    '33': '#f59e0b', '34': '#60a5fa', '35': '#a855f7',
-    '36': '#06b6d4', '37': '#e2e8f0',
-    '90': '#6b7280', '91': '#f87171', '92': '#4ade80',
-    '93': '#fbbf24', '94': '#93c5fd', '95': '#c084fc',
-    '96': '#67e8f9', '97': '#f9fafb',
+    "30": "#4a4a4a",
+    "31": "#ef4444",
+    "32": "#22c55e",
+    "33": "#f59e0b",
+    "34": "#60a5fa",
+    "35": "#a855f7",
+    "36": "#06b6d4",
+    "37": "#e2e8f0",
+    "90": "#6b7280",
+    "91": "#f87171",
+    "92": "#4ade80",
+    "93": "#fbbf24",
+    "94": "#93c5fd",
+    "95": "#c084fc",
+    "96": "#67e8f9",
+    "97": "#f9fafb",
 }
 
 
 def _ansi_to_html(text: str) -> str:
     """Convert ANSI SGR codes to HTML spans; escape all other HTML."""
     # Strip non-SGR control sequences (cursor movement, clear, etc.)
-    text = _ANSI_OTHER.sub('', text)
+    text = _ANSI_OTHER.sub("", text)
 
     out: list[str] = []
     in_span = False
@@ -50,33 +60,33 @@ def _ansi_to_html(text: str) -> str:
 
     for m in _ANSI_CSI.finditer(text):
         # Emit plain text before this escape sequence (HTML-escaped)
-        out.append(_html_mod.escape(text[pos:m.start()]))
+        out.append(_html_mod.escape(text[pos : m.start()]))
         pos = m.end()
 
         cmd = m.group(2)
-        if cmd != 'm':
+        if cmd != "m":
             continue  # not a colour code — skip
 
-        codes = m.group(1).split(';') if m.group(1) else ['0']
+        codes = m.group(1).split(";") if m.group(1) else ["0"]
         if in_span:
-            out.append('</span>')
+            out.append("</span>")
             in_span = False
 
-        bold = '1' in codes
+        bold = "1" in codes
         color = next((c for c in codes if c in _ANSI_FG), None)
-        reset = '0' in codes or '' in codes
+        reset = "0" in codes or "" in codes
 
         if not reset and color:
-            style = f'color:{_ANSI_FG[color]}'
+            style = f"color:{_ANSI_FG[color]}"
             if bold:
-                style += ';font-weight:700'
+                style += ";font-weight:700"
             out.append(f'<span style="{style}">')
             in_span = True
 
     out.append(_html_mod.escape(text[pos:]))
     if in_span:
-        out.append('</span>')
-    return ''.join(out)
+        out.append("</span>")
+    return "".join(out)
 
 
 _STEPS = [
@@ -202,13 +212,13 @@ UnitVelocity_in_cm_per_s  100000      %WATCH OUT: km/s
 
 _KIND_COLORS = {
     "title": "#06b6d4",
-    "ok":    "#22c55e",
-    "warn":  "#f59e0b",
-    "err":   "#ef4444",
-    "cmd":   "#06b6d4",
-    "out":   "#9ca3af",
-    "sep":   "#374151",
-    "info":  "#e2e8f0",
+    "ok": "#22c55e",
+    "warn": "#f59e0b",
+    "err": "#ef4444",
+    "cmd": "#06b6d4",
+    "out": "#9ca3af",
+    "sep": "#374151",
+    "info": "#e2e8f0",
 }
 
 
@@ -222,31 +232,35 @@ class WizardController:
         on_model_loaded=None,
         auto_start: bool = True,
     ) -> None:
-        self._sv             = server
-        self._st             = server.state
-        self._port           = port
-        self._scene          = scene          # None in Launch Mode
-        self._on_model_loaded = on_model_loaded  # called on completion in Explore Mode
+        self._sv = server
+        self._st = server.state
+        self._port = port
+        self._scene = scene  # None in Launch Mode
+        self._on_model_loaded = (
+            on_model_loaded  # called on completion in Explore Mode
+        )
 
         self._sage26_dir: Path | None = None
-        self._par_path:   Path | None = None
-        self._models:     list[dict]  = []
-        self._wiz_seq:    int         = 0
-        self._wiz_buf:    bytearray   = bytearray()  # replay buffer for late-mounting xterm
-        self._back:       str         = "back_fresh"  # Back target for par/compile steps
+        self._par_path: Path | None = None
+        self._models: list[dict] = []
+        self._wiz_seq: int = 0
+        self._wiz_buf: bytearray = (
+            bytearray()
+        )  # replay buffer for late-mounting xterm
+        self._back: str = "back_fresh"  # Back target for par/compile steps
 
-        self._st.wiz_step          = 0
-        self._st.wiz_lines         = []   # kept for compat; no longer populated
-        self._st.wiz_choices       = []
-        self._st.wiz_busy          = True
-        self._st.wiz_par_show      = False
-        self._st.wiz_par_text      = ""
+        self._st.wiz_step = 0
+        self._st.wiz_lines = []  # kept for compat; no longer populated
+        self._st.wiz_choices = []
+        self._st.wiz_busy = True
+        self._st.wiz_par_show = False
+        self._st.wiz_par_text = ""
         self._st.wiz_filename_show = False
-        self._st.wiz_filename      = "millennium"
-        self._st.wiz_kind_colors   = _KIND_COLORS
-        self._st.wiz_pty_data      = ""   # base64 PTY chunk → xterm.js
-        self._st.wiz_pty_seq       = 0    # monotonically increasing
-        self._st.wiz_pty_buf       = ""   # base64 full replay buffer
+        self._st.wiz_filename = "millennium"
+        self._st.wiz_kind_colors = _KIND_COLORS
+        self._st.wiz_pty_data = ""  # base64 PTY chunk → xterm.js
+        self._st.wiz_pty_seq = 0  # monotonically increasing
+        self._st.wiz_pty_buf = ""  # base64 full replay buffer
 
         server.controller.set("wiz_choose")(self._on_choice)
         server.controller.set("wiz_close")(self._on_close)
@@ -258,19 +272,19 @@ class WizardController:
     def reset_and_start(self) -> None:
         """Clear terminal and restart the scan — used when re-opening wizard."""
         self._sage26_dir = None
-        self._par_path   = None
-        self._models     = []
-        self._wiz_buf    = bytearray()
-        self._back       = "back_fresh"
-        self._st.wiz_step          = 0
-        self._st.wiz_lines         = []
-        self._st.wiz_choices       = []
-        self._st.wiz_busy          = True
-        self._st.wiz_par_show      = False
-        self._st.wiz_par_text      = ""
+        self._par_path = None
+        self._models = []
+        self._wiz_buf = bytearray()
+        self._back = "back_fresh"
+        self._st.wiz_step = 0
+        self._st.wiz_lines = []
+        self._st.wiz_choices = []
+        self._st.wiz_busy = True
+        self._st.wiz_par_show = False
+        self._st.wiz_par_text = ""
         self._st.wiz_filename_show = False
-        self._st.wiz_filename      = "millennium"
-        self._st.wiz_pty_buf       = ""
+        self._st.wiz_filename = "millennium"
+        self._st.wiz_pty_buf = ""
         # Push a clear sequence as the first "chunk" so a late-mounting xterm
         # clears itself before replaying buffered output.
         self._push_bytes(b"\x1b[2J\x1b[H")
@@ -297,11 +311,11 @@ class WizardController:
         self._wiz_buf.extend(data)
         if len(self._wiz_buf) > self._WIZ_BUF_CAP:
             # Keep the most recent half so the display stays coherent.
-            self._wiz_buf = self._wiz_buf[len(self._wiz_buf) // 2:]
-        self._wiz_seq = (self._wiz_seq + 1) % 10 ** 9
+            self._wiz_buf = self._wiz_buf[len(self._wiz_buf) // 2 :]
+        self._wiz_seq = (self._wiz_seq + 1) % 10**9
         self._st.wiz_pty_data = _b64.b64encode(data).decode()
-        self._st.wiz_pty_seq  = self._wiz_seq
-        self._st.wiz_pty_buf  = _b64.b64encode(bytes(self._wiz_buf)).decode()
+        self._st.wiz_pty_seq = self._wiz_seq
+        self._st.wiz_pty_buf = _b64.b64encode(bytes(self._wiz_buf)).decode()
         self._st.flush()
 
     def _emit(self, text: str, kind: str = "info") -> None:
@@ -311,13 +325,13 @@ class WizardController:
 
     def _set_choices(self, choices: list[dict]) -> None:
         self._st.wiz_choices = choices
-        self._st.wiz_busy    = False
+        self._st.wiz_busy = False
         self._st.flush()
 
     def _busy(self) -> None:
-        self._st.wiz_choices  = []
-        self._st.wiz_busy          = True
-        self._st.wiz_par_show      = False
+        self._st.wiz_choices = []
+        self._st.wiz_busy = True
+        self._st.wiz_par_show = False
         self._st.wiz_filename_show = False
         self._st.flush()
 
@@ -327,21 +341,28 @@ class WizardController:
         import fcntl as _fcntl, struct as _struct, termios as _termios
 
         self._push_bytes(
-            ("\x1b[36m$ " + " ".join(str(c) for c in cmd) + "\x1b[0m\r\n").encode()
+            (
+                "\x1b[36m$ " + " ".join(str(c) for c in cmd) + "\x1b[0m\r\n"
+            ).encode()
         )
 
         master_fd = slave_fd = -1
         try:
             master_fd, slave_fd = _pty.openpty()
             try:
-                _fcntl.ioctl(slave_fd, _termios.TIOCSWINSZ,
-                             _struct.pack('HHHH', 24, 220, 0, 0))
+                _fcntl.ioctl(
+                    slave_fd,
+                    _termios.TIOCSWINSZ,
+                    _struct.pack("HHHH", 24, 220, 0, 0),
+                )
             except Exception:
                 pass
 
             proc = _subprocess.Popen(
                 [str(c) for c in cmd],
-                stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
                 close_fds=True,
                 cwd=str(cwd) if cwd else None,
                 preexec_fn=os.setsid,
@@ -357,7 +378,7 @@ class WizardController:
                 except (OSError, ValueError):
                     return b""
                 if not r:
-                    return None   # timeout
+                    return None  # timeout
                 try:
                     chunk = os.read(master_fd, 4096)
                 except OSError:
@@ -415,13 +436,14 @@ class WizardController:
 
     def _sage26_compiled(self, sage26: Path) -> tuple[bool, int]:
         o_files = list(sage26.glob("src/*.o"))
-        binary  = sage26 / "bin" / "sage"
+        binary = sage26 / "bin" / "sage"
         return (len(o_files) > 0 or binary.is_file()), len(o_files)
 
     def _find_models(self, verbose: bool = False) -> list[dict]:
         from sage_viewer.utils.discover import find_models
+
         results: list[dict] = []
-        checked: set[Path]  = set()
+        checked: set[Path] = set()
 
         # Candidate (output_dir, par_dir) pairs to scan
         pairs: list[tuple[Path, Path]] = []
@@ -484,11 +506,17 @@ class WizardController:
             compiled, n_obj = self._sage26_compiled(self._sage26_dir)
             self._emit(f"  SAGE26 found : {self._sage26_dir}", "ok")
             if compiled:
-                self._emit(f"  Compiled     : Yes  ({n_obj} object files)", "ok")
+                self._emit(
+                    f"  Compiled     : Yes  ({n_obj} object files)", "ok"
+                )
             else:
-                self._emit("  Compiled     : No   (will compile when needed)", "warn")
+                self._emit(
+                    "  Compiled     : No   (will compile when needed)", "warn"
+                )
         else:
-            self._emit("  SAGE26       : Not found in common locations", "warn")
+            self._emit(
+                "  SAGE26       : Not found in common locations", "warn"
+            )
 
         self._emit("  Scanning for models...", "info")
         self._models = self._find_models(verbose=True)
@@ -506,13 +534,31 @@ class WizardController:
         self._st.wiz_step = 1
         choices = []
         if self._models:
-            choices.append({"label": "Load Existing Model", "value": "load",
-                            "icon": "mdi-folder-open", "disabled": False})
+            choices.append(
+                {
+                    "label": "Load Existing Model",
+                    "value": "load",
+                    "icon": "mdi-folder-open",
+                    "disabled": False,
+                }
+            )
         if self._sage26_dir:
-            choices.append({"label": "Run SAGE26", "value": "run_sage26",
-                            "icon": "mdi-play-circle-outline", "disabled": False})
-        choices.append({"label": "Start Fresh", "value": "fresh",
-                        "icon": "mdi-git", "disabled": False})
+            choices.append(
+                {
+                    "label": "Run SAGE26",
+                    "value": "run_sage26",
+                    "icon": "mdi-play-circle-outline",
+                    "disabled": False,
+                }
+            )
+        choices.append(
+            {
+                "label": "Start Fresh",
+                "value": "fresh",
+                "icon": "mdi-git",
+                "disabled": False,
+            }
+        )
         self._set_choices(choices)
 
     def _on_choice(self, value: str, **_) -> None:
@@ -531,7 +577,7 @@ class WizardController:
             await self._step_fresh_choice()
 
         elif value.startswith("model:"):
-            name  = value[6:]
+            name = value[6:]
             model = next((m for m in self._models if m["name"] == name), None)
             if model:
                 await self._launch_explore(model["par"], model_name=name)
@@ -572,38 +618,74 @@ class WizardController:
         self._st.wiz_step = 2
         if not self._sage26_dir:
             self._emit("SAGE26 not found locally.", "err")
-            self._emit("Use 'Start Fresh' to clone it from GitHub first.", "info")
-            self._set_choices([{"label": "Back", "value": "back_main",
-                                "icon": "mdi-arrow-left", "disabled": False}])
+            self._emit(
+                "Use 'Start Fresh' to clone it from GitHub first.", "info"
+            )
+            self._set_choices(
+                [
+                    {
+                        "label": "Back",
+                        "value": "back_main",
+                        "icon": "mdi-arrow-left",
+                        "disabled": False,
+                    }
+                ]
+            )
             return
 
         compiled, n_obj = self._sage26_compiled(self._sage26_dir)
         if compiled:
-            self._emit(f"SAGE26 found at {self._sage26_dir}  ({n_obj} object files)", "ok")
+            self._emit(
+                f"SAGE26 found at {self._sage26_dir}  ({n_obj} object files)",
+                "ok",
+            )
             self._emit("Select a parameter file to run:", "info")
             self._emit("", "info")
             await self._step_pick_par()
         else:
             self._emit(f"SAGE26 found at {self._sage26_dir}", "ok")
-            self._emit("Not yet compiled — compile it first, then select a par file.", "warn")
-            self._set_choices([
-                {"label": "Compile SAGE26", "value": "compile_sage26",
-                 "icon": "mdi-cog-outline", "disabled": False},
-                {"label": "Back", "value": "back_main",
-                 "icon": "mdi-arrow-left", "disabled": False},
-            ])
+            self._emit(
+                "Not yet compiled — compile it first, then select a par file.",
+                "warn",
+            )
+            self._set_choices(
+                [
+                    {
+                        "label": "Compile SAGE26",
+                        "value": "compile_sage26",
+                        "icon": "mdi-cog-outline",
+                        "disabled": False,
+                    },
+                    {
+                        "label": "Back",
+                        "value": "back_main",
+                        "icon": "mdi-arrow-left",
+                        "disabled": False,
+                    },
+                ]
+            )
 
     async def _step_select_model(self) -> None:
         self._st.wiz_step = 1
         self._emit("Select a model to load:", "info")
         self._emit("", "info")
         choices = [
-            {"label": m["name"], "value": f"model:{m['name']}",
-             "icon": "mdi-database", "disabled": False}
+            {
+                "label": m["name"],
+                "value": f"model:{m['name']}",
+                "icon": "mdi-database",
+                "disabled": False,
+            }
             for m in self._models
         ]
-        choices.append({"label": "Back", "value": "back_main",
-                        "icon": "mdi-arrow-left", "disabled": False})
+        choices.append(
+            {
+                "label": "Back",
+                "value": "back_main",
+                "icon": "mdi-arrow-left",
+                "disabled": False,
+            }
+        )
         self._set_choices(choices)
 
     async def _step_fresh_choice(self) -> None:
@@ -612,24 +694,54 @@ class WizardController:
         choices: list[dict] = []
 
         # Clone is always the first option — full fresh start from GitHub
-        choices.append({"label": "Clone SAGE26", "value": "clone_sage26",
-                        "icon": "mdi-git", "disabled": False})
+        choices.append(
+            {
+                "label": "Clone SAGE26",
+                "value": "clone_sage26",
+                "icon": "mdi-git",
+                "disabled": False,
+            }
+        )
 
         if self._sage26_dir:
             compiled, _ = self._sage26_compiled(self._sage26_dir)
             if compiled:
-                choices.append({"label": "Run New Model", "value": "new_model",
-                                "icon": "mdi-play", "disabled": False})
+                choices.append(
+                    {
+                        "label": "Run New Model",
+                        "value": "new_model",
+                        "icon": "mdi-play",
+                        "disabled": False,
+                    }
+                )
             else:
-                choices.append({"label": "Compile SAGE26", "value": "compile_sage26",
-                                "icon": "mdi-cog", "disabled": False})
-                choices.append({"label": "Run New Model (after compile)", "value": "new_model",
-                                "icon": "mdi-play", "disabled": True})
+                choices.append(
+                    {
+                        "label": "Compile SAGE26",
+                        "value": "compile_sage26",
+                        "icon": "mdi-cog",
+                        "disabled": False,
+                    }
+                )
+                choices.append(
+                    {
+                        "label": "Run New Model (after compile)",
+                        "value": "new_model",
+                        "icon": "mdi-play",
+                        "disabled": True,
+                    }
+                )
         else:
             self._emit("SAGE26 not found locally — clone it first.", "info")
 
-        choices.append({"label": "Back", "value": "back_main",
-                        "icon": "mdi-arrow-left", "disabled": False})
+        choices.append(
+            {
+                "label": "Back",
+                "value": "back_main",
+                "icon": "mdi-arrow-left",
+                "disabled": False,
+            }
+        )
         self._set_choices(choices)
 
     async def _step_clone(self) -> None:
@@ -642,9 +754,19 @@ class WizardController:
             cwd=parent,
         )
         if rc != 0:
-            self._emit("Clone failed. Check internet connection and try again.", "err")
-            self._set_choices([{"label": "Back", "value": self._back,
-                                "icon": "mdi-arrow-left", "disabled": False}])
+            self._emit(
+                "Clone failed. Check internet connection and try again.", "err"
+            )
+            self._set_choices(
+                [
+                    {
+                        "label": "Back",
+                        "value": self._back,
+                        "icon": "mdi-arrow-left",
+                        "disabled": False,
+                    }
+                ]
+            )
             return
         self._sage26_dir = target
         await self._step_compile()
@@ -661,8 +783,16 @@ class WizardController:
         rc = await self._run_cmd(["make"], cwd=self._sage26_dir)
         if rc != 0:
             self._emit("Compilation failed. See output above.", "err")
-            self._set_choices([{"label": "Back", "value": self._back,
-                                "icon": "mdi-arrow-left", "disabled": False}])
+            self._set_choices(
+                [
+                    {
+                        "label": "Back",
+                        "value": self._back,
+                        "icon": "mdi-arrow-left",
+                        "disabled": False,
+                    }
+                ]
+            )
             return
         self._emit("Compilation complete!", "ok")
         await self._step_pick_par()
@@ -684,11 +814,17 @@ class WizardController:
                 "info",
             )
             self._emit("", "info")
-            self._set_choices([
-                _create_choice,
-                {"label": "Back", "value": self._back,
-                 "icon": "mdi-arrow-left", "disabled": False},
-            ])
+            self._set_choices(
+                [
+                    _create_choice,
+                    {
+                        "label": "Back",
+                        "value": self._back,
+                        "icon": "mdi-arrow-left",
+                        "disabled": False,
+                    },
+                ]
+            )
             return
         if len(par_files) == 1:
             self._par_path = par_files[0]
@@ -697,13 +833,23 @@ class WizardController:
             self._emit("Multiple parameter files found. Select one:", "info")
             self._emit("", "info")
             choices = [
-                {"label": p.name, "value": f"par:{p}",
-                 "icon": "mdi-file-cog", "disabled": False}
+                {
+                    "label": p.name,
+                    "value": f"par:{p}",
+                    "icon": "mdi-file-cog",
+                    "disabled": False,
+                }
                 for p in par_files
             ]
             choices.append(_create_choice)
-            choices.append({"label": "Back", "value": self._back,
-                            "icon": "mdi-arrow-left", "disabled": False})
+            choices.append(
+                {
+                    "label": "Back",
+                    "value": self._back,
+                    "icon": "mdi-arrow-left",
+                    "disabled": False,
+                }
+            )
             self._set_choices(choices)
 
     async def _step_create_par(self) -> None:
@@ -711,20 +857,30 @@ class WizardController:
         self._st.wiz_step = 3
         self._emit("Enter a name for the new config file:", "info")
         self._st.wiz_filename_show = True
-        self._st.wiz_filename      = "millennium"
+        self._st.wiz_filename = "millennium"
         self._st.flush()
-        self._set_choices([
-            {"label": "Create",
-             "value": "do_create_par",
-             "icon": "mdi-check", "disabled": False},
-            {"label": "Back",
-             "value": self._back,
-             "icon": "mdi-arrow-left", "disabled": False},
-        ])
+        self._set_choices(
+            [
+                {
+                    "label": "Create",
+                    "value": "do_create_par",
+                    "icon": "mdi-check",
+                    "disabled": False,
+                },
+                {
+                    "label": "Back",
+                    "value": self._back,
+                    "icon": "mdi-arrow-left",
+                    "disabled": False,
+                },
+            ]
+        )
 
     async def _do_create_par(self) -> None:
         """Create the par file using the user-supplied filename."""
-        raw  = str(self._st.wiz_filename or "millennium").strip() or "millennium"
+        raw = (
+            str(self._st.wiz_filename or "millennium").strip() or "millennium"
+        )
         name = raw if raw.endswith(".par") else raw + ".par"
         self._st.wiz_filename_show = False
         self._st.flush()
@@ -737,7 +893,10 @@ class WizardController:
         self._emit(f"Creating config file: {dest}", "info")
         dest.write_text(_MILLENNIUM_PAR_TEMPLATE)
         self._par_path = dest
-        self._emit("Template written. Edit the paths to the right, then Save & Run.", "ok")
+        self._emit(
+            "Template written. Edit the paths to the right, then Save & Run.",
+            "ok",
+        )
         self._emit("", "info")
         await self._step_par_edit()
 
@@ -746,7 +905,9 @@ class WizardController:
         if not self._par_path:
             return
         self._emit(f"Parameter file : {self._par_path}", "info")
-        self._emit("Edit the file to the right, then click Save & Run.", "info")
+        self._emit(
+            "Edit the file to the right, then click Save & Run.", "info"
+        )
         self._emit("", "info")
         try:
             text = self._par_path.read_text()
@@ -756,12 +917,22 @@ class WizardController:
         self._st.wiz_par_text = text
         self._st.wiz_par_show = True
         self._st.flush()
-        self._set_choices([
-            {"label": "Save & Run SAGE26", "value": "save_run_sage26",
-             "icon": "mdi-play", "disabled": False},
-            {"label": "Back", "value": self._back,
-             "icon": "mdi-arrow-left", "disabled": False},
-        ])
+        self._set_choices(
+            [
+                {
+                    "label": "Save & Run SAGE26",
+                    "value": "save_run_sage26",
+                    "icon": "mdi-play",
+                    "disabled": False,
+                },
+                {
+                    "label": "Back",
+                    "value": self._back,
+                    "icon": "mdi-arrow-left",
+                    "disabled": False,
+                },
+            ]
+        )
 
     async def _step_run_sage26(self) -> None:
         self._st.wiz_step = 4
@@ -779,11 +950,14 @@ class WizardController:
             # Create OutputDir before SAGE26 runs — it won't create it itself.
             try:
                 from sage_viewer.io.par_reader import parse_par
+
                 cfg = parse_par(self._par_path)
                 cfg.output_dir.mkdir(parents=True, exist_ok=True)
                 self._emit(f"Output dir ready: {cfg.output_dir}", "ok")
             except Exception as exc:
-                self._emit(f"Warning: could not create OutputDir — {exc}", "warn")
+                self._emit(
+                    f"Warning: could not create OutputDir — {exc}", "warn"
+                )
 
         # Find binary
         sage_bin: Path | None = None
@@ -797,29 +971,59 @@ class WizardController:
                     break
         if sage_bin is None:
             self._emit("SAGE26 binary not found (expected bin/sage).", "err")
-            self._set_choices([{"label": "Back", "value": self._back,
-                                "icon": "mdi-arrow-left", "disabled": False}])
+            self._set_choices(
+                [
+                    {
+                        "label": "Back",
+                        "value": self._back,
+                        "icon": "mdi-arrow-left",
+                        "disabled": False,
+                    }
+                ]
+            )
             return
 
         self._emit("", "info")
         self._emit("Running SAGE26 — output follows.", "info")
         self._emit("This may take a while for large simulations.", "info")
         self._emit("", "info")
-        rc = await self._run_cmd([str(sage_bin), str(self._par_path)],
-                                 cwd=self._sage26_dir)
+        rc = await self._run_cmd(
+            [str(sage_bin), str(self._par_path)], cwd=self._sage26_dir
+        )
         if rc != 0:
-            self._emit(f"SAGE26 exited with code {rc}. See output above.", "err")
-            self._set_choices([{"label": "Back", "value": self._back,
-                                "icon": "mdi-arrow-left", "disabled": False}])
+            self._emit(
+                f"SAGE26 exited with code {rc}. See output above.", "err"
+            )
+            self._set_choices(
+                [
+                    {
+                        "label": "Back",
+                        "value": self._back,
+                        "icon": "mdi-arrow-left",
+                        "disabled": False,
+                    }
+                ]
+            )
             return
 
         self._emit("", "info")
         self._emit("SAGE26 run complete!", "ok")
         self._models = self._find_models()
         if not self._models:
-            self._emit("No models found after run. Check OutputDir in the par file.", "err")
-            self._set_choices([{"label": "Back", "value": self._back,
-                                "icon": "mdi-arrow-left", "disabled": False}])
+            self._emit(
+                "No models found after run. Check OutputDir in the par file.",
+                "err",
+            )
+            self._set_choices(
+                [
+                    {
+                        "label": "Back",
+                        "value": self._back,
+                        "icon": "mdi-arrow-left",
+                        "disabled": False,
+                    }
+                ]
+            )
             return
         if len(self._models) == 1:
             m = self._models[0]
@@ -827,22 +1031,41 @@ class WizardController:
         else:
             await self._step_select_model()
 
-    async def _launch_explore(self, par_path: Path, model_name: str | None = None) -> None:
+    async def _launch_explore(
+        self, par_path: Path, model_name: str | None = None
+    ) -> None:
         name = model_name or par_path.stem
         self._st.wiz_step = 5
         self._emit("", "info")
         self._emit(f"Loading model: {name}", "title")
-        self._emit("Starting Explore Mode — refresh your browser when ready.", "info")
+        self._emit(
+            "Starting Explore Mode — refresh your browser when ready.", "info"
+        )
         self._st.flush()
         await asyncio.sleep(1.0)
 
         sage_cmd = shutil.which("sage-viewer")
         if sage_cmd:
-            os.execv(sage_cmd, [
-                sage_cmd, "--par", str(par_path), "--port", str(self._port),
-            ])
+            os.execv(
+                sage_cmd,
+                [
+                    sage_cmd,
+                    "--par",
+                    str(par_path),
+                    "--port",
+                    str(self._port),
+                ],
+            )
         else:
-            os.execv(sys.executable, [
-                sys.executable, "-m", "sage_viewer.cli",
-                "--par", str(par_path), "--port", str(self._port),
-            ])
+            os.execv(
+                sys.executable,
+                [
+                    sys.executable,
+                    "-m",
+                    "sage_viewer.cli",
+                    "--par",
+                    str(par_path),
+                    "--port",
+                    str(self._port),
+                ],
+            )

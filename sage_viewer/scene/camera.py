@@ -5,9 +5,9 @@ import pyvista as pv
 
 from sage_viewer.utils.kdtree import NearestHaloIndex
 
-_INDICATOR_COLOR   = "#888888"
+_INDICATOR_COLOR = "#888888"
 _INDICATOR_OPACITY = 0.35
-_INDICATOR_WIDTH   = 1.5
+_INDICATOR_WIDTH = 1.5
 
 
 class CameraController:
@@ -22,10 +22,16 @@ class CameraController:
         self._halo_index: NearestHaloIndex = NearestHaloIndex()
         self._galaxy_positions: np.ndarray | None = None
         self._indicator_actor = None
-        self._member_actors: list = []   # splats for FOF group members (one per regime colour)
-        self._selected_actors: list = [] # splats for selected galaxy: [white border, regime fill]
-        self._central_actor = None    # thin white outline marking the FOF central
-        self._group_ring_actor = None # red ring sized to enclose the group
+        self._member_actors: list = (
+            []
+        )  # splats for FOF group members (one per regime colour)
+        self._selected_actors: list = (
+            []
+        )  # splats for selected galaxy: [white border, regime fill]
+        self._central_actor = (
+            None  # thin white outline marking the FOF central
+        )
+        self._group_ring_actor = None  # red ring sized to enclose the group
 
     # ------------------------------------------------------------------
     # Index updates (called by Scene on snapshot change)
@@ -45,8 +51,11 @@ class CameraController:
     def _clear_indicator(self) -> None:
         if self._indicator_actor is None:
             return
-        actors = self._indicator_actor if isinstance(self._indicator_actor, list) \
+        actors = (
+            self._indicator_actor
+            if isinstance(self._indicator_actor, list)
             else [self._indicator_actor]
+        )
         for a in actors:
             if a is not None:
                 self._pl.remove_actor(a, render=False)
@@ -128,7 +137,9 @@ class CameraController:
             return
         cloud = pv.PolyData(np.asarray([position], dtype=np.float64))
         if color is None:
-            color = self._REGIME_COLORS.get(regime if regime in (0, 1) else -1, "cyan")
+            color = self._REGIME_COLORS.get(
+                regime if regime in (0, 1) else -1, "cyan"
+            )
         a_fill = self._pl.add_mesh(
             cloud,
             color=color,
@@ -153,7 +164,9 @@ class CameraController:
         self._pl.remove_actor(self._central_actor, render=False)
         self._central_actor = None
 
-    def _add_central_indicator(self, center: tuple[float, float, float]) -> None:
+    def _add_central_indicator(
+        self, center: tuple[float, float, float]
+    ) -> None:
         """Thin white screen-space ring marking the FOF central."""
         self._clear_central_indicator()
         cloud = pv.PolyData(np.array([center], dtype=np.float64))
@@ -204,7 +217,7 @@ class CameraController:
         pts = c + radius * (
             np.outer(np.cos(theta), right) + np.outer(np.sin(theta), up_perp)
         )
-        pts = np.vstack([pts, pts[0]])     # close the ring
+        pts = np.vstack([pts, pts[0]])  # close the ring
         circle = pv.lines_from_points(pts)
         self._group_ring_actor = self._pl.add_mesh(
             circle,
@@ -217,9 +230,12 @@ class CameraController:
 
     def _add_box_indicator(
         self,
-        xmin: float, xmax: float,
-        ymin: float, ymax: float,
-        zmin: float, zmax: float,
+        xmin: float,
+        xmax: float,
+        ymin: float,
+        ymax: float,
+        zmin: float,
+        zmax: float,
     ) -> None:
         self._clear_indicator()
         box = pv.Box(bounds=(xmin, xmax, ymin, ymax, zmin, zmax))
@@ -256,7 +272,7 @@ class CameraController:
         for i in range(n_rings):
             lines.append(n + 1)
             lines.extend([i * n + j for j in range(n)])
-            lines.append(i * n)   # close the loop
+            lines.append(i * n)  # close the loop
         poly = pv.PolyData(all_pts)
         # pv.PolyData(points) auto-creates a verts cell per point, which
         # VTK renders as visible point markers. Strip them so we get
@@ -289,7 +305,12 @@ class CameraController:
     ) -> None:
         """Small sphere marking a specific halo or galaxy position."""
         self._clear_indicator()
-        sphere = pv.Sphere(radius=radius, center=center, theta_resolution=12, phi_resolution=12)
+        sphere = pv.Sphere(
+            radius=radius,
+            center=center,
+            theta_resolution=12,
+            phi_resolution=12,
+        )
         self._indicator_actor = self._pl.add_mesh(
             sphere,
             color=_INDICATOR_COLOR,
@@ -323,11 +344,11 @@ class CameraController:
         """
         if not regions:
             return
-        xmin = min(ox      for ox, oy, oz, bs in regions)
+        xmin = min(ox for ox, oy, oz, bs in regions)
         xmax = max(ox + bs for ox, oy, oz, bs in regions)
-        ymin = min(oy      for ox, oy, oz, bs in regions)
+        ymin = min(oy for ox, oy, oz, bs in regions)
         ymax = max(oy + bs for ox, oy, oz, bs in regions)
-        zmin = min(oz      for ox, oy, oz, bs in regions)
+        zmin = min(oz for ox, oy, oz, bs in regions)
         zmax = max(oz + bs for ox, oy, oz, bs in regions)
         cx = (xmin + xmax) / 2
         cy = (ymin + ymax) / 2
@@ -344,8 +365,8 @@ class CameraController:
         self._clear_indicator()
         half = self._box_size / 2.0
         self._pl.camera.focal_point = (half, half, half + 1.0)
-        self._pl.camera.position    = (half, half, half)
-        self._pl.camera.up          = (0.0, 1.0, 0.0)
+        self._pl.camera.position = (half, half, half)
+        self._pl.camera.up = (0.0, 1.0, 0.0)
 
     # ------------------------------------------------------------------
     # Keyboard fly movement
@@ -359,8 +380,8 @@ class CameraController:
 
         direction: 'forward' | 'back' | 'left' | 'right' | 'up' | 'down'.
         """
-        cam   = self._pl.camera
-        pos   = np.array(cam.position,    dtype=np.float64)
+        cam = self._pl.camera
+        pos = np.array(cam.position, dtype=np.float64)
         focal = np.array(cam.focal_point, dtype=np.float64)
 
         view = focal - pos
@@ -374,19 +395,22 @@ class CameraController:
         right = np.cross(view, up)
         nr = np.linalg.norm(right)
         right = right / nr if nr > 1e-9 else np.array([1.0, 0.0, 0.0])
-        up = np.cross(right, view)   # re-orthonormalise
+        up = np.cross(right, view)  # re-orthonormalise
 
         basis = {
-            "forward": view, "back": -view,
-            "right": right,  "left": -right,
-            "up": up,        "down": -up,
+            "forward": view,
+            "back": -view,
+            "right": right,
+            "left": -right,
+            "up": up,
+            "down": -up,
         }
         d = basis.get(direction)
         if d is None:
             return
 
         delta = d * (self._box_size * float(step_frac))
-        cam.position    = tuple(pos + delta)
+        cam.position = tuple(pos + delta)
         cam.focal_point = tuple(focal + delta)
 
     def go_to_coords(
@@ -400,8 +424,8 @@ class CameraController:
         draw a wireframe sphere of radius `distance` at the target so the
         focus region is visible (matches the Box-mode wireframe convention)."""
         self._pl.camera.focal_point = (x, y, z)
-        self._pl.camera.position    = (x, y, z + distance)
-        self._pl.camera.up          = (0.0, 1.0, 0.0)
+        self._pl.camera.position = (x, y, z + distance)
+        self._pl.camera.up = (0.0, 1.0, 0.0)
         self._add_sphere_indicator((x, y, z), distance)
 
     def go_to_halo(self, halo_idx: int, distance: float = 5.0) -> None:
@@ -409,8 +433,8 @@ class CameraController:
         pos = self._halo_index.position_of(halo_idx)
         cx, cy, cz = float(pos[0]), float(pos[1]), float(pos[2])
         self._pl.camera.focal_point = (cx, cy, cz)
-        self._pl.camera.position    = (cx, cy, cz + distance)
-        self._pl.camera.up          = (0.0, 1.0, 0.0)
+        self._pl.camera.position = (cx, cy, cz + distance)
+        self._pl.camera.up = (0.0, 1.0, 0.0)
         self._add_circle_indicator((cx, cy, cz), distance * 0.015)
 
     def go_to_nearest_halo(
@@ -436,8 +460,8 @@ class CameraController:
         cx, cy, cz = float(pos[0]), float(pos[1]), float(pos[2])
 
         self._pl.camera.focal_point = (cx, cy, cz)
-        self._pl.camera.position    = (cx, cy, cz + radius)
-        self._pl.camera.up          = (0.0, 1.0, 0.0)
+        self._pl.camera.position = (cx, cy, cz + radius)
+        self._pl.camera.up = (0.0, 1.0, 0.0)
 
         self._add_circle_indicator((cx, cy, cz), radius * 0.015)
         return (cx, cy, cz)
@@ -466,27 +490,30 @@ class CameraController:
     ) -> None:
         """Frame a sphere of the given radius and draw a wireframe sphere indicator."""
         cx, cy, cz = center
-        fov_rad  = np.deg2rad(self._pl.camera.view_angle)
+        fov_rad = np.deg2rad(self._pl.camera.view_angle)
         distance = radius / np.tan(fov_rad / 2.0) * 1.2
         self._pl.camera.focal_point = center
-        self._pl.camera.position    = (cx, cy, cz + distance)
-        self._pl.camera.up          = (0.0, 1.0, 0.0)
+        self._pl.camera.position = (cx, cy, cz + distance)
+        self._pl.camera.up = (0.0, 1.0, 0.0)
         self._add_sphere_indicator(center, radius)
 
     def zoom_to_box(
         self,
-        xmin: float, xmax: float,
-        ymin: float, ymax: float,
-        zmin: float, zmax: float,
+        xmin: float,
+        xmax: float,
+        ymin: float,
+        ymax: float,
+        zmin: float,
+        zmax: float,
     ) -> None:
         """Frame an axis-aligned sub-box and draw a wireframe box indicator."""
         cx = (xmin + xmax) / 2.0
         cy = (ymin + ymax) / 2.0
         cz = (zmin + zmax) / 2.0
         radius = max(xmax - xmin, ymax - ymin, zmax - zmin) / 2.0
-        fov_rad  = np.deg2rad(self._pl.camera.view_angle)
+        fov_rad = np.deg2rad(self._pl.camera.view_angle)
         distance = radius / np.tan(fov_rad / 2.0) * 1.2
         self._pl.camera.focal_point = (cx, cy, cz)
-        self._pl.camera.position    = (cx, cy, cz + distance)
-        self._pl.camera.up          = (0.0, 1.0, 0.0)
+        self._pl.camera.position = (cx, cy, cz + distance)
+        self._pl.camera.up = (0.0, 1.0, 0.0)
         self._add_box_indicator(xmin, xmax, ymin, ymax, zmin, zmax)

@@ -9,12 +9,21 @@ from sage_viewer.io.galaxy_reader import GalaxySnapshot
 from sage_viewer.io.snapshot_table import SnapshotTable
 
 
-def _age_lcdm(a: np.ndarray | float, h: float = 0.673,
-              Om: float = 0.315, OL: float = 0.685) -> np.ndarray:
+def _age_lcdm(
+    a: np.ndarray | float,
+    h: float = 0.673,
+    Om: float = 0.315,
+    OL: float = 0.685,
+) -> np.ndarray:
     """Cosmic age (Gyr) at scale factor a in flat ΛCDM (Planck 2018 defaults)."""
-    H0_inv = 9.778 / max(h, 0.01)   # Gyr
+    H0_inv = 9.778 / max(h, 0.01)  # Gyr
     a = np.asarray(a, dtype=np.float64)
-    return (2.0 / 3.0) / np.sqrt(OL) * np.arcsinh(np.sqrt(OL / Om) * a ** 1.5) * H0_inv
+    return (
+        (2.0 / 3.0)
+        / np.sqrt(OL)
+        * np.arcsinh(np.sqrt(OL / Om) * a**1.5)
+        * H0_inv
+    )
 
 
 def _classify_environment(host_mvir_msun: float, n_members: int) -> str:
@@ -56,8 +65,12 @@ def _sfh_age_gyr(
             grp = f[f"Snap_{snap_num}"]
             if "SFHMassDisk" not in grp or "SFHMassBulge" not in grp:
                 return None
-            sfh_d = np.asarray(grp["SFHMassDisk"][raw_index, :], dtype=np.float64)
-            sfh_b = np.asarray(grp["SFHMassBulge"][raw_index, :], dtype=np.float64)
+            sfh_d = np.asarray(
+                grp["SFHMassDisk"][raw_index, :], dtype=np.float64
+            )
+            sfh_b = np.asarray(
+                grp["SFHMassBulge"][raw_index, :], dtype=np.float64
+            )
             sfh = sfh_d + sfh_b
     except Exception:
         return None
@@ -105,11 +118,11 @@ def build_galaxy_info(
     gal_type_str = "Central" if is_central else "Satellite"
     # `mvir` in the snapshot is raw 10¹⁰ Msun/h; everything else is already Msun.
     mvir = float(galaxies.mvir[idx]) * 1.0e10 / max(hubble_h, 1e-6)
-    sm   = float(galaxies.stellar_mass[idx])
+    sm = float(galaxies.stellar_mass[idx])
     ssfr = float(galaxies.ssfr[idx])
-    bm   = float(galaxies.bulge_mass[idx])
-    cg   = float(galaxies.cold_gas[idx])
-    bt   = bm / sm if sm > 0 else 0.0
+    bm = float(galaxies.bulge_mass[idx])
+    cg = float(galaxies.cold_gas[idx])
+    bt = bm / sm if sm > 0 else 0.0
 
     bt_label = f"{bt:.2f}"
     if bt <= 0.0:
@@ -118,12 +131,12 @@ def build_galaxy_info(
         bt_label += "  (bulge-dom.)"
 
     info: dict = {
-        "GalaxyID":    "—",
-        "Type":        gal_type_str,
-        "Halo Mvir":   f"{mvir:.2e} Msun",
+        "GalaxyID": "—",
+        "Type": gal_type_str,
+        "Halo Mvir": f"{mvir:.2e} Msun",
         "Stellar Mass": f"{sm:.2e} Msun",
-        "sSFR":        f"{ssfr:.2e} yr^-1",
-        "Cold Gas":    f"{cg:.2e} Msun",
+        "sSFR": f"{ssfr:.2e} yr^-1",
+        "Cold Gas": f"{cg:.2e} Msun",
         "Bulge / Total": bt_label,
     }
 
@@ -182,12 +195,18 @@ def build_galaxy_info(
             members_str = (
                 f"{env}, {others} other "
                 + ("member" if others == 1 else "members")
-                + (", target IS central" if is_central else ", target is satellite")
+                + (
+                    ", target IS central"
+                    if is_central
+                    else ", target is satellite"
+                )
             )
         info["Environment"] = members_str
 
     # Mass-weighted stellar age (Gyr), precomputed at load time from SFH bins
-    age = float(galaxies.mean_age[idx]) if galaxies.mean_age.size > idx else 0.0
+    age = (
+        float(galaxies.mean_age[idx]) if galaxies.mean_age.size > idx else 0.0
+    )
     info["Approx Age"] = f"{age:.2f} Gyr" if age > 0 else "—"
 
     return info

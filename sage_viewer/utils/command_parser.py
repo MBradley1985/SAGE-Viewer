@@ -4,6 +4,7 @@ Patterns are matched in order; the first match wins.  Each handler returns a
 short string describing what it did (or an error/unknown reason), which is
 shown back to the user in the console history.
 """
+
 from __future__ import annotations
 
 import re
@@ -14,9 +15,10 @@ from collections.abc import Callable
 @dataclass
 class CommandContext:
     """Bag of everything a command handler needs to act on the scene."""
+
     scene: object
     state: object
-    ctrl:  object
+    ctrl: object
 
 
 # A command "pattern" is a regex; the handler receives the regex match
@@ -73,15 +75,26 @@ Models:
 
 
 _HALO_MODES = {"mvir", "rvir", "vvir"}
-_GAL_MODES  = {
-    "stellar_mass", "sfr", "ssfr", "cold_gas", "bulge_mass",
-    "bt", "bh_mass", "ics_mass", "age", "density", "type", "structure",
+_GAL_MODES = {
+    "stellar_mass",
+    "sfr",
+    "ssfr",
+    "cold_gas",
+    "bulge_mass",
+    "bt",
+    "bh_mass",
+    "ics_mass",
+    "age",
+    "density",
+    "type",
+    "structure",
 }
 
 
 # ---------------------------------------------------------------------------
 # Handler implementations
 # ---------------------------------------------------------------------------
+
 
 def _h_help(_m, _ctx) -> str:
     return _HELP_TEXT
@@ -102,10 +115,10 @@ def _h_show_only_env(m, ctx) -> str:
     classes = _parse_env_classes(m.group("kinds"))
     if not classes:
         return f"Unknown environment class in: {m.group('kinds')!r}"
-    ctx.state.env_show_field    = "field"    in classes
+    ctx.state.env_show_field = "field" in classes
     ctx.state.env_show_isolated = "isolated" in classes
-    ctx.state.env_show_group    = "group"    in classes
-    ctx.state.env_show_cluster  = "cluster"  in classes
+    ctx.state.env_show_group = "group" in classes
+    ctx.state.env_show_cluster = "cluster" in classes
     return f"Showing: {', '.join(sorted(classes))}"
 
 
@@ -144,7 +157,7 @@ def _h_hide_everything(_m, ctx) -> str:
 
 def _h_layer_visibility(m, ctx) -> str:
     layer = m.group("layer")
-    show  = m.group("verb") in ("show",)
+    show = m.group("verb") in ("show",)
     if "halo" in layer:
         ctx.state.halos_visible = show
         return f"Haloes {'visible' if show else 'hidden'}."
@@ -292,8 +305,8 @@ def _h_clear_indicator(_m, ctx) -> str:
 
 def _h_opacity(m, ctx) -> str:
     layer = m.group("layer")
-    val   = float(m.group("v"))
-    val   = max(0.0, min(1.0, val))
+    val = float(m.group("v"))
+    val = max(0.0, min(1.0, val))
     if "halo" in layer:
         ctx.state.halo_opacity = val
         return f"Halo opacity → {val:.2f}"
@@ -303,17 +316,17 @@ def _h_opacity(m, ctx) -> str:
 
 def _h_color_by(m, ctx) -> str:
     layer = m.group("layer")
-    mode  = m.group("mode").strip().lower().replace(" ", "_")
+    mode = m.group("mode").strip().lower().replace(" ", "_")
     aliases = {
-        "m*":           "stellar_mass",
-        "stellar":      "stellar_mass",
-        "mass":         "stellar_mass" if "gal" in layer else "mvir",
-        "bulge/total":  "bt",
-        "b/t":          "bt",
-        "bh":           "bh_mass",
-        "ics":          "ics_mass",
-        "cold":         "cold_gas",
-        "bulge":        "bulge_mass",
+        "m*": "stellar_mass",
+        "stellar": "stellar_mass",
+        "mass": "stellar_mass" if "gal" in layer else "mvir",
+        "bulge/total": "bt",
+        "b/t": "bt",
+        "bh": "bh_mass",
+        "ics": "ics_mass",
+        "cold": "cold_gas",
+        "bulge": "bulge_mass",
     }
     mode = aliases.get(mode, mode)
     if "halo" in layer:
@@ -329,7 +342,7 @@ def _h_color_by(m, ctx) -> str:
 
 def _h_colormap(m, ctx) -> str:
     layer = m.group("layer")
-    name  = m.group("name").strip()
+    name = m.group("name").strip()
     if "halo" in layer:
         ctx.state.halo_colormap = name
         return f"Halo colormap → {name}"
@@ -360,9 +373,15 @@ def _h_list_models(_m, ctx) -> str:
     primary = ctx.scene.primary_name
     lines = []
     for n in names:
-        tag = " (primary)" if n == primary else " (overlay)" if ctx.scene._models[n].visible else ""
+        tag = (
+            " (primary)"
+            if n == primary
+            else " (overlay)" if ctx.scene._models[n].visible else ""
+        )
         lines.append(f"  • {n}{tag}")
-    return "Loaded models:\n" + "\n".join(lines) if lines else "No models loaded."
+    return (
+        "Loaded models:\n" + "\n".join(lines) if lines else "No models loaded."
+    )
 
 
 def _h_whats_selected(_m, ctx) -> str:
@@ -381,15 +400,21 @@ def _h_whats_selected(_m, ctx) -> str:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _parse_env_classes(text: str) -> set:
     """`groups, clusters and field` → {'group', 'cluster', 'field'}"""
     text = text.lower()
     out = set()
-    if "field" in text:    out.add("field")
-    if "isolat" in text:   out.add("isolated")
-    if "group" in text:    out.add("group")
-    if "cluster" in text:  out.add("cluster")
-    if "pair" in text:     out.add("isolated")  # pairs map to isolated bucket
+    if "field" in text:
+        out.add("field")
+    if "isolat" in text:
+        out.add("isolated")
+    if "group" in text:
+        out.add("group")
+    if "cluster" in text:
+        out.add("cluster")
+    if "pair" in text:
+        out.add("isolated")  # pairs map to isolated bucket
     return out
 
 
@@ -398,56 +423,97 @@ def _parse_env_classes(text: str) -> set:
 # ---------------------------------------------------------------------------
 
 _COMMANDS: list[tuple[re.Pattern, Handler]] = [
-    (re.compile(r"^(help|\?|commands)$"),                       _h_help),
-    (re.compile(r"^(clear history|clear console)$"),            _h_clear_history),
-    (re.compile(r"^what'?s selected|where am i|status$"),       _h_whats_selected),
-    (re.compile(r"^list models$"),                              _h_list_models),
-
+    (re.compile(r"^(help|\?|commands)$"), _h_help),
+    (re.compile(r"^(clear history|clear console)$"), _h_clear_history),
+    (re.compile(r"^what'?s selected|where am i|status$"), _h_whats_selected),
+    (re.compile(r"^list models$"), _h_list_models),
     # Filter / visibility
     (re.compile(r"^(show all|show everything|reset filters)$"), _h_show_all),
-    (re.compile(r"^hide everything$"),                          _h_hide_everything),
-    (re.compile(r"^show only (?P<kinds>.+)$"),                  _h_show_only_env),
-    (re.compile(r"^show (?P<kinds>(?:field|isolated|group|groups|cluster|clusters|pair|pairs)(?:\s*,?\s*(?:and\s+)?(?:field|isolated|group|groups|cluster|clusters|pair|pairs))*)$"), _h_show_env_add),
-    (re.compile(r"^hide (?P<kinds>(?:field|isolated|group|groups|cluster|clusters|pair|pairs)(?:\s*,?\s*(?:and\s+)?(?:field|isolated|group|groups|cluster|clusters|pair|pairs))*)$"), _h_hide_env),
-    (re.compile(r"^(?P<verb>show|hide) (?P<layer>haloe?s?|galax(?:y|ies))$"), _h_layer_visibility),
-    (re.compile(r"^(?:show only |only )?(?P<type>centrals?|satellites?)$"),  _h_type_filter),
-
+    (re.compile(r"^hide everything$"), _h_hide_everything),
+    (re.compile(r"^show only (?P<kinds>.+)$"), _h_show_only_env),
+    (
+        re.compile(
+            r"^show (?P<kinds>(?:field|isolated|group|groups|cluster|clusters|pair|pairs)(?:\s*,?\s*(?:and\s+)?(?:field|isolated|group|groups|cluster|clusters|pair|pairs))*)$"
+        ),
+        _h_show_env_add,
+    ),
+    (
+        re.compile(
+            r"^hide (?P<kinds>(?:field|isolated|group|groups|cluster|clusters|pair|pairs)(?:\s*,?\s*(?:and\s+)?(?:field|isolated|group|groups|cluster|clusters|pair|pairs))*)$"
+        ),
+        _h_hide_env,
+    ),
+    (
+        re.compile(
+            r"^(?P<verb>show|hide) (?P<layer>haloe?s?|galax(?:y|ies))$"
+        ),
+        _h_layer_visibility,
+    ),
+    (
+        re.compile(r"^(?:show only |only )?(?P<type>centrals?|satellites?)$"),
+        _h_type_filter,
+    ),
     # Navigation
-    (re.compile(r"^(?:go to|goto|fly to)\s+halo\s+(?P<idx>\d+)$"),   _h_goto_halo),
-    (re.compile(r"^(?:go to|goto|fly to)\s+galaxy\s+(?P<idx>\d+)$"), _h_goto_galaxy),
-    (re.compile(r"^(?:snap|snapshot)\s+(?P<n>\d+)$"),                _h_set_snap),
-    (re.compile(r"^(?:redshift|z)\s+(?P<z>[\d.+-eE]+)$"),            _h_set_redshift),
-    (re.compile(r"^(?:centre|center)(?:\s+camera)?$"),               _h_center),
-    (re.compile(r"^reset(?:\s+camera)?$"),                           _h_reset_camera),
-    (re.compile(r"^focus\s+(?P<verb>on|off)$"),                      _h_focus),
-
+    (
+        re.compile(r"^(?:go to|goto|fly to)\s+halo\s+(?P<idx>\d+)$"),
+        _h_goto_halo,
+    ),
+    (
+        re.compile(r"^(?:go to|goto|fly to)\s+galaxy\s+(?P<idx>\d+)$"),
+        _h_goto_galaxy,
+    ),
+    (re.compile(r"^(?:snap|snapshot)\s+(?P<n>\d+)$"), _h_set_snap),
+    (re.compile(r"^(?:redshift|z)\s+(?P<z>[\d.+-eE]+)$"), _h_set_redshift),
+    (re.compile(r"^(?:centre|center)(?:\s+camera)?$"), _h_center),
+    (re.compile(r"^reset(?:\s+camera)?$"), _h_reset_camera),
+    (re.compile(r"^focus\s+(?P<verb>on|off)$"), _h_focus),
     # Playback
-    (re.compile(r"^play$"),                                     _h_play),
-    (re.compile(r"^pause$"),                                    _h_pause),
-    (re.compile(r"^stop$"),                                     _h_stop),
-    (re.compile(r"^reverse$"),                                  _h_reverse),
-    (re.compile(r"^(loop|repeat)$"),                            _h_loop),
-    (re.compile(r"^speed\s+(?P<s>[\d.]+)x?$"),                  _h_speed),
-    (re.compile(r"^rotate\s+(?P<dir>off|stop)$"),               _h_rotate),
-    (re.compile(r"^rotate\s+(?P<dir>cw|ccw)\s+(?P<deg>\d+)$"),  _h_rotate),
-
+    (re.compile(r"^play$"), _h_play),
+    (re.compile(r"^pause$"), _h_pause),
+    (re.compile(r"^stop$"), _h_stop),
+    (re.compile(r"^reverse$"), _h_reverse),
+    (re.compile(r"^(loop|repeat)$"), _h_loop),
+    (re.compile(r"^speed\s+(?P<s>[\d.]+)x?$"), _h_speed),
+    (re.compile(r"^rotate\s+(?P<dir>off|stop)$"), _h_rotate),
+    (re.compile(r"^rotate\s+(?P<dir>cw|ccw)\s+(?P<deg>\d+)$"), _h_rotate),
     # Inspection
-    (re.compile(r"^(galaxy info|show galaxy)$"),                _h_galaxy_info),
-    (re.compile(r"^(group info|show group)$"),                  _h_group_info),
-    (re.compile(r"^highlight\s+(?:the\s+)?galaxy$"),            _h_highlight_galaxy),
-    (re.compile(r"^highlight\s+(?:the\s+)?(?:group\s+)?members$"), _h_highlight_members),
-    (re.compile(r"^clear(?:\s+indicator)?$"),                   _h_clear_indicator),
-    (re.compile(r"^screenshot(?:\s+(?P<label>\S.*))?$"),        _h_screenshot),
-
+    (re.compile(r"^(galaxy info|show galaxy)$"), _h_galaxy_info),
+    (re.compile(r"^(group info|show group)$"), _h_group_info),
+    (re.compile(r"^highlight\s+(?:the\s+)?galaxy$"), _h_highlight_galaxy),
+    (
+        re.compile(r"^highlight\s+(?:the\s+)?(?:group\s+)?members$"),
+        _h_highlight_members,
+    ),
+    (re.compile(r"^clear(?:\s+indicator)?$"), _h_clear_indicator),
+    (re.compile(r"^screenshot(?:\s+(?P<label>\S.*))?$"), _h_screenshot),
     # Layer controls
-    (re.compile(r"^(?:set\s+)?(?P<layer>halo|galax(?:y|ies))\s+opacity\s+(?P<v>[\d.]+)$"), _h_opacity),
-    (re.compile(r"^colou?r\s+(?P<layer>halo|galax(?:y|ies))\s+by\s+(?P<mode>.+)$"),       _h_color_by),
-    (re.compile(r"^(?P<layer>halo|galax(?:y|ies))\s+colou?r\s+by\s+(?P<mode>.+)$"),       _h_color_by),
-    (re.compile(r"^(?P<layer>halo|galax(?:y|ies))\s+colou?rmap\s+(?P<name>.+)$"),         _h_colormap),
-
+    (
+        re.compile(
+            r"^(?:set\s+)?(?P<layer>halo|galax(?:y|ies))\s+opacity\s+(?P<v>[\d.]+)$"
+        ),
+        _h_opacity,
+    ),
+    (
+        re.compile(
+            r"^colou?r\s+(?P<layer>halo|galax(?:y|ies))\s+by\s+(?P<mode>.+)$"
+        ),
+        _h_color_by,
+    ),
+    (
+        re.compile(
+            r"^(?P<layer>halo|galax(?:y|ies))\s+colou?r\s+by\s+(?P<mode>.+)$"
+        ),
+        _h_color_by,
+    ),
+    (
+        re.compile(
+            r"^(?P<layer>halo|galax(?:y|ies))\s+colou?rmap\s+(?P<name>.+)$"
+        ),
+        _h_colormap,
+    ),
     # Models
-    (re.compile(r"^switch(?:\s+to)?\s+(?P<name>.+)$"),  _h_switch_model),
-    (re.compile(r"^overlay\s+(?P<name>.+)$"),           _h_overlay),
+    (re.compile(r"^switch(?:\s+to)?\s+(?P<name>.+)$"), _h_switch_model),
+    (re.compile(r"^overlay\s+(?P<name>.+)$"), _h_overlay),
 ]
 
 

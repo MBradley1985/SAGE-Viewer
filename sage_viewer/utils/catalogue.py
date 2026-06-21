@@ -16,21 +16,23 @@ _2D_KEYS = {"SFHMassDisk", "SFHMassBulge"}
 
 # Unit annotations — purely informational, no conversion applied
 _UNITS: dict[str, str] = {
-    "Posx": "Mpc/h", "Posy": "Mpc/h", "Posz": "Mpc/h",
-    "StellarMass":        "10^10 Msun/h",
-    "BulgeMass":          "10^10 Msun/h",
-    "ColdGas":            "10^10 Msun/h",
-    "Mvir":               "10^10 Msun/h",
-    "CentralMvir":        "10^10 Msun/h",
-    "BlackHoleMass":      "10^10 Msun/h",
-    "IntraClusterStars":  "10^10 Msun/h",
-    "H2gas":              "10^10 Msun/h",
-    "CGMgas":             "10^10 Msun/h",
-    "HotGas":             "10^10 Msun/h",
-    "SfrDisk":            "Msun/yr",
-    "SfrBulge":           "Msun/yr",
-    "SFHMassDisk":        "10^10 Msun/h",
-    "SFHMassBulge":       "10^10 Msun/h",
+    "Posx": "Mpc/h",
+    "Posy": "Mpc/h",
+    "Posz": "Mpc/h",
+    "StellarMass": "10^10 Msun/h",
+    "BulgeMass": "10^10 Msun/h",
+    "ColdGas": "10^10 Msun/h",
+    "Mvir": "10^10 Msun/h",
+    "CentralMvir": "10^10 Msun/h",
+    "BlackHoleMass": "10^10 Msun/h",
+    "IntraClusterStars": "10^10 Msun/h",
+    "H2gas": "10^10 Msun/h",
+    "CGMgas": "10^10 Msun/h",
+    "HotGas": "10^10 Msun/h",
+    "SfrDisk": "Msun/yr",
+    "SfrBulge": "Msun/yr",
+    "SFHMassDisk": "10^10 Msun/h",
+    "SFHMassBulge": "10^10 Msun/h",
 }
 
 
@@ -85,43 +87,59 @@ def _build_metadata(
     meta: dict[str, str] = {}
 
     # ── Export info ───────────────────────────────────────────────────────
-    meta["exported"]       = datetime.datetime.now().isoformat(timespec="seconds")
-    meta["scope"]          = scope_label
-    meta["n_galaxies"]     = str(n_galaxies)
-    meta["snapshot"]       = str(snap_num)
-    meta["snap_label"]     = snap_label
+    meta["exported"] = datetime.datetime.now().isoformat(timespec="seconds")
+    meta["scope"] = scope_label
+    meta["n_galaxies"] = str(n_galaxies)
+    meta["snapshot"] = str(snap_num)
+    meta["snap_label"] = snap_label
 
     if snap_table is not None:
         try:
             z = snap_table.snap_to_z(snap_num)
             a = snap_table.snap_to_a(snap_num)
-            meta["redshift"]      = np.format_float_positional(z, unique=True, trim="-")
-            meta["scale_factor"]  = np.format_float_positional(a, unique=True, trim="-")
-            meta["n_snapshots"]   = str(snap_table.count)
+            meta["redshift"] = np.format_float_positional(
+                z, unique=True, trim="-"
+            )
+            meta["scale_factor"] = np.format_float_positional(
+                a, unique=True, trim="-"
+            )
+            meta["n_snapshots"] = str(snap_table.count)
         except Exception:
             pass
 
     # ── Simulation parameters ─────────────────────────────────────────────
     if cfg is not None:
-        meta["par_file"]              = str(cfg.par_path)
-        meta["output_dir"]            = str(cfg.output_dir)
-        meta["file_name_galaxies"]    = cfg.file_name_galaxies
-        meta["first_file"]            = str(cfg.first_file)
-        meta["last_file"]             = str(cfg.last_file)
-        meta["tree_type"]             = cfg.tree_type
-        meta["tree_name"]             = cfg.tree_name
-        meta["simulation_dir"]        = str(cfg.simulation_dir)
-        meta["snap_list_path"]        = str(cfg.snap_list_path)
-        meta["last_snapshot_nr"]      = str(cfg.last_snapshot_nr)
-        meta["num_sim_tree_files"]    = str(cfg.num_sim_tree_files)
+        meta["par_file"] = str(cfg.par_path)
+        meta["output_dir"] = str(cfg.output_dir)
+        meta["file_name_galaxies"] = cfg.file_name_galaxies
+        meta["first_file"] = str(cfg.first_file)
+        meta["last_file"] = str(cfg.last_file)
+        meta["tree_type"] = cfg.tree_type
+        meta["tree_name"] = cfg.tree_name
+        meta["simulation_dir"] = str(cfg.simulation_dir)
+        meta["snap_list_path"] = str(cfg.snap_list_path)
+        meta["last_snapshot_nr"] = str(cfg.last_snapshot_nr)
+        meta["num_sim_tree_files"] = str(cfg.num_sim_tree_files)
 
         # ── Cosmology + box ───────────────────────────────────────────────
-        meta["hubble_h"]              = np.format_float_positional(cfg.hubble_h,      unique=True, trim="-")
-        meta["H0_km_s_Mpc"]          = np.format_float_positional(cfg.hubble_h * 100, unique=True, trim="-")
-        meta["omega_matter"]          = np.format_float_positional(cfg.omega,         unique=True, trim="-")
-        meta["omega_lambda"]          = np.format_float_positional(cfg.omega_lambda,  unique=True, trim="-")
-        meta["box_size_Mpch"]         = np.format_float_positional(cfg.box_size,      unique=True, trim="-")
-        meta["part_mass_1e10Msun_h"]  = np.format_float_positional(cfg.part_mass,     unique=True, trim="-")
+        meta["hubble_h"] = np.format_float_positional(
+            cfg.hubble_h, unique=True, trim="-"
+        )
+        meta["H0_km_s_Mpc"] = np.format_float_positional(
+            cfg.hubble_h * 100, unique=True, trim="-"
+        )
+        meta["omega_matter"] = np.format_float_positional(
+            cfg.omega, unique=True, trim="-"
+        )
+        meta["omega_lambda"] = np.format_float_positional(
+            cfg.omega_lambda, unique=True, trim="-"
+        )
+        meta["box_size_Mpch"] = np.format_float_positional(
+            cfg.box_size, unique=True, trim="-"
+        )
+        meta["part_mass_1e10Msun_h"] = np.format_float_positional(
+            cfg.part_mass, unique=True, trim="-"
+        )
 
         # Extra keys from the par file (anything not in the standard fields)
         for k, v in sorted(cfg.extra.items()):
@@ -193,6 +211,7 @@ def write_catalogue(
 
 # ── Formatting ────────────────────────────────────────────────────────────────
 
+
 def _fmt(val, dtype) -> str:
     """Format a scalar without scientific notation and without truncation.
 
@@ -207,8 +226,10 @@ def _fmt(val, dtype) -> str:
 
 # ── Format writers ────────────────────────────────────────────────────────────
 
+
 def _write_csv(data: dict, units: dict, meta: dict, out_path: Path) -> None:
     import csv
+
     scalar = _scalar_only(data)
     with open(out_path, "w", newline="") as f:
         for k, v in meta.items():
@@ -249,8 +270,9 @@ def _write_hdf5(data: dict, units: dict, meta: dict, out_path: Path) -> None:
             mg.attrs[k] = str(v)
         gg = hf.create_group("Galaxies")
         for key, arr in data.items():
-            ds = gg.create_dataset(key, data=arr, compression="gzip",
-                                   compression_opts=4)
+            ds = gg.create_dataset(
+                key, data=arr, compression="gzip", compression_opts=4
+            )
             u = units.get(key, "")
             if u:
                 ds.attrs["units"] = u
@@ -275,4 +297,6 @@ def _write_fits(data: dict, units: dict, meta: dict, out_path: Path) -> None:
         hdr[fits_key] = str(v)[:72]
 
     hdu = fits.BinTableHDU(tbl, header=hdr, name="GALAXIES")
-    fits.HDUList([fits.PrimaryHDU(), hdu]).writeto(str(out_path), overwrite=True)
+    fits.HDUList([fits.PrimaryHDU(), hdu]).writeto(
+        str(out_path), overwrite=True
+    )

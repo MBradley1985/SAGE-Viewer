@@ -48,10 +48,22 @@ def parse_par(par_path: str | Path) -> SimConfig:
         return raw.get(key, default)
 
     known_keys = {
-        "OutputDir", "FileNameGalaxies", "FirstFile", "LastFile",
-        "OutputFormat", "TreeName", "TreeType", "SimulationDir",
-        "FileWithSnapList", "LastSnapShotNr", "NumSimulationTreeFiles",
-        "Omega", "OmegaLambda", "Hubble_h", "BoxSize", "PartMass",
+        "OutputDir",
+        "FileNameGalaxies",
+        "FirstFile",
+        "LastFile",
+        "OutputFormat",
+        "TreeName",
+        "TreeType",
+        "SimulationDir",
+        "FileWithSnapList",
+        "LastSnapShotNr",
+        "NumSimulationTreeFiles",
+        "Omega",
+        "OmegaLambda",
+        "Hubble_h",
+        "BoxSize",
+        "PartMass",
         "NumOutputs",
     }
     extra = {k: v for k, v in raw.items() if k not in known_keys}

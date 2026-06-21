@@ -39,7 +39,9 @@ class Scene:
         max_halos: int = 100_000,
         max_galaxies: int = 100_000,
     ) -> None:
-        self._plotter = pv.Plotter(off_screen=off_screen, window_size=[1600, 900])
+        self._plotter = pv.Plotter(
+            off_screen=off_screen, window_size=[1600, 900]
+        )
         self._plotter.set_background("black")
         self._plotter.renderer.SetNearClippingPlaneTolerance(0.00001)
 
@@ -61,7 +63,7 @@ class Scene:
         self._primary_name = primary.name
 
         # Adjacent-box state
-        self._adjacent_order: list[str] = []   # names in placement order
+        self._adjacent_order: list[str] = []  # names in placement order
         self._active_box_name: str = primary.name
 
         # Label actors keyed by model name (only shown when multiple boxes are loaded)
@@ -70,11 +72,13 @@ class Scene:
         self._camera = CameraController(self._plotter, primary.box_size)
 
         self._current_snap: int = (
-            initial_snap if initial_snap is not None else primary.snap_count - 1
+            initial_snap
+            if initial_snap is not None
+            else primary.snap_count - 1
         )
 
-        self._on_snap_change:  list[Callable[[int], None]] = []
-        self._on_model_change: list[Callable[[], None]]    = []
+        self._on_snap_change: list[Callable[[int], None]] = []
+        self._on_model_change: list[Callable[[], None]] = []
         self._focus_region: dict | None = None
 
         self.set_snapshot(self._current_snap)
@@ -84,6 +88,7 @@ class Scene:
         # navigation is stall-free by the time the browser opens.
         # Suppress per-snapshot log lines so they don't bury the server URL.
         from sage_viewer.io import halo_reader, galaxy_reader
+
         halo_reader.VERBOSE = False
         galaxy_reader.VERBOSE = False
         self.primary.loader.preload_all()
@@ -216,10 +221,10 @@ class Scene:
             self._recompute_offsets()
             # Always start adjacent boxes with default color/colormap so they
             # don't inherit whatever the primary box had been set to.
-            model.halo_layer.color_mode  = "mvir"
-            model.halo_layer.colormap    = "viridis"
+            model.halo_layer.color_mode = "mvir"
+            model.halo_layer.colormap = "viridis"
             model.galaxy_layer.color_mode = "structure"
-            model.galaxy_layer.colormap   = "plasma"
+            model.galaxy_layer.colormap = "plasma"
             model.set_snapshot(model.snap_count - 1)
             model.visible = True
             self._update_labels()
@@ -259,7 +264,7 @@ class Scene:
         """Return (cx, 0, cz) — the XZ centre of the named box."""
         m = self._models[name]
         off = m.offset
-        bs  = m.box_size
+        bs = m.box_size
         return float(off[0] + bs / 2), 0.0, float(off[2] + bs / 2)
 
     def _label_position(self, name: str) -> tuple[float, float, float]:
@@ -289,9 +294,9 @@ class Scene:
 
         tp = actor.GetTextProperty()
         if name == self._active_box_name:
-            tp.SetColor(0.2, 1.0, 0.4)   # green for active
+            tp.SetColor(0.2, 1.0, 0.4)  # green for active
         else:
-            tp.SetColor(1.0, 1.0, 1.0)   # white for idle
+            tp.SetColor(1.0, 1.0, 1.0)  # white for idle
         tp.SetFontSize(14)
         tp.SetJustificationToCentered()
         tp.SetVerticalJustificationToCentered()
@@ -390,7 +395,7 @@ class Scene:
             if other_name == self._primary_name:
                 continue
             if other_name in self._adjacent_order:
-                continue   # adjacent boxes are not overlay-checked
+                continue  # adjacent boxes are not overlay-checked
             if m.visible and not self.is_compatible_for_overlay(other_name):
                 m.visible = False
 
@@ -411,8 +416,10 @@ class Scene:
         if self._focus_region is not None:
             halos, galaxies = self.primary.loader.get(self._current_snap)
             self._apply_focus_masks_for_layer(
-                self.primary.halo_layer, self.primary.galaxy_layer,
-                halos.positions, galaxies.positions,
+                self.primary.halo_layer,
+                self.primary.galaxy_layer,
+                halos.positions,
+                galaxies.positions,
             )
         for cb in self._on_snap_change:
             cb(self._current_snap)
@@ -512,8 +519,10 @@ class Scene:
 
         if self._focus_region is not None:
             self._apply_focus_masks_for_layer(
-                self.primary.halo_layer, self.primary.galaxy_layer,
-                halos.positions, galaxies.positions,
+                self.primary.halo_layer,
+                self.primary.galaxy_layer,
+                halos.positions,
+                galaxies.positions,
             )
 
         self.refresh_label(self._primary_name)
@@ -543,16 +552,28 @@ class Scene:
 
     def set_focus_box(
         self,
-        xmin: float, xmax: float,
-        ymin: float, ymax: float,
-        zmin: float, zmax: float,
+        xmin: float,
+        xmax: float,
+        ymin: float,
+        ymax: float,
+        zmin: float,
+        zmax: float,
     ) -> None:
-        self._focus_region = dict(type="box", xmin=xmin, xmax=xmax,
-                                  ymin=ymin, ymax=ymax, zmin=zmin, zmax=zmax)
+        self._focus_region = dict(
+            type="box",
+            xmin=xmin,
+            xmax=xmax,
+            ymin=ymin,
+            ymax=ymax,
+            zmin=zmin,
+            zmax=zmax,
+        )
         halos, galaxies = self.primary.loader.get(self._current_snap)
         self._apply_focus_masks_for_layer(
-            self.primary.halo_layer, self.primary.galaxy_layer,
-            halos.positions, galaxies.positions,
+            self.primary.halo_layer,
+            self.primary.galaxy_layer,
+            halos.positions,
+            galaxies.positions,
         )
 
     def set_focus_sphere(
@@ -563,8 +584,10 @@ class Scene:
         self._focus_region = dict(type="sphere", center=center, radius=radius)
         halos, galaxies = self.primary.loader.get(self._current_snap)
         self._apply_focus_masks_for_layer(
-            self.primary.halo_layer, self.primary.galaxy_layer,
-            halos.positions, galaxies.positions,
+            self.primary.halo_layer,
+            self.primary.galaxy_layer,
+            halos.positions,
+            galaxies.positions,
         )
 
     def clear_focus(self) -> None:
@@ -583,36 +606,52 @@ class Scene:
         if r is None:
             return
         if r["type"] == "box":
+
             def _box_mask(pos):
                 if len(pos) == 0:
                     return np.array([], dtype=bool)
                 return (
-                    (pos[:, 0] >= r["xmin"]) & (pos[:, 0] <= r["xmax"]) &
-                    (pos[:, 1] >= r["ymin"]) & (pos[:, 1] <= r["ymax"]) &
-                    (pos[:, 2] >= r["zmin"]) & (pos[:, 2] <= r["zmax"])
+                    (pos[:, 0] >= r["xmin"])
+                    & (pos[:, 0] <= r["xmax"])
+                    & (pos[:, 1] >= r["ymin"])
+                    & (pos[:, 1] <= r["ymax"])
+                    & (pos[:, 2] >= r["zmin"])
+                    & (pos[:, 2] <= r["zmax"])
                 )
+
             halo_layer.set_mask(_box_mask(halo_pos))
             gal_layer.set_mask(_box_mask(gal_pos))
         elif r["type"] == "sphere":
             cx, cy, cz = r["center"]
             rad = r["radius"]
+
             def _sphere_mask(pos):
                 if len(pos) == 0:
                     return np.array([], dtype=bool)
-                return np.linalg.norm(pos - np.array([cx, cy, cz]), axis=1) <= rad
+                return (
+                    np.linalg.norm(pos - np.array([cx, cy, cz]), axis=1) <= rad
+                )
+
             halo_layer.set_mask(_sphere_mask(halo_pos))
             gal_layer.set_mask(_sphere_mask(gal_pos))
 
     def _apply_focus_masks(self, halo_pos, gal_pos) -> None:
         self._apply_focus_masks_for_layer(
-            self.primary.halo_layer, self.primary.galaxy_layer, halo_pos, gal_pos
+            self.primary.halo_layer,
+            self.primary.galaxy_layer,
+            halo_pos,
+            gal_pos,
         )
 
     def next_snap_num(self) -> int:
-        return (self.active_model.current_snap + 1) % self.active_model.snap_count
+        return (
+            self.active_model.current_snap + 1
+        ) % self.active_model.snap_count
 
     def prev_snap_num(self) -> int:
-        return (self.active_model.current_snap - 1) % self.active_model.snap_count
+        return (
+            self.active_model.current_snap - 1
+        ) % self.active_model.snap_count
 
     # ------------------------------------------------------------------
     # Callbacks

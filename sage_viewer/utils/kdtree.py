@@ -16,7 +16,9 @@ class NearestHaloIndex:
         if positions is not None and len(positions) > 0:
             self.update(positions)
 
-    def update(self, positions: np.ndarray, tree: KDTree | None = None) -> None:
+    def update(
+        self, positions: np.ndarray, tree: KDTree | None = None
+    ) -> None:
         self._positions = positions
         self._tree = tree if tree is not None else KDTree(positions)
 

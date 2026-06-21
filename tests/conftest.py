@@ -1,4 +1,5 @@
 """Shared fixtures for the SAGE-Viewer test suite."""
+
 from __future__ import annotations
 
 import struct
@@ -9,7 +10,6 @@ import numpy as np
 import pytest
 
 from sage_viewer.io.halo_reader import HALO_DTYPE
-
 
 FIXTURE_DIR = Path(__file__).parent / "data"
 
@@ -25,11 +25,11 @@ def mini_tree_path(tmp_path_factory) -> Path:
     halos_per_forest = np.array([30, 30, 30], dtype=np.int32)
 
     halos = np.zeros(n_halos, dtype=HALO_DTYPE)
-    halos["Mvir"] = rng.uniform(0.01, 10.0, n_halos)   # in 1e10 Msun/h
+    halos["Mvir"] = rng.uniform(0.01, 10.0, n_halos)  # in 1e10 Msun/h
     halos["Pos"] = rng.uniform(0, 62.5, (n_halos, 3)).astype(np.float32)
     # Assign each forest a different SnapNum: 61, 62, 63
     for i, snap in enumerate([61, 62, 63]):
-        halos[i * 30: (i + 1) * 30]["SnapNum"] = snap
+        halos[i * 30 : (i + 1) * 30]["SnapNum"] = snap
 
     with open(out, "wb") as f:
         np.array([n_forests], dtype=np.int32).tofile(f)
@@ -50,9 +50,15 @@ def mini_hdf5_path(tmp_path_factory) -> Path:
         for snap in [61, 62, 63]:
             grp = f.create_group(f"Snap_{snap}")
             n = 30
-            grp.create_dataset("Posx", data=rng.uniform(0, 62.5, n).astype(np.float32))
-            grp.create_dataset("Posy", data=rng.uniform(0, 62.5, n).astype(np.float32))
-            grp.create_dataset("Posz", data=rng.uniform(0, 62.5, n).astype(np.float32))
+            grp.create_dataset(
+                "Posx", data=rng.uniform(0, 62.5, n).astype(np.float32)
+            )
+            grp.create_dataset(
+                "Posy", data=rng.uniform(0, 62.5, n).astype(np.float32)
+            )
+            grp.create_dataset(
+                "Posz", data=rng.uniform(0, 62.5, n).astype(np.float32)
+            )
             grp.create_dataset(
                 "StellarMass",
                 data=rng.uniform(0.01, 1.0, n).astype(np.float32),
@@ -94,7 +100,9 @@ def mini_a_list_path(tmp_path_factory) -> Path:
 
 
 @pytest.fixture(scope="session")
-def mini_par_path(tmp_path_factory, mini_hdf5_path, mini_a_list_path, mini_tree_path) -> Path:
+def mini_par_path(
+    tmp_path_factory, mini_hdf5_path, mini_a_list_path, mini_tree_path
+) -> Path:
     """Minimal .par file pointing to the synthetic fixtures."""
     tree_dir = mini_tree_path.parent
     out = tmp_path_factory.mktemp("par") / "test.par"

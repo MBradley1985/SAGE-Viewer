@@ -9,9 +9,8 @@ from trame.widgets import vuetify3 as v3
 
 from sage_viewer.scene.scene import Scene
 
-
 _FIELD = "padding:8px 0 4px;"
-_BTN   = "padding:8px 0 4px;"
+_BTN = "padding:8px 0 4px;"
 
 # Full ordered lists; each entry may carry an optional "requires" key naming
 # the model_fields flag that must be True for the mode to appear.
@@ -19,143 +18,207 @@ _HALO_MODES = [
     {"title": "Mvir", "value": "mvir"},
     {"title": "Rvir", "value": "rvir"},
     {"title": "Vvir", "value": "vvir"},
-    {"title": "Vmax", "value": "vmax",  "requires": "vmax"},
+    {"title": "Vmax", "value": "vmax", "requires": "vmax"},
 ]
 
 _GALAXY_MODES = [
     # Special / computed — always available
-    {"title": "Structure",    "value": "structure"},
+    {"title": "Structure", "value": "structure"},
     {"title": "Stellar Mass", "value": "stellar_mass"},
-    {"title": "SFR",          "value": "sfr"},
-    {"title": "sSFR",         "value": "ssfr"},
-    {"title": "B / T",        "value": "bt"},
-    {"title": "Age",          "value": "age",        "requires": "mean_age"},
-    {"title": "Type",         "value": "type"},
+    {"title": "SFR", "value": "sfr"},
+    {"title": "sSFR", "value": "ssfr"},
+    {"title": "B / T", "value": "bt"},
+    {"title": "Age", "value": "age", "requires": "mean_age"},
+    {"title": "Type", "value": "type"},
     # Alphabetical — optional SAGE26 properties
-    {"title": "BH Mass",           "value": "bh_mass",                  "requires": "bh_mass"},
-    {"title": "Bulge Mass",        "value": "bulge_mass"},
-    {"title": "Bulge Radius",      "value": "bulge_radius",             "requires": "bulge_radius"},
-    {"title": "CGM Gas",           "value": "cgm_gas",                  "requires": "cgm_gas"},
-    {"title": "Cold Gas",          "value": "cold_gas"},
-    {"title": "Cooling",           "value": "cooling",                  "requires": "cooling"},
-    {"title": "Disk Radius",       "value": "disk_radius",              "requires": "disk_radius"},
-    {"title": "Ejected Mass",      "value": "ejected_mass",             "requires": "ejected_mass"},
-    {"title": "H1 Gas",            "value": "h1_gas",                   "requires": "h1_gas"},
-    {"title": "H2 Gas",            "value": "h2_gas",                   "requires": "h2_mass"},
-    {"title": "Heating",           "value": "heating",                  "requires": "heating"},
-    {"title": "Hot Gas",           "value": "hot_gas",                  "requires": "hot_gas"},
-    {"title": "ICS Mass",          "value": "ics_mass",                 "requires": "ics_mass"},
-    {"title": "Inst. Bulge Mass",  "value": "instability_bulge_mass",   "requires": "instability_bulge_mass"},
-    {"title": "Inst. Bulge Rad",   "value": "instability_bulge_radius", "requires": "instability_bulge_radius"},
-    {"title": "Mass Loading",      "value": "mass_loading",             "requires": "mass_loading"},
-    {"title": "Merger Bulge Mass", "value": "merger_bulge_mass",        "requires": "merger_bulge_mass"},
-    {"title": "Merger Bulge Rad",  "value": "merger_bulge_radius",      "requires": "merger_bulge_radius"},
-    {"title": "Metals — Bulge",    "value": "metals_bulge_mass",        "requires": "metals_bulge_mass"},
-    {"title": "Metals — CGM Gas",  "value": "metals_cgm_gas",           "requires": "metals_cgm_gas"},
-    {"title": "Metals — Cold Gas", "value": "metals_cold_gas",          "requires": "metals_cold_gas"},
-    {"title": "Metals — Ejected",  "value": "metals_ejected_mass",      "requires": "metals_ejected_mass"},
-    {"title": "Metals — Hot Gas",  "value": "metals_hot_gas",           "requires": "metals_hot_gas"},
-    {"title": "Metals — ICS",      "value": "metals_ics",               "requires": "metals_ics"},
-    {"title": "Metals — Stellar",  "value": "metals_stellar_mass",      "requires": "metals_stellar_mass"},
-    {"title": "Outflow Rate",      "value": "outflow_rate",             "requires": "outflow_rate"},
-    {"title": "SFR Bulge",         "value": "sfr_bulge",                "requires": "sfr_bulge"},
-    {"title": "SFR Bulge Z",       "value": "sfr_bulge_z",              "requires": "sfr_bulge_z"},
-    {"title": "SFR Disk",          "value": "sfr_disk",                 "requires": "sfr_disk"},
-    {"title": "SFR Disk Z",        "value": "sfr_disk_z",               "requires": "sfr_disk_z"},
+    {"title": "BH Mass", "value": "bh_mass", "requires": "bh_mass"},
+    {"title": "Bulge Mass", "value": "bulge_mass"},
+    {
+        "title": "Bulge Radius",
+        "value": "bulge_radius",
+        "requires": "bulge_radius",
+    },
+    {"title": "CGM Gas", "value": "cgm_gas", "requires": "cgm_gas"},
+    {"title": "Cold Gas", "value": "cold_gas"},
+    {"title": "Cooling", "value": "cooling", "requires": "cooling"},
+    {
+        "title": "Disk Radius",
+        "value": "disk_radius",
+        "requires": "disk_radius",
+    },
+    {
+        "title": "Ejected Mass",
+        "value": "ejected_mass",
+        "requires": "ejected_mass",
+    },
+    {"title": "H1 Gas", "value": "h1_gas", "requires": "h1_gas"},
+    {"title": "H2 Gas", "value": "h2_gas", "requires": "h2_mass"},
+    {"title": "Heating", "value": "heating", "requires": "heating"},
+    {"title": "Hot Gas", "value": "hot_gas", "requires": "hot_gas"},
+    {"title": "ICS Mass", "value": "ics_mass", "requires": "ics_mass"},
+    {
+        "title": "Inst. Bulge Mass",
+        "value": "instability_bulge_mass",
+        "requires": "instability_bulge_mass",
+    },
+    {
+        "title": "Inst. Bulge Rad",
+        "value": "instability_bulge_radius",
+        "requires": "instability_bulge_radius",
+    },
+    {
+        "title": "Mass Loading",
+        "value": "mass_loading",
+        "requires": "mass_loading",
+    },
+    {
+        "title": "Merger Bulge Mass",
+        "value": "merger_bulge_mass",
+        "requires": "merger_bulge_mass",
+    },
+    {
+        "title": "Merger Bulge Rad",
+        "value": "merger_bulge_radius",
+        "requires": "merger_bulge_radius",
+    },
+    {
+        "title": "Metals — Bulge",
+        "value": "metals_bulge_mass",
+        "requires": "metals_bulge_mass",
+    },
+    {
+        "title": "Metals — CGM Gas",
+        "value": "metals_cgm_gas",
+        "requires": "metals_cgm_gas",
+    },
+    {
+        "title": "Metals — Cold Gas",
+        "value": "metals_cold_gas",
+        "requires": "metals_cold_gas",
+    },
+    {
+        "title": "Metals — Ejected",
+        "value": "metals_ejected_mass",
+        "requires": "metals_ejected_mass",
+    },
+    {
+        "title": "Metals — Hot Gas",
+        "value": "metals_hot_gas",
+        "requires": "metals_hot_gas",
+    },
+    {"title": "Metals — ICS", "value": "metals_ics", "requires": "metals_ics"},
+    {
+        "title": "Metals — Stellar",
+        "value": "metals_stellar_mass",
+        "requires": "metals_stellar_mass",
+    },
+    {
+        "title": "Outflow Rate",
+        "value": "outflow_rate",
+        "requires": "outflow_rate",
+    },
+    {"title": "SFR Bulge", "value": "sfr_bulge", "requires": "sfr_bulge"},
+    {
+        "title": "SFR Bulge Z",
+        "value": "sfr_bulge_z",
+        "requires": "sfr_bulge_z",
+    },
+    {"title": "SFR Disk", "value": "sfr_disk", "requires": "sfr_disk"},
+    {"title": "SFR Disk Z", "value": "sfr_disk_z", "requires": "sfr_disk_z"},
 ]
+
 
 def _filter_modes(mode_list: list[dict], fields: dict) -> list[dict]:
     """Return only modes whose required field is present (or have no requirement)."""
     return [m for m in mode_list if fields.get(m.get("requires", ""), True)]
 
+
 _CMAPS = [
     # Sequential
-    {"title": "Viridis",  "value": "viridis"},
-    {"title": "Plasma",   "value": "plasma"},
-    {"title": "Inferno",  "value": "inferno"},
-    {"title": "Magma",    "value": "magma"},
-    {"title": "Cividis",  "value": "cividis"},
-    {"title": "Turbo",    "value": "turbo"},
-    {"title": "Blues",    "value": "Blues"},
-    {"title": "Purples",  "value": "Purples"},
-    {"title": "Greens",   "value": "Greens"},
-    {"title": "Oranges",  "value": "Oranges"},
-    {"title": "Reds",     "value": "Reds"},
-    {"title": "Greys",    "value": "Greys"},
-    {"title": "YlOrRd",   "value": "YlOrRd"},
-    {"title": "YlGnBu",   "value": "YlGnBu"},
-    {"title": "BuPu",     "value": "BuPu"},
-    {"title": "Hot",      "value": "hot"},
-    {"title": "Cool",     "value": "cool"},
-    {"title": "Bone",     "value": "bone"},
-    {"title": "Copper",   "value": "copper"},
+    {"title": "Viridis", "value": "viridis"},
+    {"title": "Plasma", "value": "plasma"},
+    {"title": "Inferno", "value": "inferno"},
+    {"title": "Magma", "value": "magma"},
+    {"title": "Cividis", "value": "cividis"},
+    {"title": "Turbo", "value": "turbo"},
+    {"title": "Blues", "value": "Blues"},
+    {"title": "Purples", "value": "Purples"},
+    {"title": "Greens", "value": "Greens"},
+    {"title": "Oranges", "value": "Oranges"},
+    {"title": "Reds", "value": "Reds"},
+    {"title": "Greys", "value": "Greys"},
+    {"title": "YlOrRd", "value": "YlOrRd"},
+    {"title": "YlGnBu", "value": "YlGnBu"},
+    {"title": "BuPu", "value": "BuPu"},
+    {"title": "Hot", "value": "hot"},
+    {"title": "Cool", "value": "cool"},
+    {"title": "Bone", "value": "bone"},
+    {"title": "Copper", "value": "copper"},
     # Diverging
     {"title": "Coolwarm", "value": "coolwarm"},
-    {"title": "RdBu",     "value": "RdBu"},
-    {"title": "Seismic",  "value": "seismic"},
+    {"title": "RdBu", "value": "RdBu"},
+    {"title": "Seismic", "value": "seismic"},
     {"title": "Spectral", "value": "Spectral"},
-    {"title": "BrBG",     "value": "BrBG"},
+    {"title": "BrBG", "value": "BrBG"},
     # Cyclic / qualitative
     {"title": "Twilight", "value": "twilight"},
-    {"title": "Jet",      "value": "jet"},
-    {"title": "Rainbow",  "value": "rainbow"},
+    {"title": "Jet", "value": "jet"},
+    {"title": "Rainbow", "value": "rainbow"},
 ]
 
 
 _HALO_CB = {
-    "mvir": ("Mvir",    "10^10",  "10^15 Msun"),
-    "rvir": ("Rvir",    "0.03",   "3 Mpc/h"),
-    "vvir": ("Vvir",    "30",     "1000 km/s"),
-    "vmax": ("Vmax",    "30",     "1000 km/s"),
+    "mvir": ("Mvir", "10^10", "10^15 Msun"),
+    "rvir": ("Rvir", "0.03", "3 Mpc/h"),
+    "vvir": ("Vvir", "30", "1000 km/s"),
+    "vmax": ("Vmax", "30", "1000 km/s"),
 }
 
 _GAL_CB = {
-    "stellar_mass":    ("M*",          "10^8",    "10^12.5 Msun"),
-    "ssfr":            ("sSFR",        "10^-14",  "10^-6 yr^-1"),
-    "sfr":             ("SFR",         "10^-3",   "10^2 Msun/yr"),
-    "cold_gas":        ("Mgas",        "10^7",    "10^11.5 Msun"),
-    "bt":              ("B/T",         "0",       "1"),
-    "bh_mass":         ("Mbh",         "10^4",    "10^10 Msun"),
-    "ics_mass":        ("Mics",        "10^6",    "10^12 Msun"),
-    "age":             ("Age",         "0",       "14 Gyr"),
-    "bulge_mass":      ("Mbulge",      "10^7",    "10^12 Msun"),
-    "type":            ("Type",        "Central", "Satellite"),
+    "stellar_mass": ("M*", "10^8", "10^12.5 Msun"),
+    "ssfr": ("sSFR", "10^-14", "10^-6 yr^-1"),
+    "sfr": ("SFR", "10^-3", "10^2 Msun/yr"),
+    "cold_gas": ("Mgas", "10^7", "10^11.5 Msun"),
+    "bt": ("B/T", "0", "1"),
+    "bh_mass": ("Mbh", "10^4", "10^10 Msun"),
+    "ics_mass": ("Mics", "10^6", "10^12 Msun"),
+    "age": ("Age", "0", "14 Gyr"),
+    "bulge_mass": ("Mbulge", "10^7", "10^12 Msun"),
+    "type": ("Type", "Central", "Satellite"),
     # Gas / outflows
-    "cgm_gas":         ("Mcgm",        "10^7",    "10^12 Msun"),
-    "h1_gas":          ("MH1",         "10^7",    "10^12 Msun"),
-    "h2_gas":          ("MH2",         "10^6",    "10^11 Msun"),
-    "hot_gas":         ("Mhot",        "10^7",    "10^12 Msun"),
-    "ejected_mass":    ("Meject",      "10^7",    "10^12 Msun"),
-    "outflow_rate":    ("OutflowRate", "10^-6",   "10^3 Msun/yr"),
-    "mass_loading":    ("Eta",         "10^-2",   "10^3"),
-    "cooling":         ("Cooling",     "10^-5",   "10^5"),
-    "heating":         ("Heating",     "10^-5",   "10^5"),
+    "cgm_gas": ("Mcgm", "10^7", "10^12 Msun"),
+    "h1_gas": ("MH1", "10^7", "10^12 Msun"),
+    "h2_gas": ("MH2", "10^6", "10^11 Msun"),
+    "hot_gas": ("Mhot", "10^7", "10^12 Msun"),
+    "ejected_mass": ("Meject", "10^7", "10^12 Msun"),
+    "outflow_rate": ("OutflowRate", "10^-6", "10^3 Msun/yr"),
+    "mass_loading": ("Eta", "10^-2", "10^3"),
+    "cooling": ("Cooling", "10^-5", "10^5"),
+    "heating": ("Heating", "10^-5", "10^5"),
     # Structural
-    "disk_radius":     ("Rdisk",       "10^-4",   "1 Mpc/h"),
-    "bulge_radius":    ("Rbulge",      "10^-4",   "1 Mpc/h"),
-    "merger_bulge_mass":        ("Mmb",   "10^6",  "10^12 Msun"),
-    "merger_bulge_radius":      ("Rmb",   "10^-4", "1 Mpc/h"),
-    "instability_bulge_mass":   ("Mib",   "10^6",  "10^12 Msun"),
-    "instability_bulge_radius": ("Rib",   "10^-4", "1 Mpc/h"),
+    "disk_radius": ("Rdisk", "10^-4", "1 Mpc/h"),
+    "bulge_radius": ("Rbulge", "10^-4", "1 Mpc/h"),
+    "merger_bulge_mass": ("Mmb", "10^6", "10^12 Msun"),
+    "merger_bulge_radius": ("Rmb", "10^-4", "1 Mpc/h"),
+    "instability_bulge_mass": ("Mib", "10^6", "10^12 Msun"),
+    "instability_bulge_radius": ("Rib", "10^-4", "1 Mpc/h"),
     # SFR components
-    "sfr_bulge":   ("SFRbulge",  "10^-6",  "10^3 Msun/yr"),
-    "sfr_disk":    ("SFRdisk",   "10^-6",  "10^3 Msun/yr"),
-    "sfr_bulge_z": ("SFRbulgeZ", "10^-6",  "1"),
-    "sfr_disk_z":  ("SFRdiskZ",  "10^-6",  "1"),
+    "sfr_bulge": ("SFRbulge", "10^-6", "10^3 Msun/yr"),
+    "sfr_disk": ("SFRdisk", "10^-6", "10^3 Msun/yr"),
+    "sfr_bulge_z": ("SFRbulgeZ", "10^-6", "1"),
+    "sfr_disk_z": ("SFRdiskZ", "10^-6", "1"),
     # Metals
-    "metals_stellar_mass": ("Z*",     "10^-2", "10^10 Msun"),
-    "metals_bulge_mass":   ("Zbulge", "10^-2", "10^10 Msun"),
-    "metals_cold_gas":     ("Zcold",  "10^-2", "10^10 Msun"),
-    "metals_hot_gas":      ("Zhot",   "10^-2", "10^10 Msun"),
-    "metals_cgm_gas":      ("Zcgm",   "10^-2", "10^10 Msun"),
+    "metals_stellar_mass": ("Z*", "10^-2", "10^10 Msun"),
+    "metals_bulge_mass": ("Zbulge", "10^-2", "10^10 Msun"),
+    "metals_cold_gas": ("Zcold", "10^-2", "10^10 Msun"),
+    "metals_hot_gas": ("Zhot", "10^-2", "10^10 Msun"),
+    "metals_cgm_gas": ("Zcgm", "10^-2", "10^10 Msun"),
     "metals_ejected_mass": ("Zeject", "10^-2", "10^10 Msun"),
-    "metals_ics":          ("Zics",   "10^-2", "10^10 Msun"),
+    "metals_ics": ("Zics", "10^-2", "10^10 Msun"),
 }
 
-_CBAR_BASE = (
-    "height:8px;flex:1;min-width:0;border-radius:2px;"
-    "background:"
-)
+_CBAR_BASE = "height:8px;flex:1;min-width:0;border-radius:2px;" "background:"
+
 
 def _cbar_style(gradient: str) -> str:
     return _CBAR_BASE + gradient
@@ -165,155 +228,168 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state, ctrl = server.state, server.controller
 
     # Navigation state
-    state.nav_halo_idx         = 0
-    state.nav_gal_idx          = 0
-    state.nav_gal_last_radius  = 10.0  # 10 Mpc/h — Target Go default
-    state.nav_x                = round(scene._cfg.box_size / 2, 2)
-    state.nav_y                = round(scene._cfg.box_size / 2, 2)
-    state.nav_z                = round(scene._cfg.box_size / 2, 2)
-    state.nav_distance         = 10.0  # 10 Mpc/h — Target/Environment standoff
-    state.nav_box_xmin         = 0.0
-    state.nav_box_xmax         = round(scene._cfg.box_size / 2, 2)
-    state.nav_box_ymin         = 0.0
-    state.nav_box_ymax         = round(scene._cfg.box_size / 2, 2)
-    state.nav_box_zmin         = 0.0
-    state.nav_box_zmax         = round(scene._cfg.box_size / 2, 2)
-    state.focus_active         = False
-    state.nav_active_tab       = "layers"
-    state.draw_sphere_active   = False   # interactive sphere widget in Coords tab
-    state.draw_box_active      = False   # interactive box widget in Box tab
+    state.nav_halo_idx = 0
+    state.nav_gal_idx = 0
+    state.nav_gal_last_radius = 10.0  # 10 Mpc/h — Target Go default
+    state.nav_x = round(scene._cfg.box_size / 2, 2)
+    state.nav_y = round(scene._cfg.box_size / 2, 2)
+    state.nav_z = round(scene._cfg.box_size / 2, 2)
+    state.nav_distance = 10.0  # 10 Mpc/h — Target/Environment standoff
+    state.nav_box_xmin = 0.0
+    state.nav_box_xmax = round(scene._cfg.box_size / 2, 2)
+    state.nav_box_ymin = 0.0
+    state.nav_box_ymax = round(scene._cfg.box_size / 2, 2)
+    state.nav_box_zmin = 0.0
+    state.nav_box_zmax = round(scene._cfg.box_size / 2, 2)
+    state.focus_active = False
+    state.nav_active_tab = "layers"
+    state.draw_sphere_active = False  # interactive sphere widget in Coords tab
+    state.draw_box_active = False  # interactive box widget in Box tab
 
     # Console — supports multiple parallel sessions. The state vars
     # below always reflect the *active* console; switching consoles
     # syncs them in/out of the per-session Python-side storage dict
     # (`_consoles_data`).
-    state.console_input        = ""
-    state.console_history      = []   # active console's history
-    state.consoles_list        = [{"id": 1, "title": "Console 1"}]
-    state.console_active_id    = 1
-    state.console_popout_show  = False
-    state.pty_out_data   = ""   # base64-encoded latest PTY output chunk
-    state.pty_out_seq    = 0    # monotonically increasing; JS polls this
+    state.console_input = ""
+    state.console_history = []  # active console's history
+    state.consoles_list = [{"id": 1, "title": "Console 1"}]
+    state.console_active_id = 1
+    state.console_popout_show = False
+    state.pty_out_data = ""  # base64-encoded latest PTY output chunk
+    state.pty_out_seq = 0  # monotonically increasing; JS polls this
     # PTY input relay — JS dispatches native input events to hidden <input> elements
     # bound to these state vars via v-model; that is the only reliable path from
     # external JS to @state.change handlers in Trame 3.
-    state.pty_input_raw  = ""   # "seq:cid:b64data" — set by JS onData
-    state.pty_ensure_seq = 0    # incremented by JS after xterm.js mounts
+    state.pty_input_raw = ""  # "seq:cid:b64data" — set by JS onData
+    state.pty_ensure_seq = 0  # incremented by JS after xterm.js mounts
 
     # Library
-    state.library_files = []   # list of {"name", "path", "kind", "size_kb"}
-    state.library_items = []   # open pop-outs: [{id, name, kind, data_url, top_px}]
+    state.library_files = []  # list of {"name", "path", "kind", "size_kb"}
+    state.library_items = (
+        []
+    )  # open pop-outs: [{id, name, kind, data_url, top_px}]
 
     # Group info panel state (mirrors galinfo_*)
-    state.groupinfo_show  = False
+    state.groupinfo_show = False
     state.groupinfo_items = []
 
     # ── Filter state (log10 ranges where appropriate) ──────────
     # Halo filters
-    state.filter_halo_mvir   = [10.0, 15.0]   # log10 Msun
-    state.filter_halo_rvir   = [0.0, 3.0]     # Mpc/h (raw)
-    state.filter_halo_vvir   = [0.0, 1000.0]  # km/s   (raw)
-    state.filter_halo_len    = [0, 10000]      # particle count (raw)
-    state.filter_halo_vmax   = [0.0, 1000.0]  # km/s   (raw)
-    state.filter_halo_conc   = [0.0, 50.0]    # NFW concentration (raw)
-    state.filter_halo_spin   = [0.0, 0.2]     # spin parameter (raw)
+    state.filter_halo_mvir = [10.0, 15.0]  # log10 Msun
+    state.filter_halo_rvir = [0.0, 3.0]  # Mpc/h (raw)
+    state.filter_halo_vvir = [0.0, 1000.0]  # km/s   (raw)
+    state.filter_halo_len = [0, 10000]  # particle count (raw)
+    state.filter_halo_vmax = [0.0, 1000.0]  # km/s   (raw)
+    state.filter_halo_conc = [0.0, 50.0]  # NFW concentration (raw)
+    state.filter_halo_spin = [0.0, 0.2]  # spin parameter (raw)
     # Galaxy mass / rate filters
-    state.filter_gal_smass   = [0.0, 14.0]    # log10 Msun
-    state.filter_gal_sfr     = [-6.0, 5.0]    # log10 Msun/yr (-6 incl. quenched)
-    state.filter_gal_ssfr    = [-14.0, 0.0]   # log10 yr^-1
-    state.filter_gal_coldgas = [0.0, 14.0]    # log10 Msun
-    state.filter_gal_bulge   = [0.0, 14.0]    # log10 Msun
-    state.filter_gal_bt      = [0.0, 1.0]     # bulge/total
-    state.filter_gal_bhmass  = [0.0, 14.0]    # log10 Msun
-    state.filter_gal_ics     = [0.0, 14.0]    # log10 Msun
-    state.filter_gal_h2      = [0.0, 14.0]    # log10 Msun
-    state.filter_gal_cgmgas  = [0.0, 14.0]    # log10 Msun
-    state.filter_gal_hotgas  = [0.0, 14.0]    # log10 Msun
-    state.filter_gal_h1gas   = [0.0, 14.0]    # log10 Msun
-    state.filter_gal_ejected = [0.0, 14.0]    # log10 Msun
-    state.filter_gal_outflow = [-6.0, 5.0]    # log10 Msun/yr
-    state.filter_gal_massload= [-3.0, 5.0]    # log10 dimensionless
-    state.filter_gal_cooling  = [-7.0, 7.0]   # log10 SAGE units
-    state.filter_gal_heating  = [-7.0, 7.0]   # log10 SAGE units
+    state.filter_gal_smass = [0.0, 14.0]  # log10 Msun
+    state.filter_gal_sfr = [-6.0, 5.0]  # log10 Msun/yr (-6 incl. quenched)
+    state.filter_gal_ssfr = [-14.0, 0.0]  # log10 yr^-1
+    state.filter_gal_coldgas = [0.0, 14.0]  # log10 Msun
+    state.filter_gal_bulge = [0.0, 14.0]  # log10 Msun
+    state.filter_gal_bt = [0.0, 1.0]  # bulge/total
+    state.filter_gal_bhmass = [0.0, 14.0]  # log10 Msun
+    state.filter_gal_ics = [0.0, 14.0]  # log10 Msun
+    state.filter_gal_h2 = [0.0, 14.0]  # log10 Msun
+    state.filter_gal_cgmgas = [0.0, 14.0]  # log10 Msun
+    state.filter_gal_hotgas = [0.0, 14.0]  # log10 Msun
+    state.filter_gal_h1gas = [0.0, 14.0]  # log10 Msun
+    state.filter_gal_ejected = [0.0, 14.0]  # log10 Msun
+    state.filter_gal_outflow = [-6.0, 5.0]  # log10 Msun/yr
+    state.filter_gal_massload = [-3.0, 5.0]  # log10 dimensionless
+    state.filter_gal_cooling = [-7.0, 7.0]  # log10 SAGE units
+    state.filter_gal_heating = [-7.0, 7.0]  # log10 SAGE units
     # Galaxy structural
-    state.filter_gal_diskrad  = [-4.0, 1.0]   # log10 Mpc/h
-    state.filter_gal_bulgerad = [-4.0, 1.0]   # log10 Mpc/h
-    state.filter_gal_mb_mass  = [0.0, 14.0]   # log10 Msun (merger bulge mass)
-    state.filter_gal_mb_rad   = [-4.0, 1.0]   # log10 Mpc/h (merger bulge radius)
-    state.filter_gal_ib_mass  = [0.0, 14.0]   # log10 Msun (instability bulge mass)
-    state.filter_gal_ib_rad   = [-4.0, 1.0]   # log10 Mpc/h (instability bulge radius)
+    state.filter_gal_diskrad = [-4.0, 1.0]  # log10 Mpc/h
+    state.filter_gal_bulgerad = [-4.0, 1.0]  # log10 Mpc/h
+    state.filter_gal_mb_mass = [0.0, 14.0]  # log10 Msun (merger bulge mass)
+    state.filter_gal_mb_rad = [-4.0, 1.0]  # log10 Mpc/h (merger bulge radius)
+    state.filter_gal_ib_mass = [
+        0.0,
+        14.0,
+    ]  # log10 Msun (instability bulge mass)
+    state.filter_gal_ib_rad = [
+        -4.0,
+        1.0,
+    ]  # log10 Mpc/h (instability bulge radius)
     # SFR components
-    state.filter_gal_sfr_bulge  = [-6.0, 5.0]   # log10 Msun/yr
-    state.filter_gal_sfr_disk   = [-6.0, 5.0]   # log10 Msun/yr
-    state.filter_gal_sfr_blg_z  = [-6.0, 1.0]   # log10 dimensionless
-    state.filter_gal_sfr_dsk_z  = [-6.0, 1.0]   # log10 dimensionless
+    state.filter_gal_sfr_bulge = [-6.0, 5.0]  # log10 Msun/yr
+    state.filter_gal_sfr_disk = [-6.0, 5.0]  # log10 Msun/yr
+    state.filter_gal_sfr_blg_z = [-6.0, 1.0]  # log10 dimensionless
+    state.filter_gal_sfr_dsk_z = [-6.0, 1.0]  # log10 dimensionless
     # Metals
-    state.filter_gal_met_cg   = [-2.0, 12.0]  # log10 Msun (metals cold gas)
-    state.filter_gal_met_sm   = [-2.0, 12.0]  # log10 Msun (metals stellar)
-    state.filter_gal_met_bm   = [-2.0, 12.0]  # log10 Msun (metals bulge)
-    state.filter_gal_met_hg   = [-2.0, 12.0]  # log10 Msun (metals hot gas)
-    state.filter_gal_met_em   = [-2.0, 12.0]  # log10 Msun (metals ejected)
-    state.filter_gal_met_ics  = [-2.0, 12.0]  # log10 Msun (metals ICS)
-    state.filter_gal_met_cgm  = [-2.0, 12.0]  # log10 Msun (metals CGM)
+    state.filter_gal_met_cg = [-2.0, 12.0]  # log10 Msun (metals cold gas)
+    state.filter_gal_met_sm = [-2.0, 12.0]  # log10 Msun (metals stellar)
+    state.filter_gal_met_bm = [-2.0, 12.0]  # log10 Msun (metals bulge)
+    state.filter_gal_met_hg = [-2.0, 12.0]  # log10 Msun (metals hot gas)
+    state.filter_gal_met_em = [-2.0, 12.0]  # log10 Msun (metals ejected)
+    state.filter_gal_met_ics = [-2.0, 12.0]  # log10 Msun (metals ICS)
+    state.filter_gal_met_cgm = [-2.0, 12.0]  # log10 Msun (metals CGM)
     # Misc
     _snap_max = max(0, scene.primary.snap_table.count - 1)
     # Categoricals
-    state.filter_gal_type    = "both"          # both | central | satellite
-    state.filter_gal_ffb     = "any"           # any | yes | no   (FFBRegime)
-    state.filter_gal_cgm     = "any"           # any | cold | hot (Regime 0/1)
+    state.filter_gal_type = "both"  # both | central | satellite
+    state.filter_gal_ffb = "any"  # any | yes | no   (FFBRegime)
+    state.filter_gal_cgm = "any"  # any | cold | hot (Regime 0/1)
     # Environment categories — each checkbox toggles inclusion of that class.
     # When all four are checked the filter is a no-op (= "show all").
-    state.env_show_field    = True
+    state.env_show_field = True
     state.env_show_isolated = True
-    state.env_show_pairs    = True
-    state.env_show_group    = True
-    state.env_show_cluster  = True
-    state.fof_links_on      = False           # FoF-link gold lines toggle
-    state.filter_gal_age    = [0.0, 14.0]    # Gyr  (mass-weighted stellar age)
+    state.env_show_pairs = True
+    state.env_show_group = True
+    state.env_show_cluster = True
+    state.fof_links_on = False  # FoF-link gold lines toggle
+    state.filter_gal_age = [0.0, 14.0]  # Gyr  (mass-weighted stellar age)
 
     # ── Galaxy info panel ──────────────────────────────────────
-    state.galinfo_show  = False
-    state.galinfo_items = []   # list[{label, value}] for the panel
+    state.galinfo_show = False
+    state.galinfo_items = []  # list[{label, value}] for the panel
 
     # ── Record state ───────────────────────────────────────────
-    state.recording_active   = False
-    state.recording_frames   = 0
-    state.recording_dir      = ""
-    state.last_screenshot    = ""
-    state.last_movie         = ""
-    state.movie_fps          = 10
-    state.movie_resolution   = "native"   # native | hd | uhd
-    state.movie_format       = "gif"      # gif | mov | png
-    state.screenshot_label   = ""
-    state.movie_label        = ""
-    state.movie_loop         = True   # only used for GIF output
+    state.recording_active = False
+    state.recording_frames = 0
+    state.recording_dir = ""
+    state.last_screenshot = ""
+    state.last_movie = ""
+    state.movie_fps = 10
+    state.movie_resolution = "native"  # native | hd | uhd
+    state.movie_format = "gif"  # gif | mov | png
+    state.screenshot_label = ""
+    state.movie_label = ""
+    state.movie_loop = True  # only used for GIF output
 
     # Colorbar state — full style strings to avoid Vue concatenation issues
     from sage_viewer.utils.colormap import cmap_css_gradient
+
     _h_label, _h_min, _h_max = _HALO_CB[scene.halo_layer.color_mode]
     _g_label, _g_min, _g_max = _GAL_CB.get(
         scene.galaxy_layer.color_mode, ("—", "—", "—")
     )
-    state.halo_cbar_style = _cbar_style(cmap_css_gradient(scene.halo_layer.colormap))
-    state.halo_cbar_min   = _h_min
-    state.halo_cbar_max   = _h_max
-    state.gal_cbar_style  = _cbar_style(cmap_css_gradient(scene.galaxy_layer.colormap))
-    state.gal_cbar_min    = _g_min
-    state.gal_cbar_max    = _g_max
+    state.halo_cbar_style = _cbar_style(
+        cmap_css_gradient(scene.halo_layer.colormap)
+    )
+    state.halo_cbar_min = _h_min
+    state.halo_cbar_max = _h_max
+    state.gal_cbar_style = _cbar_style(
+        cmap_css_gradient(scene.galaxy_layer.colormap)
+    )
+    state.gal_cbar_min = _g_min
+    state.gal_cbar_max = _g_max
 
     # Layer state
-    state.halos_visible     = True
-    state.galaxies_visible  = True
-    state.halo_opacity      = scene.halo_layer.opacity
-    state.galaxy_opacity    = scene.galaxy_layer.opacity
-    state.halo_color_mode   = scene.halo_layer.color_mode
+    state.halos_visible = True
+    state.galaxies_visible = True
+    state.halo_opacity = scene.halo_layer.opacity
+    state.galaxy_opacity = scene.galaxy_layer.opacity
+    state.halo_color_mode = scene.halo_layer.color_mode
     state.galaxy_color_mode = scene.galaxy_layer.color_mode
-    state.halo_colormap     = scene.halo_layer.colormap
-    state.galaxy_colormap   = scene.galaxy_layer.colormap
+    state.halo_colormap = scene.halo_layer.colormap
+    state.galaxy_colormap = scene.galaxy_layer.colormap
 
     def _rebuild_color_mode_lists() -> None:
         fields = dict(scene.primary.fields_available)
-        state.halo_color_modes   = _filter_modes(_HALO_MODES, fields)
+        state.halo_color_modes = _filter_modes(_HALO_MODES, fields)
         state.galaxy_color_modes = _filter_modes(_GALAXY_MODES, fields)
 
     _rebuild_color_mode_lists()
@@ -353,23 +429,30 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     def _apply_filters() -> None:
         import numpy as np
+
         halos, galaxies = scene._loader.get(scene.current_snap)
 
         # Halo filters
-        m_lo, m_hi   = state.filter_halo_mvir
-        r_lo, r_hi   = state.filter_halo_rvir
-        v_lo, v_hi   = state.filter_halo_vvir
+        m_lo, m_hi = state.filter_halo_mvir
+        r_lo, r_hi = state.filter_halo_rvir
+        v_lo, v_hi = state.filter_halo_vvir
 
         h_mvir_log = np.log10(np.maximum(halos.masses, 1.0))
         h_mask = (
-            (h_mvir_log >= float(m_lo)) & (h_mvir_log <= float(m_hi)) &
-            (halos.rvir >= float(r_lo)) & (halos.rvir <= float(r_hi)) &
-            (halos.vvir >= float(v_lo)) & (halos.vvir <= float(v_hi))
+            (h_mvir_log >= float(m_lo))
+            & (h_mvir_log <= float(m_hi))
+            & (halos.rvir >= float(r_lo))
+            & (halos.rvir <= float(r_hi))
+            & (halos.vvir >= float(v_lo))
+            & (halos.vvir <= float(v_hi))
         )
         full = (
-            float(m_lo) <= 10.0 + 1e-6 and float(m_hi) >= 15.0 - 1e-6
-            and float(r_lo) <=  0.0 + 1e-6 and float(r_hi) >=  3.0 - 1e-6
-            and float(v_lo) <=  0.0 + 1e-6 and float(v_hi) >= 1000.0 - 1e-6
+            float(m_lo) <= 10.0 + 1e-6
+            and float(m_hi) >= 15.0 - 1e-6
+            and float(r_lo) <= 0.0 + 1e-6
+            and float(r_hi) >= 3.0 - 1e-6
+            and float(v_lo) <= 0.0 + 1e-6
+            and float(v_hi) >= 1000.0 - 1e-6
         )
         if full:
             h_mask = None
@@ -387,8 +470,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 """True when the slider has been moved away from its default extent."""
                 return float(lo) > mn + 1e-6 or float(hi) < mx - 1e-6
 
-            def _lg(x):  return np.log10(np.maximum(x, 1.0))
-            def _lgr(x): return np.log10(np.maximum(x, 1e-6))
+            def _lg(x):
+                return np.log10(np.maximum(x, 1.0))
+
+            def _lgr(x):
+                return np.log10(np.maximum(x, 1e-6))
 
             def _apply(lo, hi, arr, mn, mx):
                 if _active(lo, hi, mn, mx):
@@ -398,7 +484,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 # Zero/negative raw values always pass (not "below range", just absent).
                 if _active(lo, hi, mn, mx):
                     log_v = np.log10(np.maximum(raw, 1e-30))
-                    g_mask.__iand__((raw <= 0) | ((log_v >= float(lo)) & (log_v <= float(hi))))
+                    g_mask.__iand__(
+                        (raw <= 0)
+                        | ((log_v >= float(lo)) & (log_v <= float(hi)))
+                    )
 
             # ── Unconditional filters ──────────────────────────────────────────
             sm_lo, sm_hi = state.filter_gal_smass
@@ -409,12 +498,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
             sfr_lo, sfr_hi = state.filter_gal_sfr
             if _active(sfr_lo, sfr_hi, -6.0, 5.0):
                 sfr_log = np.log10(np.maximum(galaxies.sfr, 1e-6))
-                g_mask &= (sfr_log >= float(sfr_lo)) & (sfr_log <= float(sfr_hi))
+                g_mask &= (sfr_log >= float(sfr_lo)) & (
+                    sfr_log <= float(sfr_hi)
+                )
 
             ss_lo, ss_hi = state.filter_gal_ssfr
             if _active(ss_lo, ss_hi, -14.0, 0.0):
                 ssfr_log = np.log10(np.maximum(galaxies.ssfr, 1e-14))
-                g_mask &= (ssfr_log >= float(ss_lo)) & (ssfr_log <= float(ss_hi))
+                g_mask &= (ssfr_log >= float(ss_lo)) & (
+                    ssfr_log <= float(ss_hi)
+                )
 
             cg_lo, cg_hi = state.filter_gal_coldgas
             if _active(cg_lo, cg_hi, 0.0, 14.0):
@@ -597,7 +690,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 if show_p and fields.get("central_id", False):
                     # Use central_id (not central_mvir) for accurate FOF group count
                     _, _inv, _grp_sizes = np.unique(
-                        galaxies.central_id, return_inverse=True, return_counts=True
+                        galaxies.central_id,
+                        return_inverse=True,
+                        return_counts=True,
                     )
                     cat_mask |= _grp_sizes[_inv] == 2
                 if show_g:
@@ -615,25 +710,55 @@ def build_navigation_panel(server, scene: Scene) -> None:
     scene.register_snap_change_callback(lambda _n: _apply_filters())
 
     @state.change(
-        "filter_halo_mvir", "filter_halo_rvir", "filter_halo_vvir",
-        "filter_halo_len", "filter_halo_vmax", "filter_halo_conc", "filter_halo_spin",
-        "filter_gal_smass", "filter_gal_sfr", "filter_gal_ssfr",
-        "filter_gal_coldgas", "filter_gal_bulge", "filter_gal_bt", "filter_gal_type",
-        "filter_gal_bhmass", "filter_gal_ics", "filter_gal_h2",
-        "filter_gal_cgmgas", "filter_gal_hotgas",
-        "filter_gal_h1gas", "filter_gal_ejected", "filter_gal_outflow",
-        "filter_gal_massload", "filter_gal_cooling", "filter_gal_heating",
-        "filter_gal_diskrad", "filter_gal_bulgerad",
-        "filter_gal_mb_mass", "filter_gal_mb_rad",
-        "filter_gal_ib_mass", "filter_gal_ib_rad",
-        "filter_gal_sfr_bulge", "filter_gal_sfr_disk",
-        "filter_gal_sfr_blg_z", "filter_gal_sfr_dsk_z",
-        "filter_gal_met_cg", "filter_gal_met_sm", "filter_gal_met_bm",
-        "filter_gal_met_hg", "filter_gal_met_em", "filter_gal_met_ics",
+        "filter_halo_mvir",
+        "filter_halo_rvir",
+        "filter_halo_vvir",
+        "filter_halo_len",
+        "filter_halo_vmax",
+        "filter_halo_conc",
+        "filter_halo_spin",
+        "filter_gal_smass",
+        "filter_gal_sfr",
+        "filter_gal_ssfr",
+        "filter_gal_coldgas",
+        "filter_gal_bulge",
+        "filter_gal_bt",
+        "filter_gal_type",
+        "filter_gal_bhmass",
+        "filter_gal_ics",
+        "filter_gal_h2",
+        "filter_gal_cgmgas",
+        "filter_gal_hotgas",
+        "filter_gal_h1gas",
+        "filter_gal_ejected",
+        "filter_gal_outflow",
+        "filter_gal_massload",
+        "filter_gal_cooling",
+        "filter_gal_heating",
+        "filter_gal_diskrad",
+        "filter_gal_bulgerad",
+        "filter_gal_mb_mass",
+        "filter_gal_mb_rad",
+        "filter_gal_ib_mass",
+        "filter_gal_ib_rad",
+        "filter_gal_sfr_bulge",
+        "filter_gal_sfr_disk",
+        "filter_gal_sfr_blg_z",
+        "filter_gal_sfr_dsk_z",
+        "filter_gal_met_cg",
+        "filter_gal_met_sm",
+        "filter_gal_met_bm",
+        "filter_gal_met_hg",
+        "filter_gal_met_em",
+        "filter_gal_met_ics",
         "filter_gal_met_cgm",
-        "filter_gal_ffb", "filter_gal_cgm",
-        "env_show_field", "env_show_isolated", "env_show_pairs",
-        "env_show_group", "env_show_cluster",
+        "filter_gal_ffb",
+        "filter_gal_cgm",
+        "env_show_field",
+        "env_show_isolated",
+        "env_show_pairs",
+        "env_show_group",
+        "env_show_cluster",
         "filter_gal_age",
     )
     def on_filter_change(**_):
@@ -641,62 +766,62 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     @ctrl.set("reset_opacities")
     def on_reset_opacities():
-        state.halo_opacity   = 0.15
+        state.halo_opacity = 0.15
         state.galaxy_opacity = 1.0
         state.flush()
 
     @ctrl.set("reset_filters")
     def on_reset_filters():
-        state.filter_halo_mvir    = [10.0, 15.0]
-        state.filter_halo_rvir    = [0.0, 3.0]
-        state.filter_halo_vvir    = [0.0, 1000.0]
-        state.filter_halo_len     = [0, 10000]
-        state.filter_halo_vmax    = [0.0, 1000.0]
-        state.filter_halo_conc    = [0.0, 50.0]
-        state.filter_halo_spin    = [0.0, 0.2]
-        state.filter_gal_smass    = [0.0, 14.0]
-        state.filter_gal_sfr      = [-6.0, 5.0]
-        state.filter_gal_ssfr     = [-14.0, 0.0]
-        state.filter_gal_coldgas  = [0.0, 14.0]
-        state.filter_gal_bulge    = [0.0, 14.0]
-        state.filter_gal_bt       = [0.0, 1.0]
-        state.filter_gal_type     = "both"
-        state.filter_gal_bhmass   = [0.0, 14.0]
-        state.filter_gal_ics      = [0.0, 14.0]
-        state.filter_gal_h2       = [0.0, 14.0]
-        state.filter_gal_cgmgas   = [0.0, 14.0]
-        state.filter_gal_hotgas   = [0.0, 14.0]
-        state.filter_gal_h1gas    = [0.0, 14.0]
-        state.filter_gal_ejected  = [0.0, 14.0]
-        state.filter_gal_outflow  = [-6.0, 5.0]
+        state.filter_halo_mvir = [10.0, 15.0]
+        state.filter_halo_rvir = [0.0, 3.0]
+        state.filter_halo_vvir = [0.0, 1000.0]
+        state.filter_halo_len = [0, 10000]
+        state.filter_halo_vmax = [0.0, 1000.0]
+        state.filter_halo_conc = [0.0, 50.0]
+        state.filter_halo_spin = [0.0, 0.2]
+        state.filter_gal_smass = [0.0, 14.0]
+        state.filter_gal_sfr = [-6.0, 5.0]
+        state.filter_gal_ssfr = [-14.0, 0.0]
+        state.filter_gal_coldgas = [0.0, 14.0]
+        state.filter_gal_bulge = [0.0, 14.0]
+        state.filter_gal_bt = [0.0, 1.0]
+        state.filter_gal_type = "both"
+        state.filter_gal_bhmass = [0.0, 14.0]
+        state.filter_gal_ics = [0.0, 14.0]
+        state.filter_gal_h2 = [0.0, 14.0]
+        state.filter_gal_cgmgas = [0.0, 14.0]
+        state.filter_gal_hotgas = [0.0, 14.0]
+        state.filter_gal_h1gas = [0.0, 14.0]
+        state.filter_gal_ejected = [0.0, 14.0]
+        state.filter_gal_outflow = [-6.0, 5.0]
         state.filter_gal_massload = [-3.0, 5.0]
-        state.filter_gal_cooling  = [-7.0, 7.0]
-        state.filter_gal_heating  = [-7.0, 7.0]
-        state.filter_gal_diskrad  = [-4.0, 1.0]
+        state.filter_gal_cooling = [-7.0, 7.0]
+        state.filter_gal_heating = [-7.0, 7.0]
+        state.filter_gal_diskrad = [-4.0, 1.0]
         state.filter_gal_bulgerad = [-4.0, 1.0]
-        state.filter_gal_mb_mass  = [0.0, 14.0]
-        state.filter_gal_mb_rad   = [-4.0, 1.0]
-        state.filter_gal_ib_mass    = [0.0, 14.0]
-        state.filter_gal_ib_rad    = [-4.0, 1.0]
+        state.filter_gal_mb_mass = [0.0, 14.0]
+        state.filter_gal_mb_rad = [-4.0, 1.0]
+        state.filter_gal_ib_mass = [0.0, 14.0]
+        state.filter_gal_ib_rad = [-4.0, 1.0]
         state.filter_gal_sfr_bulge = [-6.0, 5.0]
-        state.filter_gal_sfr_disk  = [-6.0, 5.0]
+        state.filter_gal_sfr_disk = [-6.0, 5.0]
         state.filter_gal_sfr_blg_z = [-6.0, 1.0]
         state.filter_gal_sfr_dsk_z = [-6.0, 1.0]
-        state.filter_gal_met_cg    = [-2.0, 12.0]
-        state.filter_gal_met_sm    = [-2.0, 12.0]
-        state.filter_gal_met_bm    = [-2.0, 12.0]
-        state.filter_gal_met_hg    = [-2.0, 12.0]
-        state.filter_gal_met_em    = [-2.0, 12.0]
-        state.filter_gal_met_ics   = [-2.0, 12.0]
-        state.filter_gal_met_cgm   = [-2.0, 12.0]
-        state.filter_gal_ffb       = "any"
-        state.filter_gal_cgm      = "any"
-        state.env_show_field      = True
-        state.env_show_isolated   = True
-        state.env_show_pairs      = True
-        state.env_show_group      = True
-        state.env_show_cluster    = True
-        state.filter_gal_age      = [0.0, 14.0]
+        state.filter_gal_met_cg = [-2.0, 12.0]
+        state.filter_gal_met_sm = [-2.0, 12.0]
+        state.filter_gal_met_bm = [-2.0, 12.0]
+        state.filter_gal_met_hg = [-2.0, 12.0]
+        state.filter_gal_met_em = [-2.0, 12.0]
+        state.filter_gal_met_ics = [-2.0, 12.0]
+        state.filter_gal_met_cgm = [-2.0, 12.0]
+        state.filter_gal_ffb = "any"
+        state.filter_gal_cgm = "any"
+        state.env_show_field = True
+        state.env_show_isolated = True
+        state.env_show_pairs = True
+        state.env_show_group = True
+        state.env_show_cluster = True
+        state.filter_gal_age = [0.0, 14.0]
         state.flush()
 
     # ------------------------------------------------------------------
@@ -709,7 +834,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         # FoF links connect halos — hide them whenever halos are hidden.
         should_show_fof = bool(halos_visible) and bool(state.fof_links_on)
         if should_show_fof:
-            _sync_fof_layer()   # update masks before the visible setter triggers _rebuild
+            _sync_fof_layer()  # update masks before the visible setter triggers _rebuild
         scene.primary.fof_layer.visible = should_show_fof
         _push()
 
@@ -755,6 +880,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def on_halo_cmap(halo_colormap, **_):
         scene.halo_layer.colormap = halo_colormap
         from sage_viewer.utils.colormap import cmap_css_gradient
+
         state.halo_cbar_style = _cbar_style(cmap_css_gradient(halo_colormap))
         _push()
 
@@ -762,6 +888,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def on_galaxy_cmap(galaxy_colormap, **_):
         scene.galaxy_layer.colormap = galaxy_colormap
         from sage_viewer.utils.colormap import cmap_css_gradient
+
         state.gal_cbar_style = _cbar_style(cmap_css_gradient(galaxy_colormap))
         _push()
 
@@ -769,12 +896,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # Interactive draw-widget storage (one slot each; only one active at a time)
     # ------------------------------------------------------------------
 
-    _draw_sphere_widget:  list = [None]   # vtkSphereWidget or None
-    _draw_sphere_actor:   list = [None]   # custom 5-ring mesh actor or None
-    _draw_box_widget:     list = [None]   # vtkBoxWidget or None
-    _box_cam_obs_tag:     list = [None]   # (widget, w_tag, cam, cam_tag) or None
-    _handle_world_r:      list = [None]   # fixed world-space handle radius
-    _box_handle_sources:  list = [[]]     # vtkSphereSource objects for the 7 handle spheres
+    _draw_sphere_widget: list = [None]  # vtkSphereWidget or None
+    _draw_sphere_actor: list = [None]  # custom 5-ring mesh actor or None
+    _draw_box_widget: list = [None]  # vtkBoxWidget or None
+    _box_cam_obs_tag: list = [None]  # (widget, w_tag, cam, cam_tag) or None
+    _handle_world_r: list = [None]  # fixed world-space handle radius
+    _box_handle_sources: list = [
+        []
+    ]  # vtkSphereSource objects for the 7 handle spheres
 
     def _remove_sphere_actor() -> None:
         if _draw_sphere_actor[0] is not None:
@@ -837,15 +966,22 @@ def build_navigation_panel(server, scene: Scene) -> None:
         """Draw 5 great-circle rings identical to _add_sphere_indicator."""
         import numpy as _np2
         import pyvista as _pv2
+
         _remove_sphere_actor()
-        cx2 = float(center[0]); cy2 = float(center[1]); cz2 = float(center[2])
+        cx2 = float(center[0])
+        cy2 = float(center[1])
+        cz2 = float(center[2])
         r2 = max(0.01, float(radius))
         t = _np2.linspace(0.0, 2.0 * _np2.pi, 64, dtype=_np2.float64)
         c2, s2 = _np2.cos(t) * r2, _np2.sin(t) * r2
-        rings = [_np2.column_stack([cx2 + c2, cy2 + s2, _np2.full_like(c2, cz2)])]
+        rings = [
+            _np2.column_stack([cx2 + c2, cy2 + s2, _np2.full_like(c2, cz2)])
+        ]
         for deg in (0.0, 45.0, 90.0, 135.0):
             ca, sa = _np2.cos(_np2.deg2rad(deg)), _np2.sin(_np2.deg2rad(deg))
-            rings.append(_np2.column_stack([cx2 + c2 * ca, cy2 + c2 * sa, cz2 + s2]))
+            rings.append(
+                _np2.column_stack([cx2 + c2 * ca, cy2 + c2 * sa, cz2 + s2])
+            )
         all_pts = _np2.vstack(rings)
         n = len(t)
         lines = []
@@ -857,8 +993,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
         poly.verts = _np2.empty(0, dtype=_np2.int64)
         poly.lines = _np2.array(lines, dtype=_np2.int64)
         _draw_sphere_actor[0] = scene.plotter.add_mesh(
-            poly, color="cyan", opacity=0.9, line_width=2,
-            style="wireframe", render_points_as_spheres=False, point_size=0,
+            poly,
+            color="cyan",
+            opacity=0.9,
+            line_width=2,
+            style="wireframe",
+            render_points_as_spheres=False,
+            point_size=0,
         )
         try:
             _draw_sphere_actor[0].GetProperty().SetRenderPointsAsSpheres(False)
@@ -898,7 +1039,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def on_go_to_halo():
         try:
             idx = int(state.nav_halo_idx)
-            d   = float(state.nav_distance)
+            d = float(state.nav_distance)
             scene.camera.go_to_halo(idx, d)
             # Always engage focus on Go (user can toggle it off afterwards)
             pos = scene.camera._halo_index.position_of(idx)
@@ -925,15 +1066,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     @ctrl.set("go_to_galaxy_1")
     def on_go_to_galaxy_1():
-        _go_to_galaxy_at_radius(3.0)    # 3 Mpc/h
+        _go_to_galaxy_at_radius(3.0)  # 3 Mpc/h
 
     @ctrl.set("go_to_galaxy_3")
     def on_go_to_galaxy_3():
-        _go_to_galaxy_at_radius(5.0)    # 5 Mpc/h
+        _go_to_galaxy_at_radius(5.0)  # 5 Mpc/h
 
     @ctrl.set("go_to_galaxy_5")
     def on_go_to_galaxy_5():
-        _go_to_galaxy_at_radius(10.0)   # 10 Mpc/h
+        _go_to_galaxy_at_radius(10.0)  # 10 Mpc/h
 
     @ctrl.set("go_to_galaxy_enter")
     def on_go_to_galaxy_enter():
@@ -943,8 +1084,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def on_clear_indicator():
         scene.camera._clear_indicator()
         scene.camera._clear_member_indicators()
-        state.galinfo_show   = False
-        state.galinfo_items  = []
+        state.galinfo_show = False
+        state.galinfo_items = []
         state.groupinfo_show = False
         state.groupinfo_items = []
         state.flush()
@@ -956,7 +1097,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         # Only actually visible when halos are also shown
         actual_vis = new_state and bool(state.halos_visible)
         if actual_vis:
-            _sync_fof_layer()   # update masks before enabling so first render is correct
+            _sync_fof_layer()  # update masks before enabling so first render is correct
         scene.set_fof_links_visible(actual_vis)
         state.fof_links_on = new_state
         state.flush()
@@ -1021,14 +1162,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
             t = _fly_task[0]
             if t and not t.done():
                 t.cancel()
-            _push()   # confirm final stopped position to the client
+            _push()  # confirm final stopped position to the client
 
     @ctrl.set("go_to_env_halo")
     def on_go_to_env_halo():
         """Fly to the chosen halo and snap nav_gal_idx to the FOF central there."""
         try:
             hidx = int(state.nav_halo_idx)
-            d    = float(state.nav_distance)
+            d = float(state.nav_distance)
         except (TypeError, ValueError):
             return
         halos, galaxies = scene._loader.get(scene.current_snap)
@@ -1041,6 +1182,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         scene.camera.go_to_halo(hidx, d)
         # Resolve to nearest galaxy so Group Info / Highlight Members work
         import numpy as np
+
         if galaxies.count > 0:
             d2 = np.sum((galaxies.positions - np.array(halo_pos)) ** 2, axis=1)
             state.nav_gal_idx = int(np.argmin(d2))
@@ -1056,6 +1198,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @ctrl.set("show_galaxy_info")
     def on_show_galaxy_info():
         from sage_viewer.utils.galaxy_info import build_galaxy_info
+
         try:
             gidx = int(state.nav_gal_idx)
         except (TypeError, ValueError):
@@ -1072,8 +1215,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
             snap_table=scene._snap_table,
             hubble_h=scene._cfg.hubble_h,
         )
-        state.galinfo_items = [{"label": k, "value": v} for k, v in info.items()]
-        state.galinfo_show  = True
+        state.galinfo_items = [
+            {"label": k, "value": v} for k, v in info.items()
+        ]
+        state.galinfo_show = True
         # Close any other right-side overlay
         state.groupinfo_show = False
         state.flush()
@@ -1088,13 +1233,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
         """Return (central_position, group_extent_mpch, central_idx_in_galaxies)."""
         import numpy as np
         from sage_viewer.utils.group_info import member_indices
+
         members = member_indices(galaxies, gidx)
         if len(members) == 0:
             return None, 0.0, -1
         pos = galaxies.positions[members]
-        gt  = galaxies.gal_type[members]
+        gt = galaxies.gal_type[members]
         # Prefer the type==0 central; fall back to the geometric centre
-        central_mask = (gt == 0)
+        central_mask = gt == 0
         if central_mask.any():
             central_idx_local = int(np.argmax(central_mask))
             central_pos = pos[central_idx_local]
@@ -1102,13 +1248,18 @@ def build_navigation_panel(server, scene: Scene) -> None:
         else:
             central_pos = pos.mean(axis=0)
             central_idx = -1
-        extent = float(np.linalg.norm(pos - central_pos, axis=1).max()) if len(pos) else 0.0
+        extent = (
+            float(np.linalg.norm(pos - central_pos, axis=1).max())
+            if len(pos)
+            else 0.0
+        )
         return central_pos, extent, central_idx
 
     @ctrl.set("show_group_info")
     def on_show_group_info():
         from sage_viewer.utils.group_info import build_group_info
         import numpy as np
+
         try:
             gidx = int(state.nav_gal_idx)
         except (TypeError, ValueError):
@@ -1122,17 +1273,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
             idx=gidx,
             hubble_h=scene._cfg.hubble_h,
         )
-        state.groupinfo_items = [{"label": k, "value": v} for k, v in info.items()]
-        state.groupinfo_show  = True
+        state.groupinfo_items = [
+            {"label": k, "value": v} for k, v in info.items()
+        ]
+        state.groupinfo_show = True
         # Mutually exclusive with the other right-side overlays
-        state.galinfo_show    = False
+        state.galinfo_show = False
 
         # Place the standard small red circle on the FOF central — same
         # indicator style used by the Galaxy info action.
-        central_pos, _extent, _central_idx = _find_central_pos_and_extent(galaxies, gidx)
+        central_pos, _extent, _central_idx = _find_central_pos_and_extent(
+            galaxies, gidx
+        )
         if central_pos is not None:
             scene.camera._add_circle_indicator(
-                (float(central_pos[0]), float(central_pos[1]), float(central_pos[2])),
+                (
+                    float(central_pos[0]),
+                    float(central_pos[1]),
+                    float(central_pos[2]),
+                ),
                 0.0,
             )
         state.flush()
@@ -1149,15 +1308,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # ------------------------------------------------------------------
 
     state.export_dialog_show = False
-    state.export_scope        = "filters"   # filters|target|group|coords|box
-    state.export_format       = "csv"       # csv|hdf5|fits|txt
-    state.export_filename     = ""          # optional custom stem
-    state.export_status       = ""          # last result path or error
-    state.export_busy         = False
+    state.export_scope = "filters"  # filters|target|group|coords|box
+    state.export_format = "csv"  # csv|hdf5|fits|txt
+    state.export_filename = ""  # optional custom stem
+    state.export_status = ""  # last result path or error
+    state.export_busy = False
 
     def _resolve_export_indices(scope: str) -> tuple:  # noqa: F821
         """Return (gal_indices_into_snapshot, scope_bounds_dict)."""
         import numpy as np
+
         _, galaxies = scene._loader.get(scene.current_snap)
         if galaxies.count == 0:
             raise ValueError("No galaxies loaded.")
@@ -1169,14 +1329,21 @@ def build_navigation_panel(server, scene: Scene) -> None:
             pos = galaxies.positions[idx]
             bounds = {
                 "galaxy_index_in_snapshot": idx,
-                "position_x_Mpch": np.format_float_positional(float(pos[0]), unique=True, trim="-"),
-                "position_y_Mpch": np.format_float_positional(float(pos[1]), unique=True, trim="-"),
-                "position_z_Mpch": np.format_float_positional(float(pos[2]), unique=True, trim="-"),
+                "position_x_Mpch": np.format_float_positional(
+                    float(pos[0]), unique=True, trim="-"
+                ),
+                "position_y_Mpch": np.format_float_positional(
+                    float(pos[1]), unique=True, trim="-"
+                ),
+                "position_z_Mpch": np.format_float_positional(
+                    float(pos[2]), unique=True, trim="-"
+                ),
             }
             return np.array([idx], dtype=np.int64), bounds
 
         if scope == "group":
             from sage_viewer.utils.group_info import member_indices
+
             idx = int(state.nav_gal_idx)
             members = member_indices(galaxies, idx)
             if len(members) == 0:
@@ -1185,24 +1352,38 @@ def build_navigation_panel(server, scene: Scene) -> None:
             bounds = {
                 "central_galaxy_index_in_snapshot": idx,
                 "n_members": len(members),
-                "central_position_x_Mpch": np.format_float_positional(float(central_pos[0]), unique=True, trim="-"),
-                "central_position_y_Mpch": np.format_float_positional(float(central_pos[1]), unique=True, trim="-"),
-                "central_position_z_Mpch": np.format_float_positional(float(central_pos[2]), unique=True, trim="-"),
+                "central_position_x_Mpch": np.format_float_positional(
+                    float(central_pos[0]), unique=True, trim="-"
+                ),
+                "central_position_y_Mpch": np.format_float_positional(
+                    float(central_pos[1]), unique=True, trim="-"
+                ),
+                "central_position_z_Mpch": np.format_float_positional(
+                    float(central_pos[2]), unique=True, trim="-"
+                ),
             }
             return members.astype(np.int64), bounds
 
         if scope == "coords":
-            cx, cy, cz = float(state.nav_x), float(state.nav_y), float(state.nav_z)
+            cx, cy, cz = (
+                float(state.nav_x),
+                float(state.nav_y),
+                float(state.nav_z),
+            )
             r = float(state.nav_distance)
-            d2 = np.sum((galaxies.positions - np.array([cx, cy, cz])) ** 2, axis=1)
+            d2 = np.sum(
+                (galaxies.positions - np.array([cx, cy, cz])) ** 2, axis=1
+            )
             mask = d2 <= r * r
             if not mask.any():
-                raise ValueError(f"No galaxies within {r} Mpc/h of ({cx:.1f},{cy:.1f},{cz:.1f}).")
+                raise ValueError(
+                    f"No galaxies within {r} Mpc/h of ({cx:.1f},{cy:.1f},{cz:.1f})."
+                )
             bounds = {
                 "sphere_center_x_Mpch": cx,
                 "sphere_center_y_Mpch": cy,
                 "sphere_center_z_Mpch": cz,
-                "sphere_radius_Mpch":   r,
+                "sphere_radius_Mpch": r,
             }
             return np.where(mask)[0].astype(np.int64), bounds
 
@@ -1212,16 +1393,22 @@ def build_navigation_panel(server, scene: Scene) -> None:
             ymin, ymax = float(state.nav_box_ymin), float(state.nav_box_ymax)
             zmin, zmax = float(state.nav_box_zmin), float(state.nav_box_zmax)
             mask = (
-                (pos[:, 0] >= xmin) & (pos[:, 0] <= xmax) &
-                (pos[:, 1] >= ymin) & (pos[:, 1] <= ymax) &
-                (pos[:, 2] >= zmin) & (pos[:, 2] <= zmax)
+                (pos[:, 0] >= xmin)
+                & (pos[:, 0] <= xmax)
+                & (pos[:, 1] >= ymin)
+                & (pos[:, 1] <= ymax)
+                & (pos[:, 2] >= zmin)
+                & (pos[:, 2] <= zmax)
             )
             if not mask.any():
                 raise ValueError("No galaxies within the current box bounds.")
             bounds = {
-                "box_xmin_Mpch": xmin, "box_xmax_Mpch": xmax,
-                "box_ymin_Mpch": ymin, "box_ymax_Mpch": ymax,
-                "box_zmin_Mpch": zmin, "box_zmax_Mpch": zmax,
+                "box_xmin_Mpch": xmin,
+                "box_xmax_Mpch": xmax,
+                "box_ymin_Mpch": ymin,
+                "box_ymax_Mpch": ymax,
+                "box_zmin_Mpch": zmin,
+                "box_zmax_Mpch": zmax,
             }
             return np.where(mask)[0].astype(np.int64), bounds
 
@@ -1238,19 +1425,20 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     _SCOPE_LABELS = {
         "filters": "Current Filters",
-        "target":  "Target Galaxy",
-        "group":   "Group Members",
-        "coords":  "Coords Sphere",
-        "box":     "Box Region",
+        "target": "Target Galaxy",
+        "group": "Group Members",
+        "coords": "Coords Sphere",
+        "box": "Box Region",
     }
 
     @ctrl.set("do_export")
     async def on_do_export():
         import asyncio, pathlib, datetime
-        scope  = str(state.export_scope)
-        fmt    = str(state.export_format)
-        stem   = str(state.export_filename or "").strip()
-        state.export_busy   = True
+
+        scope = str(state.export_scope)
+        fmt = str(state.export_format)
+        stem = str(state.export_filename or "").strip()
+        state.export_busy = True
         state.export_status = "Exporting…"
         state.flush()
 
@@ -1259,21 +1447,31 @@ def build_navigation_panel(server, scene: Scene) -> None:
             _, galaxies = scene._loader.get(scene.current_snap)
             sage_idx = galaxies.sage_indices[gal_indices]
 
-            cfg       = scene.primary.cfg
-            snap_tbl  = scene.primary.snap_table
+            cfg = scene.primary.cfg
+            snap_tbl = scene.primary.snap_table
             hdf5_path = cfg.hdf5_path
-            snap_num  = scene.current_snap
-            snap_lbl  = str(state.snap_label) if hasattr(state, "snap_label") else f"snap{snap_num}"
+            snap_num = scene.current_snap
+            snap_lbl = (
+                str(state.snap_label)
+                if hasattr(state, "snap_label")
+                else f"snap{snap_num}"
+            )
 
             repo_root = pathlib.Path(__file__).resolve().parents[2]
-            out_dir   = repo_root / "sage_outputs" / "catalogues"
+            out_dir = repo_root / "sage_outputs" / "catalogues"
             if not stem:
-                ts   = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 stem = f"catalogue_{scope}_{ts}"
-            exts = {"csv": ".csv", "hdf5": ".h5", "fits": ".fits", "txt": ".txt"}
+            exts = {
+                "csv": ".csv",
+                "hdf5": ".h5",
+                "fits": ".fits",
+                "txt": ".txt",
+            }
             out_path = out_dir / f"{stem}{exts.get(fmt, '.csv')}"
 
             from sage_viewer.utils.catalogue import write_catalogue
+
             result = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: write_catalogue(
@@ -1309,7 +1507,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # Cache the last-highlighted set so re-toggling re-shows the SAME
     # positions even if the snapshot or nav_gal_idx have drifted in between.
     _highlight_cache: dict = {
-        "positions": None, "regimes": None, "gidx": -1, "snap": -1, "central_idx": -1,
+        "positions": None,
+        "regimes": None,
+        "gidx": -1,
+        "snap": -1,
+        "central_idx": -1,
     }
 
     @ctrl.set("highlight_group_members")
@@ -1326,6 +1528,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         import numpy as np
         from sage_viewer.utils.group_info import member_indices
+
         try:
             gidx = int(state.nav_gal_idx)
         except (TypeError, ValueError):
@@ -1346,17 +1549,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 return
             # Find the FOF central (type 0); fall back to first member
             member_types = galaxies.gal_type[members]
-            central_mask = (member_types == 0)
-            central_idx = int(members[np.argmax(central_mask)]) if central_mask.any() else int(members[0])
+            central_mask = member_types == 0
+            central_idx = (
+                int(members[np.argmax(central_mask)])
+                if central_mask.any()
+                else int(members[0])
+            )
             # others excludes only the selected galaxy (central stays in for regime colouring)
             others = members[members != gidx]
             positions = galaxies.positions[others].copy()
-            has_regime = scene.primary.fields_available.get("cgm_regime", False)
-            regimes = galaxies.cgm_regime[others].copy() if has_regime else None
-            _highlight_cache["positions"]   = positions
-            _highlight_cache["regimes"]     = regimes
-            _highlight_cache["gidx"]        = gidx
-            _highlight_cache["snap"]        = cur_snap
+            has_regime = scene.primary.fields_available.get(
+                "cgm_regime", False
+            )
+            regimes = (
+                galaxies.cgm_regime[others].copy() if has_regime else None
+            )
+            _highlight_cache["positions"] = positions
+            _highlight_cache["regimes"] = regimes
+            _highlight_cache["gidx"] = gidx
+            _highlight_cache["snap"] = cur_snap
             _highlight_cache["central_idx"] = central_idx
 
         central_idx = _highlight_cache["central_idx"]
@@ -1371,9 +1582,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
         # Selected galaxy: gold if it IS the central, else regime colour
         if 0 <= gidx < galaxies.count:
             if gidx == central_idx:
-                cam._add_selected_indicator(galaxies.positions[gidx], color="gold")
+                cam._add_selected_indicator(
+                    galaxies.positions[gidx], color="gold"
+                )
             else:
-                has_regime = scene.primary.fields_available.get("cgm_regime", False)
+                has_regime = scene.primary.fields_available.get(
+                    "cgm_regime", False
+                )
                 regime = int(galaxies.cgm_regime[gidx]) if has_regime else None
                 cam._add_selected_indicator(galaxies.positions[gidx], regime)
         _push()
@@ -1383,8 +1598,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # ------------------------------------------------------------------
 
     _record_state: dict = {
-        "active": False, "dir": None, "frames": 0, "cb": None,
-        "fps": 10, "format": "gif", "scale": 1, "movie_base": "movie",
+        "active": False,
+        "dir": None,
+        "frames": 0,
+        "cb": None,
+        "fps": 10,
+        "format": "gif",
+        "scale": 1,
+        "movie_base": "movie",
     }
     _session_state: dict = {"dir": None}
 
@@ -1393,6 +1614,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def _get_session_dir() -> pathlib.Path:
         """Lazily create one session folder per app launch."""
         import datetime
+
         if _session_state["dir"] is None:
             ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             sess = _make_outdir("sage_outputs") / f"session_{ts}"
@@ -1403,12 +1625,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def _safe_label(label: str) -> str:
         """Sanitize a user-typed label into a safe filename fragment."""
         import re
+
         s = re.sub(r"[^\w\-]+", "_", str(label or "").strip())
         return s.strip("_")
 
     def _resolve_name(user_label: str, prefix: str) -> str:
         """Return '<prefix>_<label>' if labelled, else '<prefix>_<timestamp>'."""
         import datetime
+
         label = _safe_label(user_label)
         if label:
             return f"{prefix}_{label}"
@@ -1422,6 +1646,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         Using vtkWindowToImageFilter.SetScale produces tiled rendering that
         leaves a visible grid seam at the tile boundaries in the output."""
         import vtk
+
         rw = scene.plotter.ren_win
         prev = rw.GetOffScreenRendering()
         rw.SetOffScreenRendering(1)
@@ -1435,20 +1660,22 @@ def build_navigation_panel(server, scene: Scene) -> None:
             vimg = w2i.GetOutput()
             if scale <= 1:
                 return vimg
-            from vtkmodules.util.numpy_support import vtk_to_numpy, numpy_to_vtk
+            from vtkmodules.util.numpy_support import (
+                vtk_to_numpy,
+                numpy_to_vtk,
+            )
             import numpy as _np2
             from PIL import Image as _PIL2
+
             w, h, _ = vimg.GetDimensions()
-            arr = vtk_to_numpy(
-                vimg.GetPointData().GetScalars()
-            ).reshape(h, w, 3)[::-1]
+            arr = vtk_to_numpy(vimg.GetPointData().GetScalars()).reshape(
+                h, w, 3
+            )[::-1]
             try:
                 _resample = _PIL2.Resampling.LANCZOS
             except AttributeError:
                 _resample = _PIL2.LANCZOS
-            up = _PIL2.fromarray(arr).resize(
-                (w * scale, h * scale), _resample
-            )
+            up = _PIL2.fromarray(arr).resize((w * scale, h * scale), _resample)
             up_arr = _np2.asarray(up)[::-1].ravel().astype(_np2.uint8)
             vtk_data = numpy_to_vtk(
                 up_arr, deep=True, array_type=vtk.VTK_UNSIGNED_CHAR
@@ -1466,11 +1693,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
         from vtkmodules.util.numpy_support import vtk_to_numpy
         import numpy as _np2
         from PIL import Image as _PIL
+
         vimg = _capture_image(scale)
         w, h, _ = vimg.GetDimensions()
-        arr = vtk_to_numpy(
-            vimg.GetPointData().GetScalars()
-        ).reshape(h, w, 3)[::-1]
+        arr = vtk_to_numpy(vimg.GetPointData().GetScalars()).reshape(h, w, 3)[
+            ::-1
+        ]
         return _PIL.fromarray(arr.astype(_np2.uint8), "RGB")
 
     def _composite_overlays(pil_img):
@@ -1489,6 +1717,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         """Paste open library image cards at top-right, matching the UI position."""
         import base64 as _b64, io as _bio2
         from PIL import Image as _PIL2, ImageDraw as _ID2, ImageFont as _IF2
+
         W, H = pil_img.size
         card_max_w = min(540, int(W * 0.50))
         right_pad = 24
@@ -1522,11 +1751,22 @@ def build_navigation_panel(server, scene: Scene) -> None:
             cw, ch = iw + pad * 2, ih + hdr + pad
             card = _PIL2.new("RGBA", (cw, ch), (17, 24, 39, 235))
             draw = _ID2.Draw(card)
-            draw.rectangle([0, 0, cw - 1, ch - 1], outline=(55, 65, 81), width=1)
+            draw.rectangle(
+                [0, 0, cw - 1, ch - 1], outline=(55, 65, 81), width=1
+            )
             draw.rectangle([0, 0, cw - 1, hdr], fill=(26, 35, 53, 255))
-            draw.text((8, 10), (item.get("name") or "")[:50], fill=(226, 232, 240), font=_f)
+            draw.text(
+                (8, 10),
+                (item.get("name") or "")[:50],
+                fill=(226, 232, 240),
+                font=_f,
+            )
             card.paste(img, (pad, hdr + pad // 2), img)
-            base.paste(card, (max(0, W - right_pad - cw), max(0, 32 + i * stagger)), card)
+            base.paste(
+                card,
+                (max(0, W - right_pad - cw), max(0, 32 + i * stagger)),
+                card,
+            )
         return base.convert("RGB")
 
     def _draw_console_popout(pil_img):
@@ -1535,6 +1775,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         Matches the CSS: left:24, bottom:24, width≤560, height≤360."""
         from PIL import Image as _PIL, ImageDraw, ImageFont
         import platform
+
         W, H = pil_img.size
         pop_w = min(560, int(W * 0.60))
         pop_h = min(360, int(H * 0.55))
@@ -1544,7 +1785,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
         try:
             if platform.system() == "Darwin":
                 _font = ImageFont.truetype(
-                    "/System/Library/Fonts/Supplemental/Courier New.ttf", font_sz
+                    "/System/Library/Fonts/Supplemental/Courier New.ttf",
+                    font_sz,
                 )
             else:
                 _font = ImageFont.truetype("DejaVuSansMono.ttf", font_sz)
@@ -1552,12 +1794,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
             _font = ImageFont.load_default()
         overlay = _PIL.new("RGBA", (pop_w, pop_h), (13, 13, 26, 235))
         draw = ImageDraw.Draw(overlay)
-        draw.rectangle([0, 0, pop_w - 1, pop_h - 1], outline=(6, 182, 212), width=1)
+        draw.rectangle(
+            [0, 0, pop_w - 1, pop_h - 1], outline=(6, 182, 212), width=1
+        )
         title_h = 26
         draw.rectangle([1, 1, pop_w - 2, title_h], fill=(20, 20, 45, 255))
         draw.line([1, title_h, pop_w - 2, title_h], fill=(31, 41, 55, 255))
         cid = getattr(state, "console_active_id", 1)
-        draw.text((8, 6), f"CONSOLE  (Console {cid})", fill=(6, 182, 212), font=_font)
+        draw.text(
+            (8, 6), f"CONSOLE  (Console {cid})", fill=(6, 182, 212), font=_font
+        )
         pad_x, pad_y = 8, title_h + 6
         line_h = font_sz + 3
         max_visible = max(1, (pop_h - pad_y - 4) // line_h)
@@ -1573,7 +1819,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     lines.append((ol, (156, 163, 175)))
         visible = lines[-max_visible:]
         for i, (text, color) in enumerate(visible):
-            draw.text((pad_x, pad_y + i * line_h), text, fill=color, font=_font)
+            draw.text(
+                (pad_x, pad_y + i * line_h), text, fill=color, font=_font
+            )
         base = pil_img.convert("RGBA")
         base.paste(overlay, (pop_x, pop_y), overlay)
         return base.convert("RGB")
@@ -1581,6 +1829,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def _save_image(image, path) -> None:
         """Write a vtkImageData to disk; format inferred from extension."""
         import vtk
+
         ext = str(path).lower().rsplit(".", 1)[-1]
         if ext in ("jpg", "jpeg"):
             writer = vtk.vtkJPEGWriter()
@@ -1595,6 +1844,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     def _make_outdir(sub: str) -> pathlib.Path:
         import pathlib
+
         # Anchor outputs inside the SAGE-Viewer repo (gitignored)
         # __file__ = .../SAGE-Viewer/sage_viewer/ui/navigation_panel.py
         repo_root = pathlib.Path(__file__).resolve().parents[2]
@@ -1609,6 +1859,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             path = sess / f"{name}.{ext}"
             if path.exists():
                 import datetime
+
                 ts = datetime.datetime.now().strftime("%H%M%S")
                 path = sess / f"{name}_{ts}.{ext}"
             pf = str(getattr(state, "playback_frame", "") or "")
@@ -1616,6 +1867,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 import base64
                 import io as _io
                 from PIL import Image as _PIL
+
                 raw = base64.b64decode(pf.split(",", 1)[1])
                 pil = _PIL.open(_io.BytesIO(raw)).convert("RGB")
             else:
@@ -1653,7 +1905,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # Recording — PNG frames during playback, finalized to GIF/MOV at stop
     # ------------------------------------------------------------------
 
-    _record_task: list = [None]   # asyncio.Task | None
+    _record_task: list = [None]  # asyncio.Task | None
 
     async def _record_loop():
         """Capture frames for recording at the target FPS.
@@ -1674,7 +1926,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         record_interval = 1.0 / max(1, int(_record_state["fps"]))
         last_url: str | None = None
-        last_frame = None   # cached decoded PIL image — reused when URL unchanged
+        last_frame = (
+            None  # cached decoded PIL image — reused when URL unchanged
+        )
 
         try:
             while _record_state["active"]:
@@ -1745,6 +1999,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         if _record_state["active"]:
             return
         import asyncio
+
         sess = _get_session_dir()
         movie_base = _resolve_name(state.movie_label, "movie")
         # Frames go to a temp subdir prefixed with "_" inside the session.
@@ -1759,17 +2014,21 @@ def build_navigation_panel(server, scene: Scene) -> None:
         frames_dir.mkdir(parents=True, exist_ok=True)
 
         scale = _RES_SCALE.get(str(state.movie_resolution), 1)
-        fps   = max(1, int(state.movie_fps))
-        _record_state.update({
-            "active": True, "dir": frames_dir, "frames": 0,
-            "fps": fps,
-            "format": str(state.movie_format),
-            "scale": scale,
-            "movie_base": movie_base,
-            "session": sess,
-        })
+        fps = max(1, int(state.movie_fps))
+        _record_state.update(
+            {
+                "active": True,
+                "dir": frames_dir,
+                "frames": 0,
+                "fps": fps,
+                "format": str(state.movie_format),
+                "scale": scale,
+                "movie_base": movie_base,
+                "session": sess,
+            }
+        )
         state.recording_active = True
-        state.recording_dir    = str(frames_dir)
+        state.recording_dir = str(frames_dir)
         state.recording_frames = 0
         state.flush()
         # Schedule the capture loop as a separate task so this handler returns
@@ -1780,13 +2039,18 @@ def build_navigation_panel(server, scene: Scene) -> None:
         """Recursively remove a frames temp directory."""
         import pathlib
         import shutil
+
         try:
             shutil.rmtree(pathlib.Path(frames_dir))
         except OSError:
             pass
 
     def _finalize_movie(
-        frames_dir, session_dir, movie_base: str, fps: int, fmt: str,
+        frames_dir,
+        session_dir,
+        movie_base: str,
+        fps: int,
+        fmt: str,
         gif_loop: bool = True,
     ) -> str:
         """Convert PNG sequence in frames_dir → <session>/<movie_base>.<fmt>.
@@ -1794,6 +2058,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         On successful gif/mov, the temp frames dir is removed."""
         import subprocess
         import pathlib
+
         frames_dir = pathlib.Path(frames_dir)
         session_dir = pathlib.Path(session_dir)
 
@@ -1801,20 +2066,29 @@ def build_navigation_panel(server, scene: Scene) -> None:
             target = session_dir / movie_base
             if target.exists():
                 import datetime
-                target = session_dir / f"{movie_base}_{datetime.datetime.now():%H%M%S}"
+
+                target = (
+                    session_dir
+                    / f"{movie_base}_{datetime.datetime.now():%H%M%S}"
+                )
             frames_dir.rename(target)
             return str(target)
 
         out_path = session_dir / f"{movie_base}.{fmt}"
         if out_path.exists():
             import datetime
-            out_path = session_dir / f"{movie_base}_{datetime.datetime.now():%H%M%S}.{fmt}"
+
+            out_path = (
+                session_dir
+                / f"{movie_base}_{datetime.datetime.now():%H%M%S}.{fmt}"
+            )
 
         if fmt == "gif":
             try:
                 import imageio.v2 as imageio
                 import numpy as _np_gif
                 from PIL import Image as _PilGif
+
                 frames = sorted(frames_dir.glob("frame_*.jpg"))
                 if not frames:
                     _remove_dir(frames_dir)
@@ -1825,7 +2099,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 _f0.close()
                 ew = _w0 if _w0 % 2 == 0 else _w0 - 1
                 eh = _h0 if _h0 % 2 == 0 else _h0 - 1
-                need_crop = (ew != _w0 or eh != _h0)
+                need_crop = ew != _w0 or eh != _h0
                 imgs = []
                 for p in frames:
                     img = _PilGif.open(str(p)).convert("RGB")
@@ -1840,10 +2114,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         except AttributeError:
                             _gif_rs = _PilGif.LANCZOS
                         img = img.resize((ew, eh), _gif_rs)
-                    imgs.append(_np_gif.array(img))  # copy; allows img to be freed
+                    imgs.append(
+                        _np_gif.array(img)
+                    )  # copy; allows img to be freed
                     img.close()
                 # loop=0 = infinite, loop=1 = play once
-                imageio.mimsave(str(out_path), imgs, fps=fps, loop=0 if gif_loop else 1)
+                imageio.mimsave(
+                    str(out_path), imgs, fps=fps, loop=0 if gif_loop else 1
+                )
                 _remove_dir(frames_dir)
                 return str(out_path)
             except Exception as e:
@@ -1851,15 +2129,24 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         if fmt == "mov":
             cmd = [
-                "ffmpeg", "-y",
-                "-framerate", str(fps),
-                "-i", str(frames_dir / "frame_%05d.jpg"),
-                "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
+                "ffmpeg",
+                "-y",
+                "-framerate",
+                str(fps),
+                "-i",
+                str(frames_dir / "frame_%05d.jpg"),
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-vf",
+                "pad=ceil(iw/2)*2:ceil(ih/2)*2",
                 str(out_path),
             ]
             try:
-                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                proc = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=300
+                )
                 if proc.returncode != 0:
                     return f"ERROR (mov): ffmpeg returned {proc.returncode}: {proc.stderr[-300:]}"
                 _remove_dir(frames_dir)
@@ -1885,7 +2172,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
         # Finalize (imageio / ffmpeg) can take seconds — run in a thread so
         # the event loop stays responsive while encoding.
         import threading
-        snap = dict(_record_state)   # copy current state before thread starts
+
+        snap = dict(_record_state)  # copy current state before thread starts
+
         def _do_finalize():
             result = _finalize_movie(
                 frames_dir=snap["dir"],
@@ -1897,6 +2186,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             )
             state.last_movie = result
             state.flush()
+
         threading.Thread(target=_do_finalize, daemon=True).start()
 
     @ctrl.set("go_to_coords")
@@ -1911,8 +2201,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
             _remove_sphere_actor()
             state.draw_sphere_active = False
         x, y, z, d = (
-            float(state.nav_x), float(state.nav_y),
-            float(state.nav_z), float(state.nav_distance),
+            float(state.nav_x),
+            float(state.nav_y),
+            float(state.nav_z),
+            float(state.nav_distance),
         )
         scene.camera.zoom_to_radius((x, y, z), d)
         # Always engage focus on Go
@@ -1947,13 +2239,21 @@ def build_navigation_panel(server, scene: Scene) -> None:
             # A custom 5-ring mesh (identical to the Coords indicator sphere)
             # is drawn between them and rebuilt whenever either ball moves.
             import numpy as _np_ds
-            _cam_ds  = scene.plotter.camera
-            _fp_ds   = _cam_ds.focal_point
+
+            _cam_ds = scene.plotter.camera
+            _fp_ds = _cam_ds.focal_point
             cx, cy, cz = float(_fp_ds[0]), float(_fp_ds[1]), float(_fp_ds[2])
-            _cam_d_ds = float(_np_ds.linalg.norm(
-                _np_ds.array(_cam_ds.position) - _np_ds.array(_fp_ds)))
-            r = max(0.5, _cam_d_ds * float(_np_ds.tan(
-                _np_ds.deg2rad(_cam_ds.view_angle) / 2.0)) * 0.25)
+            _cam_d_ds = float(
+                _np_ds.linalg.norm(
+                    _np_ds.array(_cam_ds.position) - _np_ds.array(_fp_ds)
+                )
+            )
+            r = max(
+                0.5,
+                _cam_d_ds
+                * float(_np_ds.tan(_np_ds.deg2rad(_cam_ds.view_angle) / 2.0))
+                * 0.25,
+            )
             state.nav_x = round(cx, 3)
             state.nav_y = round(cy, 3)
             state.nav_z = round(cz, 3)
@@ -1965,10 +2265,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
             def _sphere_cb(point, index, widget):
                 import numpy as _np2
+
                 if index == 0:
                     # Centre ball moved — translate sphere.
                     _sc[0], _sc[1], _sc[2] = (
-                        float(point[0]), float(point[1]), float(point[2])
+                        float(point[0]),
+                        float(point[1]),
+                        float(point[2]),
                     )
                     state.nav_x = round(_sc[0], 2)
                     state.nav_y = round(_sc[1], 2)
@@ -1980,7 +2283,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         ww[1].Modified()
                 else:
                     # Edge ball moved — resize from distance to centre.
-                    p = _np2.array([float(point[0]), float(point[1]), float(point[2])])
+                    p = _np2.array(
+                        [float(point[0]), float(point[1]), float(point[2])]
+                    )
                     c = _np2.array(_sc)
                     _sr[0] = max(0.1, float(_np2.linalg.norm(p - c)))
                     state.nav_distance = round(_sr[0], 2)
@@ -2009,25 +2314,29 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def on_populate_coords_from_camera():
         """Fill the Coords fields with the current camera focal point + standoff."""
         import numpy as _np
+
         cam = scene.plotter.camera
-        fp  = _np.array(cam.focal_point, dtype=_np.float64)
-        pos = _np.array(cam.position,    dtype=_np.float64)
-        d   = float(_np.linalg.norm(pos - fp))
+        fp = _np.array(cam.focal_point, dtype=_np.float64)
+        pos = _np.array(cam.position, dtype=_np.float64)
+        d = float(_np.linalg.norm(pos - fp))
         state.nav_x = round(float(fp[0]), 3)
         state.nav_y = round(float(fp[1]), 3)
         state.nav_z = round(float(fp[2]), 3)
         # Standoff matches the current camera distance from the focal point.
-        state.nav_distance = round(d, 3) if d > 0 else float(state.nav_distance)
+        state.nav_distance = (
+            round(d, 3) if d > 0 else float(state.nav_distance)
+        )
         state.flush()
 
     @ctrl.set("populate_box_from_camera")
     def on_populate_box_from_camera():
         """Fill the Box fields with the axis-aligned bounding region currently in view."""
         import numpy as _np
+
         cam = scene.plotter.camera
-        fp  = _np.array(cam.focal_point, dtype=_np.float64)
-        pos = _np.array(cam.position,    dtype=_np.float64)
-        d   = float(_np.linalg.norm(pos - fp))
+        fp = _np.array(cam.focal_point, dtype=_np.float64)
+        pos = _np.array(cam.position, dtype=_np.float64)
+        d = float(_np.linalg.norm(pos - fp))
         # Half-extent at the focal plane = d * tan(FOV/2). Use that as the
         # cube half-width so the box roughly matches what's on screen.
         fov_rad = _np.deg2rad(cam.view_angle)
@@ -2084,13 +2393,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
         else:
             # Start — place an interactive box centred on the current view.
             import numpy as _np_db
-            _cam_db  = scene.plotter.camera
-            _fp_db   = _cam_db.focal_point
-            _cx, _cy, _cz = float(_fp_db[0]), float(_fp_db[1]), float(_fp_db[2])
-            _cam_d_db = float(_np_db.linalg.norm(
-                _np_db.array(_cam_db.position) - _np_db.array(_fp_db)))
-            _h = max(1.0, _cam_d_db * float(_np_db.tan(
-                _np_db.deg2rad(_cam_db.view_angle) / 2.0)) * 0.5)
+
+            _cam_db = scene.plotter.camera
+            _fp_db = _cam_db.focal_point
+            _cx, _cy, _cz = (
+                float(_fp_db[0]),
+                float(_fp_db[1]),
+                float(_fp_db[2]),
+            )
+            _cam_d_db = float(
+                _np_db.linalg.norm(
+                    _np_db.array(_cam_db.position) - _np_db.array(_fp_db)
+                )
+            )
+            _h = max(
+                1.0,
+                _cam_d_db
+                * float(_np_db.tan(_np_db.deg2rad(_cam_db.view_angle) / 2.0))
+                * 0.5,
+            )
             xmin, xmax = _cx - _h, _cx + _h
             ymin, ymax = _cy - _h, _cy + _h
             zmin, zmax = _cz - _h, _cz + _h
@@ -2135,7 +2456,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         _mp = _ac.GetMapper()
                         if _mp:
                             _s = _mp.GetInputAlgorithm()
-                            if _s and hasattr(_s, 'SetRadius'):
+                            if _s and hasattr(_s, "SetRadius"):
                                 _ids.add(id(_s))
                     return _ids
 
@@ -2158,9 +2479,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     _mp2 = _ac2.GetMapper()
                     if _mp2:
                         _s2 = _mp2.GetInputAlgorithm()
-                        if (_s2 and id(_s2) not in _pre_ids
-                                and hasattr(_s2, 'SetRadius')
-                                and hasattr(_s2, 'GetRadius')):
+                        if (
+                            _s2
+                            and id(_s2) not in _pre_ids
+                            and hasattr(_s2, "SetRadius")
+                            and hasattr(_s2, "GetRadius")
+                        ):
                             _new_srcs.append(_s2)
                 _box_handle_sources[0] = _new_srcs
                 _handle_world_r[0] = (
@@ -2219,7 +2543,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # ------------------------------------------------------------------
 
     from sage_viewer.utils.command_parser import (
-        CommandContext, execute_command,
+        CommandContext,
+        execute_command,
     )
     import subprocess as _subprocess
     import os as _os
@@ -2234,17 +2559,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         def __init__(self, cwd: str, env: dict) -> None:
             import pty as _pty, fcntl as _fcntl, struct as _struct, termios as _termios
+
             master_fd, slave_fd = _pty.openpty()
             try:
-                _fcntl.ioctl(slave_fd, _termios.TIOCSWINSZ,
-                             _struct.pack('HHHH', 24, 80, 0, 0))
+                _fcntl.ioctl(
+                    slave_fd,
+                    _termios.TIOCSWINSZ,
+                    _struct.pack("HHHH", 24, 80, 0, 0),
+                )
             except Exception:
                 pass
-            shell = env.get('SHELL', _os.environ.get('SHELL', '/bin/bash'))
+            shell = env.get("SHELL", _os.environ.get("SHELL", "/bin/bash"))
             self._proc = _subprocess.Popen(
-                [shell, '-l'],
-                stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
-                close_fds=True, cwd=str(cwd), env=env,
+                [shell, "-l"],
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                close_fds=True,
+                cwd=str(cwd),
+                env=env,
                 preexec_fn=_os.setsid,
             )
             _os.close(slave_fd)
@@ -2265,8 +2598,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
         def resize(self, rows: int, cols: int) -> None:
             try:
                 import fcntl as _fcntl2, struct as _struct2, termios as _termios2
-                _fcntl2.ioctl(self._fd, _termios2.TIOCSWINSZ,
-                              _struct2.pack('HHHH', rows, cols, 0, 0))
+
+                _fcntl2.ioctl(
+                    self._fd,
+                    _termios2.TIOCSWINSZ,
+                    _struct2.pack("HHHH", rows, cols, 0, 0),
+                )
             except Exception:
                 pass
 
@@ -2287,12 +2624,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def _make_console_data() -> dict:
         """Per-session state for one console: PTY terminal + SAGE command mode."""
         return {
-            "history":   [],
-            "input":     "",
-            "mode":      "terminal",
-            "prompt":    "$",
-            "pty":       None,   # _PTYSession, created lazily on first keystroke
-            "counter":   0,
+            "history": [],
+            "input": "",
+            "mode": "terminal",
+            "prompt": "$",
+            "pty": None,  # _PTYSession, created lazily on first keystroke
+            "counter": 0,
         }
 
     _consoles_data: dict[int, dict] = {1: _make_console_data()}
@@ -2321,34 +2658,36 @@ def build_navigation_panel(server, scene: Scene) -> None:
         if d is None:
             return
         d["history"] = list(state.console_history)
-        d["input"]   = state.console_input
+        d["input"] = state.console_input
 
     def _load_console(cid: int) -> None:
         """Push storage[cid] into the state vars and mark active."""
         d = _consoles_data.get(cid)
         if d is None:
             return
-        state.console_history   = list(d["history"])
-        state.console_input     = d["input"]
-        state.console_mode      = d["mode"]
-        state.console_prompt    = d["prompt"]
+        state.console_history = list(d["history"])
+        state.console_input = d["input"]
+        state.console_mode = d["mode"]
+        state.console_prompt = d["prompt"]
         state.console_active_id = cid
-        _active_console[0]      = cid
+        _active_console[0] = cid
         state.flush()
 
     # Mode + prompt initialised from the default console.
-    state.console_mode   = _consoles_data[1]["mode"]
+    state.console_mode = _consoles_data[1]["mode"]
     state.console_prompt = _consoles_data[1]["prompt"]
 
     def _push_history(prompt: str, cmd: str, out: str) -> None:
         d = _consoles_data[_active_console[0]]
         d["counter"] += 1
         history = list(state.console_history)
-        history.append({
-            "id":  d["counter"],
-            "cmd": f"{prompt} {cmd}" if cmd else prompt,
-            "out": _truncate(out) if out else "",
-        })
+        history.append(
+            {
+                "id": d["counter"],
+                "cmd": f"{prompt} {cmd}" if cmd else prompt,
+                "out": _truncate(out) if out else "",
+            }
+        )
         if len(history) > 200:
             history = history[-200:]
         state.console_history = history
@@ -2376,7 +2715,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             except (OSError, ValueError):
                 return b""
             if not r:
-                return None           # timeout — is_alive() re-checked by caller
+                return None  # timeout — is_alive() re-checked by caller
             try:
                 chunk = _os.read(fd, 4096)
             except OSError:
@@ -2400,21 +2739,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         async def _pump() -> None:
             loop = asyncio.get_running_loop()
-            seq  = 0
-            fd   = pty_sess.fd
+            seq = 0
+            fd = pty_sess.fd
             while pty_sess.is_alive():
                 try:
-                    data = await loop.run_in_executor(None, lambda: _read_chunk(fd))
+                    data = await loop.run_in_executor(
+                        None, lambda: _read_chunk(fd)
+                    )
                 except asyncio.CancelledError:
                     break
                 if data is None:
-                    continue          # select timeout — loop back and check is_alive
+                    continue  # select timeout — loop back and check is_alive
                 if not data:
-                    break             # fd closed / process exited
+                    break  # fd closed / process exited
                 seq += 1
                 if _active_console[0] == cid:
-                    state.pty_out_data = _base64.b64encode(data).decode('ascii')
-                    state.pty_out_seq  = seq
+                    state.pty_out_data = _base64.b64encode(data).decode(
+                        "ascii"
+                    )
+                    state.pty_out_seq = seq
                     state.flush()
 
         asyncio.ensure_future(_pump())
@@ -2422,23 +2765,26 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @ctrl.set("console_mode_sage")
     def on_console_mode_sage():
         d = _consoles_data[_active_console[0]]
-        d["mode"]   = "command"
+        d["mode"] = "command"
         d["prompt"] = "cmd>"
-        state.console_mode   = "command"
+        state.console_mode = "command"
         state.console_prompt = "cmd>"
-        _push_history("$", "sage",
+        _push_history(
+            "$",
+            "sage",
             "SAGE-Viewer command mode. "
             "Examples: 'show only clusters', 'go to halo 42', "
             "'snap 30', 'screenshot'. Type 'help' for the full "
-            "list, 'exit' to return to the terminal.")
+            "list, 'exit' to return to the terminal.",
+        )
         state.flush()
 
     @ctrl.set("console_mode_terminal")
     def on_console_mode_terminal():
         d = _consoles_data[_active_console[0]]
-        d["mode"]   = "terminal"
+        d["mode"] = "terminal"
         d["prompt"] = "$"
-        state.console_mode   = "terminal"
+        state.console_mode = "terminal"
         state.console_prompt = "$"
         state.flush()
         # PTY is created by pty_ensure_trigger fired from JS after xterm.js mounts.
@@ -2447,23 +2793,23 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def on_console_close_pty():
         """Kill the active PTY session and switch to SAGE command mode."""
         cid = _active_console[0]
-        d   = _consoles_data.get(cid)
+        d = _consoles_data.get(cid)
         if d is None:
             return
         pty_sess = d.get("pty")
         if pty_sess:
             pty_sess.close()
-        d["pty"]  = None
+        d["pty"] = None
         d["mode"] = "command"
         d["prompt"] = "cmd>"
-        state.console_mode   = "command"
+        state.console_mode = "command"
         state.console_prompt = "cmd>"
         state.flush()
 
     @ctrl.set("console_submit")
     async def on_console_submit():
         cid = _active_console[0]
-        d   = _consoles_data[cid]
+        d = _consoles_data[cid]
         cmd_raw = str(state.console_input or "")
 
         if d["mode"] == "terminal":
@@ -2477,9 +2823,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
         cmd = cmd_raw.rstrip()
         low = cmd.strip().lower()
         if low in ("exit", "quit", "terminal"):
-            d["mode"]   = "terminal"
+            d["mode"] = "terminal"
             d["prompt"] = "$"
-            state.console_mode   = "terminal"
+            state.console_mode = "terminal"
             state.console_prompt = "$"
             _push_history("cmd>", cmd, "(back to terminal)")
         else:
@@ -2533,7 +2879,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     pty_sess.close()
             except Exception:
                 pass
-        state.consoles_list = [c for c in state.consoles_list if c["id"] != cid]
+        state.consoles_list = [
+            c for c in state.consoles_list if c["id"] != cid
+        ]
         if _active_console[0] == cid:
             new_active = state.consoles_list[0]["id"]
             _load_console(new_active)
@@ -2550,19 +2898,20 @@ def build_navigation_panel(server, scene: Scene) -> None:
     # ------------------------------------------------------------------
 
     import pathlib as _pathlib
+
     _repo_root = _pathlib.Path(__file__).resolve().parents[2]
     _LIBRARY_DIR = _repo_root / "sage_library"
     _LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
 
     _MEDIA_EXTS = {
-        ".png":  ("image", "image/png"),
-        ".jpg":  ("image", "image/jpeg"),
+        ".png": ("image", "image/png"),
+        ".jpg": ("image", "image/jpeg"),
         ".jpeg": ("image", "image/jpeg"),
-        ".tif":  ("image", "image/tiff"),
+        ".tif": ("image", "image/tiff"),
         ".tiff": ("image", "image/tiff"),
-        ".gif":  ("image", "image/gif"),
-        ".mov":  ("video", "video/mp4"),    # MOV with H.264 ≈ MP4
-        ".mp4":  ("video", "video/mp4"),
+        ".gif": ("image", "image/gif"),
+        ".mov": ("video", "video/mp4"),  # MOV with H.264 ≈ MP4
+        ".mp4": ("video", "video/mp4"),
     }
 
     def _scan_library() -> list[dict]:
@@ -2586,14 +2935,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     rel = p.relative_to(_repo_root)
                 except ValueError:
                     rel = p
-                out.append({
-                    "name":     p.name,
-                    "rel":      str(rel),
-                    "path":     str(p),
-                    "kind":     kind,
-                    "ext":      ext.lstrip("."),
-                    "size_kb":  int(size_kb),
-                })
+                out.append(
+                    {
+                        "name": p.name,
+                        "rel": str(rel),
+                        "path": str(p),
+                        "kind": kind,
+                        "ext": ext.lstrip("."),
+                        "size_kb": int(size_kb),
+                    }
+                )
         return out
 
     @ctrl.set("library_refresh")
@@ -2602,11 +2953,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
         state.flush()
 
     _lib_id = [0]
-    _lib_items: list[dict] = []   # authoritative list; never read back from state proxy
+    _lib_items: list[dict] = (
+        []
+    )  # authoritative list; never read back from state proxy
 
     @ctrl.set("library_open")
     def on_library_open(path: str):
         import base64
+
         p = _pathlib.Path(path)
         if not p.is_file():
             return
@@ -2622,12 +2976,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
         _lib_id[0] += 1
         idx = len(_lib_items)
         new_item = {
-            "id":       _lib_id[0],
-            "name":     p.name,
-            "kind":     kind,
+            "id": _lib_id[0],
+            "name": p.name,
+            "kind": kind,
             "data_url": f"data:{mime};base64,{b64}{'#' + str(_lib_id[0]) if mime == 'image/gif' else ''}",
-            "top_px":   32  + (idx % 6) * 50,
-            "right_px": 24  + (idx % 6) * 44,
+            "top_px": 32 + (idx % 6) * 50,
+            "right_px": 24 + (idx % 6) * 44,
         }
         _lib_items.append(new_item)
         state.library_items = list(_lib_items)
@@ -2749,7 +3103,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
         _, galaxies = scene._loader.get(scene.current_snap)
         if gidx < 0 or gidx >= galaxies.count:
             return
-        cam._add_selected_indicator(galaxies.positions[gidx], color="limegreen")
+        cam._add_selected_indicator(
+            galaxies.positions[gidx], color="limegreen"
+        )
         _push()
 
     @ctrl.set("toggle_focus")
@@ -2784,7 +3140,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         elif tab == "environment":
             try:
                 hidx = int(state.nav_halo_idx)
-                d    = float(state.nav_distance)
+                d = float(state.nav_distance)
                 if 0 <= hidx < halos.count:
                     pos = scene.camera._halo_index.position_of(hidx)
                     scene.set_focus_sphere(
@@ -2795,9 +3151,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 pass
         elif tab == "box":
             try:
-                xmin, xmax = float(state.nav_box_xmin), float(state.nav_box_xmax)
-                ymin, ymax = float(state.nav_box_ymin), float(state.nav_box_ymax)
-                zmin, zmax = float(state.nav_box_zmin), float(state.nav_box_zmax)
+                xmin, xmax = float(state.nav_box_xmin), float(
+                    state.nav_box_xmax
+                )
+                ymin, ymax = float(state.nav_box_ymin), float(
+                    state.nav_box_ymax
+                )
+                zmin, zmax = float(state.nav_box_zmin), float(
+                    state.nav_box_zmax
+                )
                 scene.set_focus_box(xmin, xmax, ymin, ymax, zmin, zmax)
                 state.focus_active = True
             except Exception:
@@ -2832,9 +3194,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
         legacy callers can still pass `on_enter` and we'll keep that
         wired as a defensive backup."""
         kwargs = dict(
-            v_model=(v_model,), label=label,
-            type="number", hide_details=True,
-            variant="outlined", bg_color="#1a1a2e",
+            v_model=(v_model,),
+            label=label,
+            type="number",
+            hide_details=True,
+            variant="outlined",
+            bg_color="#1a1a2e",
             density="compact",
         )
         if on_enter is not None:
@@ -2865,27 +3230,36 @@ def build_navigation_panel(server, scene: Scene) -> None:
         with html.Div(style="display:none;"):
             for _dir in ("forward", "back", "left", "right", "up", "down"):
                 v3.VBtn(
-                    "", id=f"cam-press-{_dir}",
+                    "",
+                    id=f"cam-press-{_dir}",
                     click=(server.controller.cam_press, f"['{_dir}']"),
                 )
                 v3.VBtn(
-                    "", id=f"cam-release-{_dir}",
+                    "",
+                    id=f"cam-release-{_dir}",
                     click=(server.controller.cam_release, f"['{_dir}']"),
                 )
 
         # ── Reset + Focus + Centre ─────────────────────────────────
-        with v3.VSheet(color="transparent", style="padding:8px;flex-shrink:0;"):
+        with v3.VSheet(
+            color="transparent", style="padding:8px;flex-shrink:0;"
+        ):
             with v3.VRow(no_gutters=True, style="gap:6px;"):
                 with v3.VCol(style="padding:0;"):
                     v3.VBtn(
-                        "Reset Camera", block=True, variant="outlined",
-                        color="cyan", density="compact",
+                        "Reset Camera",
+                        block=True,
+                        variant="outlined",
+                        color="cyan",
+                        density="compact",
                         click=ctrl.reset_camera,
                     )
                 with v3.VCol(cols="auto", style="padding:0;"):
                     v3.VBtn(
-                        icon="mdi-target", variant="outlined",
-                        density="compact", click=ctrl.toggle_focus,
+                        icon="mdi-target",
+                        variant="outlined",
+                        density="compact",
+                        click=ctrl.toggle_focus,
                         color=("focus_active ? 'cyan' : 'white'",),
                         title="Focus",
                     )
@@ -2893,7 +3267,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VBtn(
                         icon="mdi-image-filter-center-focus",
                         variant="outlined",
-                        density="compact", click=ctrl.center_camera,
+                        density="compact",
+                        click=ctrl.center_camera,
                         color="white",
                         title="Place camera at box centre",
                     )
@@ -2914,18 +3289,19 @@ def build_navigation_panel(server, scene: Scene) -> None:
             ),
         ):
             for label, value in [
-                ("Structure",   "layers"),
-                ("Filters",     "filters"),
-                ("Record",      "record"),
-                ("Target",      "target"),
+                ("Structure", "layers"),
+                ("Filters", "filters"),
+                ("Record", "record"),
+                ("Target", "target"),
                 ("Environment", "environment"),
-                ("Coords",      "coords"),
-                ("Box",         "box"),
-                ("Console",     "console"),
-                ("Library",     "library"),
+                ("Coords", "coords"),
+                ("Box", "box"),
+                ("Console", "console"),
+                ("Library", "library"),
             ]:
                 v3.VBtn(
-                    label, value=value,
+                    label,
+                    value=value,
                     style=(
                         "flex:0 0 33.333%;font-size:0.72rem;letter-spacing:0;"
                         "min-width:0;height:34px;text-transform:none;"
@@ -2965,29 +3341,47 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VCheckbox(
-                        v_model=("halos_visible",), label="Visible",
-                        color="#c084fc", hide_details=True, density="compact",
+                        v_model=("halos_visible",),
+                        label="Visible",
+                        color="#c084fc",
+                        hide_details=True,
+                        density="compact",
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSlider(
-                        v_model=("halo_opacity",), label="Opacity",
-                        min=0.0, max=1.0, step=0.01,
-                        thumb_label=True, color="#c084fc", hide_details=True,
+                        v_model=("halo_opacity",),
+                        label="Opacity",
+                        min=0.0,
+                        max=1.0,
+                        step=0.01,
+                        thumb_label=True,
+                        color="#c084fc",
+                        hide_details=True,
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
-                        v_model=("halo_color_mode",), items=("halo_color_modes",),
-                        label="Colour by", hide_details=True,
-                        variant="outlined", color="#c084fc", density="compact",
+                        v_model=("halo_color_mode",),
+                        items=("halo_color_modes",),
+                        label="Colour by",
+                        hide_details=True,
+                        variant="outlined",
+                        color="#c084fc",
+                        density="compact",
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
-                        v_model=("halo_colormap",), items=(_CMAPS,),
-                        label="Colormap", hide_details=True,
-                        variant="outlined", color="#c084fc", density="compact",
+                        v_model=("halo_colormap",),
+                        items=(_CMAPS,),
+                        label="Colormap",
+                        hide_details=True,
+                        variant="outlined",
+                        color="#c084fc",
+                        density="compact",
                         disabled=("halo_color_mode === 'mvir'",),
                     )
-                with v3.VSheet(color="transparent", style="padding:4px 0 8px;"):
+                with v3.VSheet(
+                    color="transparent", style="padding:4px 0 8px;"
+                ):
                     with v3.VSheet(
                         color="transparent",
                         style="display:flex;align-items:center;gap:4px;",
@@ -2996,7 +3390,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             "{{ halo_cbar_min }}",
                             style="font-size:0.6rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
                         )
-                        v3.VSheet(style=("halo_cbar_style",), color="transparent")
+                        v3.VSheet(
+                            style=("halo_cbar_style",), color="transparent"
+                        )
                         v3.VLabel(
                             "{{ halo_cbar_max }}",
                             style="font-size:0.6rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
@@ -3013,33 +3409,51 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VCheckbox(
-                        v_model=("galaxies_visible",), label="Visible",
-                        color="#FFD700", hide_details=True, density="compact",
+                        v_model=("galaxies_visible",),
+                        label="Visible",
+                        color="#FFD700",
+                        hide_details=True,
+                        density="compact",
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSlider(
-                        v_model=("galaxy_opacity",), label="Opacity",
-                        min=0.0, max=1.0, step=0.01,
-                        thumb_label=True, color="#FFD700", hide_details=True,
+                        v_model=("galaxy_opacity",),
+                        label="Opacity",
+                        min=0.0,
+                        max=1.0,
+                        step=0.01,
+                        thumb_label=True,
+                        color="#FFD700",
+                        hide_details=True,
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
-                        v_model=("galaxy_color_mode",), items=("galaxy_color_modes",),
-                        label="Colour by", hide_details=True,
-                        variant="outlined", color="#FFD700", density="compact",
+                        v_model=("galaxy_color_mode",),
+                        items=("galaxy_color_modes",),
+                        label="Colour by",
+                        hide_details=True,
+                        variant="outlined",
+                        color="#FFD700",
+                        density="compact",
                     )
                 with v3.VSheet(color="transparent", style=_FIELD):
                     v3.VSelect(
-                        v_model=("galaxy_colormap",), items=(_CMAPS,),
-                        label="Colormap", hide_details=True,
-                        variant="outlined", color="#FFD700", density="compact",
+                        v_model=("galaxy_colormap",),
+                        items=(_CMAPS,),
+                        label="Colormap",
+                        hide_details=True,
+                        variant="outlined",
+                        color="#FFD700",
+                        density="compact",
                         # Structure mode is the bare composition (no outer
                         # property halo) — the colormap doesn't apply.
                         # For every other mode the colormap drives the
                         # outermost layer that sits around the envelope.
                         disabled=("galaxy_color_mode === 'structure'",),
                     )
-                with v3.VSheet(color="transparent", style="padding:4px 0 8px;"):
+                with v3.VSheet(
+                    color="transparent", style="padding:4px 0 8px;"
+                ):
                     with v3.VSheet(
                         color="transparent",
                         style="display:flex;align-items:center;gap:4px;",
@@ -3048,7 +3462,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             "{{ gal_cbar_min }}",
                             style="font-size:0.6rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
                         )
-                        v3.VSheet(style=("gal_cbar_style",), color="transparent")
+                        v3.VSheet(
+                            style=("gal_cbar_style",), color="transparent"
+                        )
                         v3.VLabel(
                             "{{ gal_cbar_max }}",
                             style="font-size:0.6rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
@@ -3058,8 +3474,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 v3.VBtn(
                     "Reset Opacities",
-                    block=True, variant="outlined",
-                    color="red", density="compact",
+                    block=True,
+                    variant="outlined",
+                    color="red",
+                    density="compact",
                     prepend_icon="mdi-restore",
                     click=ctrl.reset_opacities,
                 )
@@ -3077,17 +3495,26 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_halo_idx",  "Halo index",
+                    _tf(
+                        "nav_halo_idx",
+                        "Halo index",
                         on_enter=ctrl.go_to_halo,
-                        target_id="btn-target-halo-go")
+                        target_id="btn-target-halo-go",
+                    )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_distance",  "Standoff (Mpc/h)",
+                    _tf(
+                        "nav_distance",
+                        "Standoff (Mpc/h)",
                         on_enter=ctrl.go_to_halo,
-                        target_id="btn-target-halo-go")
+                        target_id="btn-target-halo-go",
+                    )
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
-                        "Go", block=True, color="#c084fc",
-                        density="compact", click=ctrl.go_to_halo,
+                        "Go",
+                        block=True,
+                        color="#c084fc",
+                        density="compact",
+                        click=ctrl.go_to_halo,
                         id="btn-target-halo-go",
                     )
 
@@ -3101,13 +3528,19 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_gal_idx", "Galaxy index",
+                    _tf(
+                        "nav_gal_idx",
+                        "Galaxy index",
                         on_enter=ctrl.go_to_galaxy_enter,
-                        target_id="btn-target-galaxy-go")
+                        target_id="btn-target-galaxy-go",
+                    )
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
-                        "Go", block=True, color="#FFD700",
-                        density="compact", click=ctrl.go_to_galaxy_enter,
+                        "Go",
+                        block=True,
+                        color="#FFD700",
+                        density="compact",
+                        click=ctrl.go_to_galaxy_enter,
                         id="btn-target-galaxy-go",
                     )
                 v3.VLabel(
@@ -3118,21 +3551,35 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 with v3.VBtnGroup(
-                    variant="outlined", density="compact",
+                    variant="outlined",
+                    density="compact",
                     style="width:100%;",
                 ):
-                    v3.VBtn("3",  style="flex:1;", color="#FFD700",
-                            click=ctrl.go_to_galaxy_1)
-                    v3.VBtn("5",  style="flex:1;", color="#FFD700",
-                            click=ctrl.go_to_galaxy_3)
-                    v3.VBtn("10", style="flex:1;", color="#FFD700",
-                            click=ctrl.go_to_galaxy_5)
+                    v3.VBtn(
+                        "3",
+                        style="flex:1;",
+                        color="#FFD700",
+                        click=ctrl.go_to_galaxy_1,
+                    )
+                    v3.VBtn(
+                        "5",
+                        style="flex:1;",
+                        color="#FFD700",
+                        click=ctrl.go_to_galaxy_3,
+                    )
+                    v3.VBtn(
+                        "10",
+                        style="flex:1;",
+                        color="#FFD700",
+                        click=ctrl.go_to_galaxy_5,
+                    )
 
                 v3.VDivider(style="margin:14px 0 10px;")
 
                 v3.VBtn(
                     "Galaxy Info",
-                    block=True, color="#FFD700",
+                    block=True,
+                    color="#FFD700",
                     density="compact",
                     prepend_icon="mdi-information-outline",
                     click=ctrl.show_galaxy_info,
@@ -3141,7 +3588,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 v3.VBtn(
                     "Highlight Galaxy",
-                    block=True, color="#FFD700", variant="outlined",
+                    block=True,
+                    color="#FFD700",
+                    variant="outlined",
                     density="compact",
                     prepend_icon="mdi-bullseye-arrow",
                     click=ctrl.highlight_galaxy,
@@ -3150,8 +3599,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 v3.VBtn(
                     "Clear Indicator",
-                    block=True, variant="outlined",
-                    color="red", density="compact",
+                    block=True,
+                    variant="outlined",
+                    color="red",
+                    density="compact",
                     prepend_icon="mdi-close-circle-outline",
                     click=ctrl.clear_indicator,
                 )
@@ -3169,17 +3620,26 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_halo_idx", "Halo index",
+                    _tf(
+                        "nav_halo_idx",
+                        "Halo index",
                         on_enter=ctrl.go_to_env_halo,
-                        target_id="btn-env-go")
+                        target_id="btn-env-go",
+                    )
                 with v3.VSheet(color="transparent", style=_FIELD):
-                    _tf("nav_distance", "Standoff (Mpc/h)",
+                    _tf(
+                        "nav_distance",
+                        "Standoff (Mpc/h)",
                         on_enter=ctrl.go_to_env_halo,
-                        target_id="btn-env-go")
+                        target_id="btn-env-go",
+                    )
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
-                        "Go", block=True, color="#c084fc",
-                        density="compact", click=ctrl.go_to_env_halo,
+                        "Go",
+                        block=True,
+                        color="#c084fc",
+                        density="compact",
+                        click=ctrl.go_to_env_halo,
                         id="btn-env-go",
                     )
 
@@ -3203,7 +3663,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VCheckbox(
                     v_model=("env_show_field",),
                     label="Field",
-                    hide_details=True, density="compact",
+                    hide_details=True,
+                    density="compact",
                     color="cyan",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
@@ -3211,7 +3672,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VCheckbox(
                     v_model=("env_show_isolated",),
                     label="Isolated",
-                    hide_details=True, density="compact",
+                    hide_details=True,
+                    density="compact",
                     color="cyan",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
@@ -3219,7 +3681,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VCheckbox(
                     v_model=("env_show_pairs",),
                     label="Pairs",
-                    hide_details=True, density="compact",
+                    hide_details=True,
+                    density="compact",
                     color="cyan",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
@@ -3227,7 +3690,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VCheckbox(
                     v_model=("env_show_group",),
                     label="Groups",
-                    hide_details=True, density="compact",
+                    hide_details=True,
+                    density="compact",
                     color="cyan",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
@@ -3235,7 +3699,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VCheckbox(
                     v_model=("env_show_cluster",),
                     label="Clusters",
-                    hide_details=True, density="compact",
+                    hide_details=True,
+                    density="compact",
                     color="cyan",
                     disabled=("!model_fields.central_mvir",),
                     style=_ENV_CB_STYLE,
@@ -3245,7 +3710,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 v3.VBtn(
                     "Group Info",
-                    block=True, color="#c084fc",
+                    block=True,
+                    color="#c084fc",
                     density="compact",
                     prepend_icon="mdi-account-group-outline",
                     click=ctrl.show_group_info,
@@ -3253,7 +3719,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VBtn(
                     "Highlight Members",
-                    block=True, color="#c084fc", variant="outlined",
+                    block=True,
+                    color="#c084fc",
+                    variant="outlined",
                     density="compact",
                     prepend_icon="mdi-bullseye-arrow",
                     click=ctrl.highlight_group_members,
@@ -3261,7 +3729,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VBtn(
                     "{{ fof_links_on ? 'FoF Links: On' : 'FoF Links: Off' }}",
-                    block=True, density="compact",
+                    block=True,
+                    density="compact",
                     variant=("fof_links_on ? 'flat' : 'outlined'",),
                     color="#FFD700",
                     prepend_icon="mdi-vector-polyline",
@@ -3270,8 +3739,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VBtn(
                     "Clear",
-                    block=True, variant="outlined",
-                    color="red", density="compact",
+                    block=True,
+                    variant="outlined",
+                    color="red",
+                    density="compact",
                     prepend_icon="mdi-close-circle-outline",
                     click=ctrl.clear_indicator,
                 )
@@ -3285,15 +3756,20 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ("X (Mpc/h)", "nav_x"),
                     ("Y (Mpc/h)", "nav_y"),
                     ("Z (Mpc/h)", "nav_z"),
-                    ("Standoff",  "nav_distance"),
+                    ("Standoff", "nav_distance"),
                 ]:
                     with v3.VSheet(color="transparent", style=_FIELD):
-                        _tf(key, label, on_enter=ctrl.go_to_coords,
-                            target_id="btn-coords-go")
+                        _tf(
+                            key,
+                            label,
+                            on_enter=ctrl.go_to_coords,
+                            target_id="btn-coords-go",
+                        )
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
                         "{{ draw_sphere_active ? 'Lock Sphere' : 'Draw Sphere' }}",
-                        block=True, variant="outlined",
+                        block=True,
+                        variant="outlined",
                         color=("draw_sphere_active ? 'orange' : 'cyan'",),
                         density="compact",
                         prepend_icon=(
@@ -3308,21 +3784,30 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         style="margin-bottom:6px;",
                     )
                     v3.VBtn(
-                        "Use Current Position", block=True, variant="outlined",
-                        color="cyan", density="compact",
+                        "Use Current Position",
+                        block=True,
+                        variant="outlined",
+                        color="cyan",
+                        density="compact",
                         prepend_icon="mdi-crosshairs-gps",
                         click=ctrl.populate_coords_from_camera,
                         style="margin-bottom:6px;",
                     )
                     v3.VBtn(
-                        "Zoom", block=True, color="cyan",
-                        density="compact", click=ctrl.go_to_coords,
+                        "Zoom",
+                        block=True,
+                        color="cyan",
+                        density="compact",
+                        click=ctrl.go_to_coords,
                         id="btn-coords-go",
                         style="margin-bottom:6px;",
                     )
                     v3.VBtn(
-                        "Clear", block=True, variant="outlined",
-                        color="#ef4444", density="compact",
+                        "Clear",
+                        block=True,
+                        variant="outlined",
+                        color="#ef4444",
+                        density="compact",
                         prepend_icon="mdi-close-circle-outline",
                         click=ctrl.clear_draw_sphere,
                         title="Cancel the active Draw Sphere widget",
@@ -3335,17 +3820,25 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v_show=("nav_active_tab === 'box'",),
             ):
                 for label, key in [
-                    ("X min", "nav_box_xmin"), ("X max", "nav_box_xmax"),
-                    ("Y min", "nav_box_ymin"), ("Y max", "nav_box_ymax"),
-                    ("Z min", "nav_box_zmin"), ("Z max", "nav_box_zmax"),
+                    ("X min", "nav_box_xmin"),
+                    ("X max", "nav_box_xmax"),
+                    ("Y min", "nav_box_ymin"),
+                    ("Y max", "nav_box_ymax"),
+                    ("Z min", "nav_box_zmin"),
+                    ("Z max", "nav_box_zmax"),
                 ]:
                     with v3.VSheet(color="transparent", style=_FIELD):
-                        _tf(key, label, on_enter=ctrl.zoom_to_box,
-                            target_id="btn-box-zoom")
+                        _tf(
+                            key,
+                            label,
+                            on_enter=ctrl.zoom_to_box,
+                            target_id="btn-box-zoom",
+                        )
                 with v3.VSheet(color="transparent", style=_BTN):
                     v3.VBtn(
                         "{{ draw_box_active ? 'Lock Box' : 'Draw Box' }}",
-                        block=True, variant="outlined",
+                        block=True,
+                        variant="outlined",
                         color=("draw_box_active ? 'orange' : 'cyan'",),
                         density="compact",
                         prepend_icon=(
@@ -3360,21 +3853,30 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         style="margin-bottom:6px;",
                     )
                     v3.VBtn(
-                        "Use Current View", block=True, variant="outlined",
-                        color="cyan", density="compact",
+                        "Use Current View",
+                        block=True,
+                        variant="outlined",
+                        color="cyan",
+                        density="compact",
                         prepend_icon="mdi-crosshairs-gps",
                         click=ctrl.populate_box_from_camera,
                         style="margin-bottom:6px;",
                     )
                     v3.VBtn(
-                        "Zoom", block=True, color="cyan",
-                        density="compact", click=ctrl.zoom_to_box,
+                        "Zoom",
+                        block=True,
+                        color="cyan",
+                        density="compact",
+                        click=ctrl.zoom_to_box,
                         id="btn-box-zoom",
                         style="margin-bottom:6px;",
                     )
                     v3.VBtn(
-                        "Clear", block=True, variant="outlined",
-                        color="#ef4444", density="compact",
+                        "Clear",
+                        block=True,
+                        variant="outlined",
+                        color="#ef4444",
+                        density="compact",
                         prepend_icon="mdi-close-circle-outline",
                         click=ctrl.clear_draw_box,
                         title="Cancel the active Draw Box widget",
@@ -3427,12 +3929,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             "{{ c.title }}",
                             size="x-small",
                             density="compact",
-                            variant=("console_active_id === c.id ? 'flat' "
-                                     ": 'outlined'",),
-                            color=("console_active_id === c.id ? 'cyan' "
-                                   ": '#6b7280'",),
-                            click=("trigger('console_switch_trigger', "
-                                   "[c.id])"),
+                            variant=(
+                                "console_active_id === c.id ? 'flat' "
+                                ": 'outlined'",
+                            ),
+                            color=(
+                                "console_active_id === c.id ? 'cyan' "
+                                ": '#6b7280'",
+                            ),
+                            click=(
+                                "trigger('console_switch_trigger', " "[c.id])"
+                            ),
                             style=(
                                 "text-transform:none;font-size:0.62rem;"
                                 "min-width:0;padding:0 8px;height:22px;"
@@ -3445,8 +3952,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             variant="text",
                             color="#6b7280",
                             v_show=("consoles_list.length > 1",),
-                            click=("trigger('console_close_trigger', "
-                                   "[c.id])"),
+                            click=(
+                                "trigger('console_close_trigger', " "[c.id])"
+                            ),
                             style="min-width:18px;padding:0;height:22px;",
                         )
                     v3.VBtn(
@@ -3461,9 +3969,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     )
                     # Mode selector — terminal (>_) and SAGE command mode (cmd).
                     v3.VBtn(
-                        ">_", size="x-small", density="compact",
-                        variant=("console_mode === 'terminal' ? 'flat' : 'outlined'",),
-                        color=("console_mode === 'terminal' ? 'cyan' : '#6b7280'",),
+                        ">_",
+                        size="x-small",
+                        density="compact",
+                        variant=(
+                            "console_mode === 'terminal' ? 'flat' : 'outlined'",
+                        ),
+                        color=(
+                            "console_mode === 'terminal' ? 'cyan' : '#6b7280'",
+                        ),
                         click=ctrl.console_mode_terminal,
                         title="Terminal",
                         style=(
@@ -3473,9 +3987,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         ),
                     )
                     v3.VBtn(
-                        "cmd", size="x-small", density="compact",
-                        variant=("console_mode === 'command' ? 'flat' : 'outlined'",),
-                        color=("console_mode === 'command' ? 'cyan' : '#6b7280'",),
+                        "cmd",
+                        size="x-small",
+                        density="compact",
+                        variant=(
+                            "console_mode === 'command' ? 'flat' : 'outlined'",
+                        ),
+                        color=(
+                            "console_mode === 'command' ? 'cyan' : '#6b7280'",
+                        ),
                         click=ctrl.console_mode_sage,
                         title="SAGE command mode",
                         style=(
@@ -3529,7 +4049,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 ):
                     v3.VBtn(
-                        "Pop-out", variant="outlined",
+                        "Pop-out",
+                        variant="outlined",
                         color=("console_popout_show ? 'cyan' : '#6b7280'",),
                         density="compact",
                         prepend_icon="mdi-dock-window",
@@ -3538,7 +4059,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     )
                     v3.VBtn(
                         icon="mdi-close-circle-outline",
-                        variant="outlined", color="red",
+                        variant="outlined",
+                        color="red",
                         density="compact",
                         click=ctrl.console_close_pty,
                         title="Close terminal",
@@ -3567,8 +4089,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ):
                         html.Div(
                             "{{ entry.cmd }}",
-                            style=("color:cyan;white-space:pre-wrap;"
-                                   "font-family:monospace;"),
+                            style=(
+                                "color:cyan;white-space:pre-wrap;"
+                                "font-family:monospace;"
+                            ),
                         )
                         html.Div(
                             "{{ entry.out }}",
@@ -3589,14 +4113,18 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         v3.VTextField(
                             v_model=("console_input",),
                             label="SAGE Commands  (type exit to return to terminal)",
-                            hide_details=True, variant="outlined",
-                            bg_color="#1a1a2e", density="compact",
+                            hide_details=True,
+                            variant="outlined",
+                            bg_color="#1a1a2e",
+                            density="compact",
                             keydown_enter=ctrl.console_submit,
                         )
                     with v3.VRow(no_gutters=True, style="gap:6px;"):
                         with v3.VCol(style="padding:0;"):
                             v3.VBtn(
-                                "Run", block=True, color="cyan",
+                                "Run",
+                                block=True,
+                                color="cyan",
                                 density="compact",
                                 prepend_icon="mdi-play",
                                 click=ctrl.console_submit,
@@ -3604,13 +4132,18 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             )
                         with v3.VCol(style="padding:0;"):
                             v3.VBtn(
-                                "Clear", block=True, variant="outlined",
-                                color="red", density="compact",
+                                "Clear",
+                                block=True,
+                                variant="outlined",
+                                color="red",
+                                density="compact",
                                 prepend_icon="mdi-delete-sweep-outline",
                                 click=ctrl.console_clear,
                             )
                     v3.VBtn(
-                        "Pop-out", block=True, variant="outlined",
+                        "Pop-out",
+                        block=True,
+                        variant="outlined",
                         color=("console_popout_show ? 'cyan' : '#6b7280'",),
                         density="compact",
                         prepend_icon="mdi-dock-window",
@@ -3693,8 +4226,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
                                 )
                             v3.VBtn(
                                 icon="mdi-delete-outline",
-                                density="compact", size="x-small",
-                                color="red", variant="text",
+                                density="compact",
+                                size="x-small",
+                                color="red",
+                                variant="text",
                                 style="flex-shrink:0;",
                                 click=(
                                     server.controller.library_delete,
@@ -3719,15 +4254,22 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     with v3.VRow(no_gutters=True, style="gap:6px;"):
                         with v3.VCol(style="padding:0;"):
                             v3.VBtn(
-                                "Refresh", block=True, color="cyan",
-                                density="compact", size="small",
+                                "Refresh",
+                                block=True,
+                                color="cyan",
+                                density="compact",
+                                size="small",
                                 prepend_icon="mdi-refresh",
                                 click=ctrl.library_refresh,
                             )
                         with v3.VCol(style="padding:0;"):
                             v3.VBtn(
-                                "Close all", block=True, variant="outlined",
-                                color="red", density="compact", size="small",
+                                "Close all",
+                                block=True,
+                                variant="outlined",
+                                color="red",
+                                density="compact",
+                                size="small",
                                 prepend_icon="mdi-close-circle-outline",
                                 click=ctrl.library_close,
                             )
@@ -3772,69 +4314,111 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     html.Div("Mvir  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_mvir",),
-                        min=10.0, max=15.0, step=0.1,
-                        thumb_label=True, color="#c084fc",
-                        density="compact", hide_details=True,
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        min=10.0,
+                        max=15.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#c084fc",
+                        density="compact",
+                        hide_details=True,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Rvir  (Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_rvir",),
-                        min=0.0, max=3.0, step=0.05,
-                        thumb_label=True, color="#c084fc",
-                        density="compact", hide_details=True,
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        min=0.0,
+                        max=3.0,
+                        step=0.05,
+                        thumb_label=True,
+                        color="#c084fc",
+                        density="compact",
+                        hide_details=True,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Vvir  (km/s)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_vvir",),
-                        min=0.0, max=1000.0, step=10.0,
-                        thumb_label=True, color="#c084fc",
-                        density="compact", hide_details=True,
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        min=0.0,
+                        max=1000.0,
+                        step=10.0,
+                        thumb_label=True,
+                        color="#c084fc",
+                        density="compact",
+                        hide_details=True,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Vmax  (km/s)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_vmax",),
-                        min=0.0, max=1000.0, step=10.0,
-                        thumb_label=True, color="#c084fc",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=1000.0,
+                        step=10.0,
+                        thumb_label=True,
+                        color="#c084fc",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.vmax",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Len  (DM particles)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_len",),
-                        min=0, max=10000, step=100,
-                        thumb_label=True, color="#c084fc",
-                        density="compact", hide_details=True,
+                        min=0,
+                        max=10000,
+                        step=100,
+                        thumb_label=True,
+                        color="#c084fc",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.len_particles",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Concentration  (NFW)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_conc",),
-                        min=0.0, max=50.0, step=0.5,
-                        thumb_label=True, color="#c084fc",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=50.0,
+                        step=0.5,
+                        thumb_label=True,
+                        color="#c084fc",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.concentration",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Spin  (dimensionless)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_spin",),
-                        min=0.0, max=0.2, step=0.002,
-                        thumb_label=True, color="#c084fc",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=0.2,
+                        step=0.002,
+                        thumb_label=True,
+                        color="#c084fc",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.spin",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
 
                 v3.VDivider(style="margin:4px 0 2px;")
@@ -3846,347 +4430,569 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     html.Div("Stellar mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_smass",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
-                    html.Div("SFR  (log10 Msun/yr,  -6 = quenched)", style=_FLBL)
+                    html.Div(
+                        "SFR  (log10 Msun/yr,  -6 = quenched)", style=_FLBL
+                    )
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr",),
-                        min=-6.0, max=5.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        min=-6.0,
+                        max=5.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("sSFR  (log10 yr^-1)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ssfr",),
-                        min=-14.0, max=0.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        min=-14.0,
+                        max=0.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("B / T  (BulgeMass / StellarMass)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_bt",),
-                        min=0.0, max=1.0, step=0.02,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        min=0.0,
+                        max=1.0,
+                        step=0.02,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Stellar age  (Gyr, mass-weighted)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_age",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.mean_age",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     # ── Alphabetical ──────────────────────────────
                     html.Div("BH mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_bhmass",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.bh_mass",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Bulge mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_bulge",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Bulge radius  (log10 Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_bulgerad",),
-                        min=-4.0, max=1.0, step=0.05,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-4.0,
+                        max=1.0,
+                        step=0.05,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.bulge_radius",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("CGM gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_cgmgas",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.cgm_gas",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Cold gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_coldgas",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Cooling  (log10 SAGE units)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_cooling",),
-                        min=-7.0, max=7.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-7.0,
+                        max=7.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.cooling",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Disk radius  (log10 Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_diskrad",),
-                        min=-4.0, max=1.0, step=0.05,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-4.0,
+                        max=1.0,
+                        step=0.05,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.disk_radius",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Ejected mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ejected",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.ejected_mass",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("H1 gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_h1gas",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.h1_gas",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("H2 gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_h2",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.h2_mass",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Heating  (log10 SAGE units)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_heating",),
-                        min=-7.0, max=7.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-7.0,
+                        max=7.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.heating",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Hot gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_hotgas",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.hot_gas",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
-                    html.Div("Instability bulge mass  (log10 Msun)", style=_FLBL)
+                    html.Div(
+                        "Instability bulge mass  (log10 Msun)", style=_FLBL
+                    )
                     v3.VRangeSlider(
                         v_model=("filter_gal_ib_mass",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.instability_bulge_mass",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
-                    html.Div("Instability bulge radius  (log10 Mpc/h)", style=_FLBL)
+                    html.Div(
+                        "Instability bulge radius  (log10 Mpc/h)", style=_FLBL
+                    )
                     v3.VRangeSlider(
                         v_model=("filter_gal_ib_rad",),
-                        min=-4.0, max=1.0, step=0.05,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-4.0,
+                        max=1.0,
+                        step=0.05,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.instability_bulge_radius",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("ICS mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ics",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.ics_mass",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
-                    html.Div("Mass loading  (log10 OutflowRate/SFR)", style=_FLBL)
+                    html.Div(
+                        "Mass loading  (log10 OutflowRate/SFR)", style=_FLBL
+                    )
                     v3.VRangeSlider(
                         v_model=("filter_gal_massload",),
-                        min=-3.0, max=5.0, step=0.05,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-3.0,
+                        max=5.0,
+                        step=0.05,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.mass_loading",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Merger bulge mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_mb_mass",),
-                        min=0.0, max=14.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=0.0,
+                        max=14.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.merger_bulge_mass",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Merger bulge radius  (log10 Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_mb_rad",),
-                        min=-4.0, max=1.0, step=0.05,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-4.0,
+                        max=1.0,
+                        step=0.05,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.merger_bulge_radius",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Metals — bulge mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_bm",),
-                        min=-2.0, max=12.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-2.0,
+                        max=12.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.metals_bulge_mass",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Metals — CGM gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_cgm",),
-                        min=-2.0, max=12.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-2.0,
+                        max=12.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.metals_cgm_gas",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Metals — cold gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_cg",),
-                        min=-2.0, max=12.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-2.0,
+                        max=12.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.metals_cold_gas",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
-                    html.Div("Metals — ejected mass  (log10 Msun)", style=_FLBL)
+                    html.Div(
+                        "Metals — ejected mass  (log10 Msun)", style=_FLBL
+                    )
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_em",),
-                        min=-2.0, max=12.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-2.0,
+                        max=12.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.metals_ejected_mass",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Metals — hot gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_hg",),
-                        min=-2.0, max=12.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-2.0,
+                        max=12.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.metals_hot_gas",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Metals — ICS  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_ics",),
-                        min=-2.0, max=12.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-2.0,
+                        max=12.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.metals_ics",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
-                    html.Div("Metals — stellar mass  (log10 Msun)", style=_FLBL)
+                    html.Div(
+                        "Metals — stellar mass  (log10 Msun)", style=_FLBL
+                    )
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_sm",),
-                        min=-2.0, max=12.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-2.0,
+                        max=12.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.metals_stellar_mass",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("Outflow rate  (log10 Msun/yr)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_outflow",),
-                        min=-6.0, max=5.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-6.0,
+                        max=5.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.outflow_rate",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("SFR bulge  (log10 Msun/yr)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr_bulge",),
-                        min=-6.0, max=5.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-6.0,
+                        max=5.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.sfr_bulge",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("SFR bulge Z  (log10 dimensionless)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr_blg_z",),
-                        min=-6.0, max=1.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-6.0,
+                        max=1.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.sfr_bulge_z",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("SFR disk  (log10 Msun/yr)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr_disk",),
-                        min=-6.0, max=5.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-6.0,
+                        max=5.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.sfr_disk",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
                     html.Div("SFR disk Z  (log10 dimensionless)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr_dsk_z",),
-                        min=-6.0, max=1.0, step=0.1,
-                        thumb_label=True, color="#FFD700",
-                        density="compact", hide_details=True,
+                        min=-6.0,
+                        max=1.0,
+                        step=0.1,
+                        thumb_label=True,
+                        color="#FFD700",
+                        density="compact",
+                        hide_details=True,
                         disabled=("!model_fields.sfr_disk_z",),
-                        thumb_size=10, track_size=2,
-                        classes="sage-fslider", style=_FSLD,
+                        thumb_size=10,
+                        track_size=2,
+                        classes="sage-fslider",
+                        style=_FSLD,
                     )
 
                 v3.VDivider(style="margin:4px 0 2px;")
@@ -4197,38 +5003,53 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     html.Div("Type", style=_FLBL)
                     v3.VSelect(
                         v_model=("filter_gal_type",),
-                        items=([
-                            {"title": "All",         "value": "both"},
-                            {"title": "Centrals",    "value": "central"},
-                            {"title": "Satellites",  "value": "satellite"},
-                        ],),
-                        hide_details=True, variant="outlined",
-                        color="#FFD700", density="compact",
+                        items=(
+                            [
+                                {"title": "All", "value": "both"},
+                                {"title": "Centrals", "value": "central"},
+                                {"title": "Satellites", "value": "satellite"},
+                            ],
+                        ),
+                        hide_details=True,
+                        variant="outlined",
+                        color="#FFD700",
+                        density="compact",
                         style=_FSEL,
                     )
                     html.Div("FFB regime", style=_FLBL)
                     v3.VSelect(
                         v_model=("filter_gal_ffb",),
-                        items=([
-                            {"title": "Any",          "value": "any"},
-                            {"title": "FFB only",     "value": "yes"},
-                            {"title": "Non-FFB only", "value": "no"},
-                        ],),
-                        hide_details=True, variant="outlined",
-                        color="#FFD700", density="compact",
+                        items=(
+                            [
+                                {"title": "Any", "value": "any"},
+                                {"title": "FFB only", "value": "yes"},
+                                {"title": "Non-FFB only", "value": "no"},
+                            ],
+                        ),
+                        hide_details=True,
+                        variant="outlined",
+                        color="#FFD700",
+                        density="compact",
                         disabled=("!model_fields.ffb_regime",),
                         style=_FSEL,
                     )
                     html.Div("CGM / Hot regime", style=_FLBL)
                     v3.VSelect(
                         v_model=("filter_gal_cgm",),
-                        items=([
-                            {"title": "Any",                     "value": "any"},
-                            {"title": "CGM galaxies",            "value": "cold"},
-                            {"title": "Hot atmosphere galaxies", "value": "hot"},
-                        ],),
-                        hide_details=True, variant="outlined",
-                        color="#FFD700", density="compact",
+                        items=(
+                            [
+                                {"title": "Any", "value": "any"},
+                                {"title": "CGM galaxies", "value": "cold"},
+                                {
+                                    "title": "Hot atmosphere galaxies",
+                                    "value": "hot",
+                                },
+                            ],
+                        ),
+                        hide_details=True,
+                        variant="outlined",
+                        color="#FFD700",
+                        density="compact",
                         disabled=("!model_fields.cgm_regime",),
                         style=_FSEL,
                     )
@@ -4237,8 +5058,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 v3.VBtn(
                     "Reset Filters",
-                    block=True, variant="outlined",
-                    color="red", density="compact",
+                    block=True,
+                    variant="outlined",
+                    color="red",
+                    density="compact",
                     size="small",
                     prepend_icon="mdi-restore",
                     click=ctrl.reset_filters,
@@ -4262,36 +5085,50 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VTextField(
                         v_model=("screenshot_label",),
                         label="Label (optional)",
-                        hide_details=True, variant="outlined",
-                        bg_color="#1a1a2e", density="compact",
+                        hide_details=True,
+                        variant="outlined",
+                        bg_color="#1a1a2e",
+                        density="compact",
                         style="padding-bottom:8px;",
                         keydown_enter=ctrl.take_screenshot,
                     )
                 v3.VBtn(
                     "Take Screenshot",
-                    block=True, color="cyan",
+                    block=True,
+                    color="cyan",
                     density="compact",
                     prepend_icon="mdi-camera",
                     click=ctrl.take_screenshot,
                     id="btn-take-screenshot",
                 )
-                with v3.VRow(no_gutters=True, style="gap:6px;padding-top:6px;"):
+                with v3.VRow(
+                    no_gutters=True, style="gap:6px;padding-top:6px;"
+                ):
                     with v3.VCol(style="padding:0;"):
                         v3.VBtn(
-                            "PNG", block=True, variant="outlined",
-                            color="cyan", density="compact",
+                            "PNG",
+                            block=True,
+                            variant="outlined",
+                            color="cyan",
+                            density="compact",
                             click=ctrl.screenshot_png,
                         )
                     with v3.VCol(style="padding:0;"):
                         v3.VBtn(
-                            "JPG", block=True, variant="outlined",
-                            color="cyan", density="compact",
+                            "JPG",
+                            block=True,
+                            variant="outlined",
+                            color="cyan",
+                            density="compact",
                             click=ctrl.screenshot_jpg,
                         )
                     with v3.VCol(style="padding:0;"):
                         v3.VBtn(
-                            "TIFF", block=True, variant="outlined",
-                            color="cyan", density="compact",
+                            "TIFF",
+                            block=True,
+                            variant="outlined",
+                            color="cyan",
+                            density="compact",
                             click=ctrl.screenshot_tiff,
                         )
                 v3.VLabel(
@@ -4318,8 +5155,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     v3.VTextField(
                         v_model=("movie_label",),
                         label="Label (optional)",
-                        hide_details=True, variant="outlined",
-                        bg_color="#1a1a2e", density="compact",
+                        hide_details=True,
+                        variant="outlined",
+                        bg_color="#1a1a2e",
+                        density="compact",
                         style="padding-bottom:8px;",
                         keydown_enter=ctrl.start_recording,
                     )
@@ -4329,9 +5168,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VSlider(
                     v_model=("movie_fps",),
-                    min=1, max=60, step=1,
-                    thumb_label=True, color="cyan",
-                    density="compact", hide_details=True,
+                    min=1,
+                    max=60,
+                    step=1,
+                    thumb_label=True,
+                    color="cyan",
+                    density="compact",
+                    hide_details=True,
                 )
 
                 v3.VLabel(
@@ -4340,13 +5183,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VSelect(
                     v_model=("movie_resolution",),
-                    items=([
-                        {"title": "Native  (1×)",       "value": "native"},
-                        {"title": "High   (2× window)", "value": "hd"},
-                        {"title": "Ultra  (4× window)", "value": "uhd"},
-                    ],),
-                    hide_details=True, variant="outlined",
-                    color="cyan", density="compact",
+                    items=(
+                        [
+                            {"title": "Native  (1×)", "value": "native"},
+                            {"title": "High   (2× window)", "value": "hd"},
+                            {"title": "Ultra  (4× window)", "value": "uhd"},
+                        ],
+                    ),
+                    hide_details=True,
+                    variant="outlined",
+                    color="cyan",
+                    density="compact",
                 )
 
                 v3.VLabel(
@@ -4355,13 +5202,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VSelect(
                     v_model=("movie_format",),
-                    items=([
-                        {"title": "GIF",          "value": "gif"},
-                        {"title": "MOV  (H.264)", "value": "mov"},
-                        {"title": "PNG sequence", "value": "png"},
-                    ],),
-                    hide_details=True, variant="outlined",
-                    color="cyan", density="compact",
+                    items=(
+                        [
+                            {"title": "GIF", "value": "gif"},
+                            {"title": "MOV  (H.264)", "value": "mov"},
+                            {"title": "PNG sequence", "value": "png"},
+                        ],
+                    ),
+                    hide_details=True,
+                    variant="outlined",
+                    color="cyan",
+                    density="compact",
                 )
 
                 # GIF-only: repeat (loop) checkbox
@@ -4375,10 +5226,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     style="padding-top:4px;",
                 )
 
-                with v3.VRow(no_gutters=True, style="gap:6px;padding-top:10px;"):
+                with v3.VRow(
+                    no_gutters=True, style="gap:6px;padding-top:10px;"
+                ):
                     with v3.VCol(style="padding:0;"):
                         v3.VBtn(
-                            "Start", block=True, color="red",
+                            "Start",
+                            block=True,
+                            color="red",
                             density="compact",
                             prepend_icon="mdi-record-circle-outline",
                             click=ctrl.start_recording,
@@ -4387,7 +5242,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         )
                     with v3.VCol(style="padding:0;"):
                         v3.VBtn(
-                            "Stop", block=True, color="#6b7280",
+                            "Stop",
+                            block=True,
+                            color="#6b7280",
                             density="compact",
                             prepend_icon="mdi-stop",
                             click=ctrl.stop_recording,

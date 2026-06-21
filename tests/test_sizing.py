@@ -30,7 +30,9 @@ def test_empty_returns_empty():
 
 def test_size_bin_mask_covers_all():
     rng = np.random.default_rng(0)
-    sizes = rng.uniform(HALO_SIZE_BINS[0], HALO_SIZE_BINS[-1], 100).astype(np.float32)
+    sizes = rng.uniform(HALO_SIZE_BINS[0], HALO_SIZE_BINS[-1], 100).astype(
+        np.float32
+    )
     masks = size_bin_mask(sizes, HALO_SIZE_BINS)
     # Every element should appear in exactly one bin
     covered = np.zeros(len(sizes), dtype=bool)

@@ -5,7 +5,6 @@ from trame.widgets import vuetify3 as v3
 
 from sage_viewer.wizard.controller import WizardController, _STEPS
 
-
 _WIZ_CSS = """
 .wiz-title { color: #06b6d4; font-weight: 700; letter-spacing: 0.08em; }
 .wiz-ok    { color: #22c55e; }
@@ -170,8 +169,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                                 hide_details=True,
                                 suffix=".par",
                                 style=(
-                                    "font-family:monospace;"
-                                    "max-width:320px;"
+                                    "font-family:monospace;" "max-width:320px;"
                                 ),
                             )
                         with html.Div(
@@ -190,9 +188,14 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                                     prepend_icon=("ch.icon",),
                                     color="#06b6d4",
                                     variant="outlined",
-                                    size=("wiz_choices.length > 5 ? 'x-small' : 'small'",),
+                                    size=(
+                                        "wiz_choices.length > 5 ? 'x-small' : 'small'",
+                                    ),
                                     disabled=("ch.disabled",),
-                                    click=(server.controller.wiz_choose, "[ch.value]"),
+                                    click=(
+                                        server.controller.wiz_choose,
+                                        "[ch.value]",
+                                    ),
                                     style="font-family:monospace;text-transform:none;",
                                 )
 
@@ -213,7 +216,11 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                             "flex-shrink:0;display:flex;align-items:center;gap:8px;"
                         ),
                     ):
-                        v3.VIcon("mdi-file-document-outline", color="#06b6d4", size="small")
+                        v3.VIcon(
+                            "mdi-file-document-outline",
+                            color="#06b6d4",
+                            size="small",
+                        )
                         html.Span(
                             "Parameter File",
                             style="color:#06b6d4;font-size:0.82rem;",

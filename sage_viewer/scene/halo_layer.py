@@ -12,11 +12,12 @@ from sage_viewer.utils.sizing import halo_world_radii
 ColorMode = Literal["mvir", "rvir", "vvir", "vmax"]
 
 _RANGES = {
-    "mvir": (10.0, 15.0),   # log10(Msun)
-    "rvir": (-1.5, 0.5),    # log10(Mpc/h)
-    "vvir": (1.5, 3.0),     # log10(km/s)
-    "vmax": (1.5, 3.0),     # log10(km/s)
+    "mvir": (10.0, 15.0),  # log10(Msun)
+    "rvir": (-1.5, 0.5),  # log10(Mpc/h)
+    "vvir": (1.5, 3.0),  # log10(km/s)
+    "vmax": (1.5, 3.0),  # log10(km/s)
 }
+
 
 class HaloLayer:
     """Manages the halo point-cloud actor(s) inside a PyVista Plotter."""
@@ -135,6 +136,7 @@ class HaloLayer:
         mask = self._combined_mask()
         if mask is not None and len(mask) == snap.count:
             from sage_viewer.io.halo_reader import HaloSnapshot as _HS
+
             snap = _HS(
                 positions=snap.positions[mask],
                 masses=snap.masses[mask],
@@ -148,7 +150,7 @@ class HaloLayer:
                 return
 
         colors = self._compute_colors(snap)
-        radii  = halo_world_radii(snap.masses)
+        radii = halo_world_radii(snap.masses)
 
         # Full rebuild every redraw — the layered NFW-style stack has
         # three actors per halo population so the in-place fast-path
@@ -164,9 +166,9 @@ class HaloLayer:
 
     _LAYERS = (
         # (radius_scale, opacity_floor, opacity_multiplier)
-        (1.00, 0.03, 0.35),   # outer envelope ~ Rvir boundary
-        (0.45, 0.05, 0.60),   # inner halo
-        (0.18, 0.08, 0.95),   # dense core
+        (1.00, 0.03, 0.35),  # outer envelope ~ Rvir boundary
+        (0.45, 0.05, 0.60),  # inner halo
+        (0.18, 0.08, 0.95),  # dense core
     )
 
     def _render_layered(

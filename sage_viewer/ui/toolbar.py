@@ -12,13 +12,13 @@ from sage_viewer.scene.scene import Scene
 
 # Frames per second for each speed multiplier
 _FPS: dict[float, float] = {
-    0.1:  0.3,
+    0.1: 0.3,
     0.25: 0.75,
-    0.5:  1.5,
+    0.5: 1.5,
     0.75: 2.25,
-    1:    3,
-    2:    6,
-    5:    15,
+    1: 3,
+    2: 6,
+    5: 15,
 }
 
 _SPEED_ITEMS = [
@@ -26,46 +26,77 @@ _SPEED_ITEMS = [
     {"title": "0.25×", "value": 0.25},
     {"title": "0.5×", "value": 0.5},
     {"title": "0.75×", "value": 0.75},
-    {"title": "1×",   "value": 1},
-    {"title": "2×",   "value": 2},
-    {"title": "5×",   "value": 5},
+    {"title": "1×", "value": 1},
+    {"title": "2×", "value": 2},
+    {"title": "5×", "value": 5},
 ]
 
 _ROTATE_ITEMS = [
-    {"title": "Off",         "value": "off"},
-    {"title": "CW  15°/s",  "value": "cw_15"},
-    {"title": "CW  30°/s",  "value": "cw_30"},
-    {"title": "CW  60°/s",  "value": "cw_60"},
-    {"title": "CCW 15°/s",  "value": "ccw_15"},
-    {"title": "CCW 30°/s",  "value": "ccw_30"},
-    {"title": "CCW 60°/s",  "value": "ccw_60"},
+    {"title": "Off", "value": "off"},
+    {"title": "CW  15°/s", "value": "cw_15"},
+    {"title": "CW  30°/s", "value": "cw_30"},
+    {"title": "CW  60°/s", "value": "cw_60"},
+    {"title": "CCW 15°/s", "value": "ccw_15"},
+    {"title": "CCW 30°/s", "value": "ccw_30"},
+    {"title": "CCW 60°/s", "value": "ccw_60"},
 ]
 
-_ROT_RATE_FPS = 12   # rotation render rate — lower = less load, larger steps
+_ROT_RATE_FPS = 12  # rotation render rate — lower = less load, larger steps
 
 # All trame state variables that affect what a rendered frame looks like.
 # Checked in _scene_hash() so the frame cache is invalidated when any of these
 # change (filters, environment, box/sphere selection, options, etc.).
 _SCENE_FILTER_VARS: tuple[str, ...] = (
-    "filter_halo_mvir", "filter_halo_rvir", "filter_halo_vvir",
-    "filter_halo_len",  "filter_halo_vmax", "filter_halo_conc", "filter_halo_spin",
-    "filter_gal_smass", "filter_gal_sfr",   "filter_gal_ssfr",
-    "filter_gal_coldgas", "filter_gal_bulge", "filter_gal_bt", "filter_gal_type",
-    "filter_gal_bhmass", "filter_gal_ics",   "filter_gal_h2",
-    "filter_gal_cgmgas", "filter_gal_hotgas",
-    "filter_gal_h1gas",  "filter_gal_ejected",  "filter_gal_outflow",
-    "filter_gal_massload", "filter_gal_cooling", "filter_gal_heating",
-    "filter_gal_diskrad",  "filter_gal_bulgerad",
-    "filter_gal_mb_mass",  "filter_gal_mb_rad",
-    "filter_gal_ib_mass",  "filter_gal_ib_rad",
-    "filter_gal_sfr_bulge",  "filter_gal_sfr_disk",
-    "filter_gal_sfr_blg_z",  "filter_gal_sfr_dsk_z",
-    "filter_gal_met_cg",  "filter_gal_met_sm",  "filter_gal_met_bm",
-    "filter_gal_met_hg",  "filter_gal_met_em",  "filter_gal_met_ics",
+    "filter_halo_mvir",
+    "filter_halo_rvir",
+    "filter_halo_vvir",
+    "filter_halo_len",
+    "filter_halo_vmax",
+    "filter_halo_conc",
+    "filter_halo_spin",
+    "filter_gal_smass",
+    "filter_gal_sfr",
+    "filter_gal_ssfr",
+    "filter_gal_coldgas",
+    "filter_gal_bulge",
+    "filter_gal_bt",
+    "filter_gal_type",
+    "filter_gal_bhmass",
+    "filter_gal_ics",
+    "filter_gal_h2",
+    "filter_gal_cgmgas",
+    "filter_gal_hotgas",
+    "filter_gal_h1gas",
+    "filter_gal_ejected",
+    "filter_gal_outflow",
+    "filter_gal_massload",
+    "filter_gal_cooling",
+    "filter_gal_heating",
+    "filter_gal_diskrad",
+    "filter_gal_bulgerad",
+    "filter_gal_mb_mass",
+    "filter_gal_mb_rad",
+    "filter_gal_ib_mass",
+    "filter_gal_ib_rad",
+    "filter_gal_sfr_bulge",
+    "filter_gal_sfr_disk",
+    "filter_gal_sfr_blg_z",
+    "filter_gal_sfr_dsk_z",
+    "filter_gal_met_cg",
+    "filter_gal_met_sm",
+    "filter_gal_met_bm",
+    "filter_gal_met_hg",
+    "filter_gal_met_em",
+    "filter_gal_met_ics",
     "filter_gal_met_cgm",
-    "filter_gal_ffb", "filter_gal_cgm", "filter_gal_age",
-    "env_show_field", "env_show_isolated", "env_show_pairs",
-    "env_show_group", "env_show_cluster",
+    "filter_gal_ffb",
+    "filter_gal_cgm",
+    "filter_gal_age",
+    "env_show_field",
+    "env_show_isolated",
+    "env_show_pairs",
+    "env_show_group",
+    "env_show_cluster",
 )
 
 
@@ -74,7 +105,7 @@ def _parse_rotate(mode: str) -> tuple[float, float]:
     if mode == "off":
         return 0.0, 0.0
     parts = mode.split("_")
-    sign  = 1.0 if parts[0] == "cw" else -1.0
+    sign = 1.0 if parts[0] == "cw" else -1.0
     return sign, float(parts[1])
 
 
@@ -82,21 +113,23 @@ def build_toolbar(server, scene: Scene) -> None:
     state, ctrl = server.state, server.controller
     snap_count = scene._snap_table.count
 
-    state.snap_num    = scene.current_snap
-    state.snap_label  = scene.snap_label
-    state.snap_max    = snap_count - 1
-    state.play_speed  = 1
-    _snap_count = [snap_count]   # mutable so closures stay current after model switch
-    state.is_playing  = False
-    state.is_reverse  = False
-    state.is_repeat   = False
+    state.snap_num = scene.current_snap
+    state.snap_label = scene.snap_label
+    state.snap_max = snap_count - 1
+    state.play_speed = 1
+    _snap_count = [
+        snap_count
+    ]  # mutable so closures stay current after model switch
+    state.is_playing = False
+    state.is_reverse = False
+    state.is_repeat = False
     state.rotate_mode = "off"
-    state.preload_status = ""   # non-empty while the snapshot cache warms
+    state.preload_status = ""  # non-empty while the snapshot cache warms
     # Pre-rendered playback: frames are rendered once on play, then flipped
     # through as images for stutter-free playback.
-    state.playback_active = False   # showing pre-rendered frames
-    state.playback_frame  = ""      # current frame data URL
-    state.prerender_busy  = False   # rendering frames (full-viewport overlay)
+    state.playback_active = False  # showing pre-rendered frames
+    state.playback_frame = ""  # current frame data URL
+    state.prerender_busy = False  # rendering frames (full-viewport overlay)
 
     # Plain dict — direction/repeat flags read from the play coroutine
     _ctl = {"reverse": False, "repeat": False, "rotate_mode": "off"}
@@ -121,21 +154,19 @@ def build_toolbar(server, scene: Scene) -> None:
             return
         state.update({"snap_num": n, "snap_label": scene.snap_label})
 
-    scene.register_snap_change_callback(
-        lambda n: _on_snap_change(n)
-    )
+    scene.register_snap_change_callback(lambda n: _on_snap_change(n))
 
     def _on_model_change():
         new_count = scene._snap_table.count
-        _snap_count[0]      = new_count
-        _suppress_snap[0]   = False      # cancel any in-flight prerender
-        _frames["key"]      = None
-        _frames["data"]     = {}
+        _snap_count[0] = new_count
+        _suppress_snap[0] = False  # cancel any in-flight prerender
+        _frames["key"] = None
+        _frames["data"] = {}
         _preload_started[0] = False
-        _preload_done[0]    = False
-        state.snap_max      = new_count - 1
-        state.snap_num      = scene.current_snap
-        state.snap_label    = scene.snap_label
+        _preload_done[0] = False
+        state.snap_max = new_count - 1
+        state.snap_num = scene.current_snap
+        state.snap_label = scene.snap_label
         state.flush()
 
     scene.register_model_change_callback(_on_model_change)
@@ -176,8 +207,14 @@ def build_toolbar(server, scene: Scene) -> None:
             val = getattr(state, v, None)
             parts.append(tuple(val) if isinstance(val, list) else val)
         parts += [
-            gl.visible, round(gl.opacity, 3), gl.color_mode, gl.colormap,
-            hl.visible, round(hl.opacity, 3), hl.color_mode, hl.colormap,
+            gl.visible,
+            round(gl.opacity, 3),
+            gl.color_mode,
+            gl.colormap,
+            hl.visible,
+            round(hl.opacity, 3),
+            hl.color_mode,
+            hl.colormap,
             scene.fof_links_visible,
             str(scene._focus_region),
         ]
@@ -209,6 +246,7 @@ def build_toolbar(server, scene: Scene) -> None:
         is never .show()n, so pyvista's screenshot() refuses to run."""
         from vtkmodules.vtkRenderingCore import vtkWindowToImageFilter
         from vtkmodules.util.numpy_support import vtk_to_numpy
+
         rw = scene.plotter.ren_win
         rw.Render()
         w2if = vtkWindowToImageFilter()
@@ -219,7 +257,7 @@ def build_toolbar(server, scene: Scene) -> None:
         vimg = w2if.GetOutput()
         w, h, _ = vimg.GetDimensions()
         arr = vtk_to_numpy(vimg.GetPointData().GetScalars()).reshape(h, w, -1)
-        return arr[::-1]   # VTK image origin is bottom-left
+        return arr[::-1]  # VTK image origin is bottom-left
 
     async def _render_frames(order: list[int]) -> None:
         """Render the snapshots in `order` (skipping any already cached) into
@@ -230,22 +268,24 @@ def build_toolbar(server, scene: Scene) -> None:
         showing it, so the rest of the render is never visible underneath
         (the live view would otherwise flicker through every snapshot)."""
         from PIL import Image
-        pl     = scene.plotter
-        cam    = pl.camera
-        pos0   = np.array(cam.position,    dtype=np.float64)
+
+        pl = scene.plotter
+        cam = pl.camera
+        pos0 = np.array(cam.position, dtype=np.float64)
         focal0 = np.array(cam.focal_point, dtype=np.float64)
         sign, dps = _parse_rotate(_ctl["rotate_mode"])
-        per_snap  = np.deg2rad(sign * dps / 3.0)
-        stop_evt  = _get_stop_evt()
+        per_snap = np.deg2rad(sign * dps / 3.0)
+        stop_evt = _get_stop_evt()
         first = order[0]
 
         # Starting frame already cached → raise the overlay before rendering.
         if first in _frames["data"]:
-            state.playback_frame  = _frames["data"][first]
+            state.playback_frame = _frames["data"][first]
             state.playback_active = True
 
-        todo = [(pos, s) for pos, s in enumerate(order)
-                if s not in _frames["data"]]
+        todo = [
+            (pos, s) for pos, s in enumerate(order) if s not in _frames["data"]
+        ]
         total = len(todo)
         if total == 0:
             state.flush()
@@ -268,18 +308,21 @@ def build_toolbar(server, scene: Scene) -> None:
                     ang = per_snap * pos
                     c, sn = np.cos(ang), np.sin(ang)
                     rm = np.array([[c, 0, sn], [0, 1, 0], [-sn, 0, c]])
-                    cam.position    = tuple(focal0 + rm @ (pos0 - focal0))
+                    cam.position = tuple(focal0 + rm @ (pos0 - focal0))
                     cam.focal_point = tuple(focal0)
-                    cam.up          = (0.0, 1.0, 0.0)
+                    cam.up = (0.0, 1.0, 0.0)
                 img = _capture_frame()
                 buf = io.BytesIO()
-                Image.fromarray(img[..., :3]).save(buf, format="JPEG", quality=85)
-                url = ("data:image/jpeg;base64,"
-                       + base64.b64encode(buf.getvalue()).decode("ascii"))
+                Image.fromarray(img[..., :3]).save(
+                    buf, format="JPEG", quality=85
+                )
+                url = "data:image/jpeg;base64," + base64.b64encode(
+                    buf.getvalue()
+                ).decode("ascii")
                 _frames["data"][s] = url
                 if s == first:
                     # Cover the rest of the render with the starting frame.
-                    state.playback_frame  = url
+                    state.playback_frame = url
                     state.playback_active = True
                 done += 1
                 state.preload_status = f"Loading snapshots...  {done}/{total}"
@@ -287,9 +330,9 @@ def build_toolbar(server, scene: Scene) -> None:
                 await asyncio.sleep(0)
         finally:
             rw.SetOffScreenRendering(prev_offscreen)
-            cam.position    = tuple(pos0)
+            cam.position = tuple(pos0)
             cam.focal_point = tuple(focal0)
-            cam.up          = (0.0, 1.0, 0.0)
+            cam.up = (0.0, 1.0, 0.0)
             state.prerender_busy = False
             state.preload_status = ""
             state.flush()
@@ -310,7 +353,7 @@ def build_toolbar(server, scene: Scene) -> None:
                 frame = _frames["data"].get(s)
                 if frame is not None:
                     state.playback_frame = frame
-                state.snap_num   = s
+                state.snap_num = s
                 state.snap_label = scene._snap_table.label(s)
                 state.flush()
 
@@ -353,12 +396,12 @@ def build_toolbar(server, scene: Scene) -> None:
         rot_start = start if _ctl["rotate_mode"] != "off" else 0
         key = _cam_key() + (rot_start,)
         if _frames["key"] != key:
-            _frames["key"]  = key
+            _frames["key"] = key
             _frames["data"] = {}
         # Freeze the slider + redshift readout while rendering — the snapshot
         # sweep below shouldn't drag them around.
         _suppress_snap[0] = True
-        await _render_frames(order)   # raises the overlay itself
+        await _render_frames(order)  # raises the overlay itself
         if stop_evt.is_set():
             _suppress_snap[0] = False
             state.playback_active = False
@@ -373,21 +416,21 @@ def build_toolbar(server, scene: Scene) -> None:
         _rots, _rotd = _parse_rotate(_ctl["rotate_mode"])
         _per_snap = np.deg2rad(_rots * _rotd / 3.0)
         if _per_snap:
-            _cam    = scene.plotter.camera
-            _pos0   = np.array(_cam.position,    dtype=np.float64)
+            _cam = scene.plotter.camera
+            _pos0 = np.array(_cam.position, dtype=np.float64)
             _focal0 = np.array(_cam.focal_point, dtype=np.float64)
-            _ang    = _per_snap * (len(order) - 1)
+            _ang = _per_snap * (len(order) - 1)
             _c, _sn = np.cos(_ang), np.sin(_ang)
-            _rm     = np.array([[_c, 0, _sn], [0, 1, 0], [-_sn, 0, _c]])
-            _cam.position    = tuple(_focal0 + _rm @ (_pos0 - _focal0))
+            _rm = np.array([[_c, 0, _sn], [0, 1, 0], [-_sn, 0, _c]])
+            _cam.position = tuple(_focal0 + _rm @ (_pos0 - _focal0))
             _cam.focal_point = tuple(_focal0)
-            _cam.up          = (0.0, 1.0, 0.0)
+            _cam.up = (0.0, 1.0, 0.0)
         # Park the live scene on the final snapshot now, while the overlay is
         # still covering it, so revealing it at the end is a seamless match —
         # no flash of the selected snapshot, no jump.
         scene.set_snapshot(order[-1])
         _push()
-        _suppress_snap[0] = False   # playback drives the slider from here
+        _suppress_snap[0] = False  # playback drives the slider from here
         await _image_playback(order)
         # Ended naturally.  Push a fresh live render so the VTK canvas is
         # up-to-date when the overlay drops — the earlier _push() may have
@@ -398,7 +441,7 @@ def build_toolbar(server, scene: Scene) -> None:
         _push()
         state.snap_label = scene.snap_label
         state.flush()
-        await asyncio.sleep(0.2)    # let the render stream before revealing
+        await asyncio.sleep(0.2)  # let the render stream before revealing
         state.playback_active = False
         state.flush()
         _ensure_rotate_loop()
@@ -421,9 +464,9 @@ def build_toolbar(server, scene: Scene) -> None:
         if _play_task[0] is not None and not _play_task[0].done():
             _play_task[0].cancel()
         _suppress_snap[0] = False
-        state.is_playing      = False
-        state.prerender_busy  = False
-        state.preload_status  = ""
+        state.is_playing = False
+        state.prerender_busy = False
+        state.preload_status = ""
         # Keep the overlay up, showing the target frame if we have it, so it
         # matches the live view we're about to reveal.
         if snap in _frames["data"]:
@@ -431,7 +474,7 @@ def build_toolbar(server, scene: Scene) -> None:
         state.playback_active = True
         # Render the live view at `snap` behind the overlay.
         scene.set_snapshot(snap)
-        state.snap_num   = snap
+        state.snap_num = snap
         state.snap_label = scene.snap_label
         state.flush()
         _push()
@@ -450,6 +493,7 @@ def build_toolbar(server, scene: Scene) -> None:
             if _play_task[0] is None or _play_task[0].done():
                 state.playback_active = False
                 state.flush()
+
         asyncio.ensure_future(_reveal())
 
     @ctrl.set("pause")
@@ -466,7 +510,7 @@ def build_toolbar(server, scene: Scene) -> None:
             return
         n = max(0, int(state.snap_num) - 1)
         scene.set_snapshot(n)
-        state.snap_num   = n
+        state.snap_num = n
         state.snap_label = scene.snap_label
         state.flush()
         _push()
@@ -477,7 +521,7 @@ def build_toolbar(server, scene: Scene) -> None:
             return
         n = min(_snap_count[0] - 1, int(state.snap_num) + 1)
         scene.set_snapshot(n)
-        state.snap_num   = n
+        state.snap_num = n
         state.snap_label = scene.snap_label
         state.flush()
         _push()
@@ -490,32 +534,32 @@ def build_toolbar(server, scene: Scene) -> None:
         for whichever model is currently selected.
         """
         _snap_count[0] = scene.active_model.snap_count
-        _frames["key"]  = None
+        _frames["key"] = None
         _frames["data"] = {}
 
     @ctrl.set("refresh_snap_range")
     def on_refresh_snap_range():
         """Update slider bounds + current snap after a model switch."""
         new_count = scene._snap_table.count
-        _snap_count[0]      = new_count
-        state.snap_max      = new_count - 1
-        state.snap_num      = scene.current_snap
-        state.snap_label    = scene.snap_label
+        _snap_count[0] = new_count
+        state.snap_max = new_count - 1
+        state.snap_num = scene.current_snap
+        state.snap_label = scene.snap_label
         # Invalidate pre-rendered frame cache; reset preload so it reruns
-        _frames["key"]      = None
-        _frames["data"]     = {}
+        _frames["key"] = None
+        _frames["data"] = {}
         _preload_started[0] = False
-        _preload_done[0]    = False
+        _preload_done[0] = False
         state.flush()
 
     @ctrl.set("toggle_reverse")
     def on_toggle_reverse():
-        _ctl["reverse"]  = not _ctl["reverse"]
+        _ctl["reverse"] = not _ctl["reverse"]
         state.is_reverse = _ctl["reverse"]
 
     @ctrl.set("toggle_repeat")
     def on_toggle_repeat():
-        _ctl["repeat"]  = not _ctl["repeat"]
+        _ctl["repeat"] = not _ctl["repeat"]
         state.is_repeat = _ctl["repeat"]
 
     # ------------------------------------------------------------------
@@ -529,16 +573,16 @@ def build_toolbar(server, scene: Scene) -> None:
             sign, deg_per_sec = _parse_rotate(mode)
             if sign == 0:
                 break
-            delta  = sign * deg_per_sec * interval
-            cam    = scene.plotter.camera
-            focal  = np.array(cam.focal_point, dtype=np.float64)
-            pos    = np.array(cam.position,    dtype=np.float64)
-            r      = pos - focal
-            angle  = np.deg2rad(delta)
-            c, s   = np.cos(angle), np.sin(angle)
-            rm     = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+            delta = sign * deg_per_sec * interval
+            cam = scene.plotter.camera
+            focal = np.array(cam.focal_point, dtype=np.float64)
+            pos = np.array(cam.position, dtype=np.float64)
+            r = pos - focal
+            angle = np.deg2rad(delta)
+            c, s = np.cos(angle), np.sin(angle)
+            rm = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
             cam.position = tuple(focal + rm @ r)
-            cam.up       = (0.0, 1.0, 0.0)
+            cam.up = (0.0, 1.0, 0.0)
             _push()
             await asyncio.sleep(interval)
 
@@ -559,12 +603,12 @@ def build_toolbar(server, scene: Scene) -> None:
     # ------------------------------------------------------------------
 
     _preload_started = [False]
-    _preload_done    = [False]
+    _preload_done = [False]
 
     async def _preload_loop():
-        loader  = scene._loader
+        loader = scene._loader
         futures = loader.preload_all()
-        total   = len(futures)
+        total = len(futures)
         if total == 0:
             _preload_done[0] = True
             return
@@ -594,7 +638,7 @@ def build_toolbar(server, scene: Scene) -> None:
         cadence — without this, playback overtakes the background preload and
         stalls on uncached snapshots mid-run, then bursts through the rest."""
         _start_preload()
-        if not _preload_started[0]:        # no loop earlier — start inline now
+        if not _preload_started[0]:  # no loop earlier — start inline now
             _preload_started[0] = True
             asyncio.ensure_future(_preload_loop())
         while not _preload_done[0]:
@@ -630,10 +674,14 @@ def build_toolbar(server, scene: Scene) -> None:
             color=("is_reverse ? 'cyan' : 'white'",),
             title="Reverse direction",
         )
-        v3.VBtn(icon="mdi-play",  click=ctrl.play,  color="white")
+        v3.VBtn(icon="mdi-play", click=ctrl.play, color="white")
         v3.VBtn(icon="mdi-pause", click=ctrl.pause, color="white")
-        v3.VBtn(icon="mdi-stop",  click=ctrl.stop,  color="white",
-                title="Stop and return to z=0")
+        v3.VBtn(
+            icon="mdi-stop",
+            click=ctrl.stop,
+            color="white",
+            title="Stop and return to z=0",
+        )
         v3.VBtn(
             icon="mdi-repeat",
             click=ctrl.toggle_repeat,
@@ -665,9 +713,13 @@ def build_toolbar(server, scene: Scene) -> None:
     with v3.VCol(style="max-width:240px;padding:0 4px;"):
         v3.VSlider(
             v_model=("snap_num",),
-            min=0, max=("snap_max",), step=1,
-            thumb_label=False, hide_details=True,
-            color="cyan", density="compact",
+            min=0,
+            max=("snap_max",),
+            step=1,
+            thumb_label=False,
+            hide_details=True,
+            color="cyan",
+            density="compact",
         )
     with html.Button(
         click=ctrl.snap_next,

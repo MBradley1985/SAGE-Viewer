@@ -8,7 +8,9 @@ from trame.widgets import vuetify3 as v3
 
 from sage_viewer.scene.scene import Scene
 
-_DOUBLE_CLICK_THRESHOLD = 0.45   # seconds between two clicks to count as double-click
+_DOUBLE_CLICK_THRESHOLD = (
+    0.45  # seconds between two clicks to count as double-click
+)
 
 
 def build_info_panel(server, scene: Scene) -> None:
@@ -65,7 +67,11 @@ def build_info_panel(server, scene: Scene) -> None:
             mask = scene.galaxy_layer._combined_mask()
             if mask is None:
                 mask = scene.galaxy_layer._filter_mask
-            visible = np.where(mask)[0] if mask is not None else np.arange(galaxies.count)
+            visible = (
+                np.where(mask)[0]
+                if mask is not None
+                else np.arange(galaxies.count)
+            )
 
             if len(visible) > 0:
                 gal_world = galaxies.positions[visible] + off
@@ -86,7 +92,9 @@ def build_info_panel(server, scene: Scene) -> None:
                 for local_i in near_local:
                     abs_idx = int(visible[local_i])
                     pos = galaxies.positions[abs_idx] + off
-                    renderer.SetWorldPoint(float(pos[0]), float(pos[1]), float(pos[2]), 1.0)
+                    renderer.SetWorldPoint(
+                        float(pos[0]), float(pos[1]), float(pos[2]), 1.0
+                    )
                     renderer.WorldToDisplay()
                     dp = renderer.GetDisplayPoint()
                     d2 = (dp[0] - sx) ** 2 + (dp[1] - sy) ** 2
@@ -153,7 +161,6 @@ def build_info_panel(server, scene: Scene) -> None:
         left_clicking=True,
         tolerance=0.025,
     )
-
 
     v3.VLabel(
         ("pick_info",),

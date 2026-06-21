@@ -45,8 +45,8 @@ def galaxy_point_sizes(
 
 def galaxy_world_radii(
     stellar_mass: np.ndarray,
-    r_min: float = 0.025,   # Mpc/h  (low-mass end)
-    r_max: float = 0.35,    # Mpc/h  (high-mass end)
+    r_min: float = 0.025,  # Mpc/h  (low-mass end)
+    r_max: float = 0.35,  # Mpc/h  (high-mass end)
     mass_range: tuple[float, float] = STELLAR_MASS_RANGE,
 ) -> np.ndarray:
     """Per-galaxy world-space gaussian radius (Mpc/h), scaling with stellar mass."""
@@ -60,8 +60,8 @@ def galaxy_world_radii(
 
 def halo_world_radii(
     masses: np.ndarray,
-    r_min: float = 0.15,    # Mpc/h  (low-mass end)
-    r_max: float = 1.5,     # Mpc/h  (high-mass end)
+    r_min: float = 0.15,  # Mpc/h  (low-mass end)
+    r_max: float = 1.5,  # Mpc/h  (high-mass end)
     mass_range: tuple[float, float] = HALO_MASS_RANGE,
 ) -> np.ndarray:
     """Per-halo world-space gaussian radius (Mpc/h), scaling with Mvir."""

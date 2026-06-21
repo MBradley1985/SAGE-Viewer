@@ -19,7 +19,6 @@ from sage_viewer.scene.box_profile import (
 from sage_viewer.scene.scene import Scene
 from sage_viewer.utils.discover import find_models
 
-
 # ──────────────────────────────────────────────────────────────────────────
 # UI palettes
 # ──────────────────────────────────────────────────────────────────────────
@@ -151,25 +150,30 @@ def create_app(
     # click). Vue 3 silently drops <script> tags from templates so we
     # have to inject these via the module/static-asset system.
     import os as _os_static
+
     _sage_static_dir = _os_static.path.join(
         _os_static.path.dirname(__file__), "static"
     )
-    server.enable_module({
-        "serve":   {"sage_static": _sage_static_dir},
-        "scripts": ["sage_static/sage_viewer.js"],
-        "styles":  ["sage_static/sage_theme.css"],
-    })
+    server.enable_module(
+        {
+            "serve": {"sage_static": _sage_static_dir},
+            "scripts": ["sage_static/sage_viewer.js"],
+            "styles": ["sage_static/sage_theme.css"],
+        }
+    )
 
     # xterm.js — browser-side terminal emulator for the console PTY.
-    server.enable_module({
-        "styles":  [
-            "https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css",
-        ],
-        "scripts": [
-            "https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js",
-            "https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js",
-        ],
-    })
+    server.enable_module(
+        {
+            "styles": [
+                "https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css",
+            ],
+            "scripts": [
+                "https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js",
+                "https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js",
+            ],
+        }
+    )
 
     # Single-theme config — DOS Blue is now the only palette.
     _vuetify_config = {
@@ -179,10 +183,10 @@ def create_app(
                 "dos_blue": {
                     "dark": True,
                     "colors": {
-                        "primary":    "#ffff55",   # DOS yellow
-                        "secondary":  "#ffffff",
+                        "primary": "#ffff55",  # DOS yellow
+                        "secondary": "#ffffff",
                         "background": "#000000",
-                        "surface":    "#000000",
+                        "surface": "#000000",
                         "on-surface": "#ffffff",
                         "on-background": "#ffffff",
                     },
@@ -191,15 +195,15 @@ def create_app(
         }
     }
     _NAV_TABS = [
-        ("Structure",   "layers"),
-        ("Filters",     "filters"),
-        ("Record",      "record"),
-        ("Target",      "target"),
+        ("Structure", "layers"),
+        ("Filters", "filters"),
+        ("Record", "record"),
+        ("Target", "target"),
         ("Environment", "environment"),
-        ("Coords",      "coords"),
-        ("Box",         "box"),
-        ("Console",     "console"),
-        ("Library",     "library"),
+        ("Coords", "coords"),
+        ("Box", "box"),
+        ("Console", "console"),
+        ("Library", "library"),
     ]
 
     # ---- Model discovery ------------------------------------------------
@@ -222,19 +226,27 @@ def create_app(
         strip = []
         pm = scene.primary
         s_lbl = pm.snap_table.label(max(0, pm.current_snap))
-        strip.append({
-            "name": pm.name, "label": f"{pm.name}  {s_lbl}",
-            "active": scene.active_box_name == pm.name, "primary": True,
-        })
+        strip.append(
+            {
+                "name": pm.name,
+                "label": f"{pm.name}  {s_lbl}",
+                "active": scene.active_box_name == pm.name,
+                "primary": True,
+            }
+        )
         for adj_name in scene._adjacent_order:
             m = scene._models.get(adj_name)
             if m is None:
                 continue
             al = m.snap_table.label(max(0, m.current_snap))
-            strip.append({
-                "name": adj_name, "label": f"{adj_name}  {al}",
-                "active": scene.active_box_name == adj_name, "primary": False,
-            })
+            strip.append(
+                {
+                    "name": adj_name,
+                    "label": f"{adj_name}  {al}",
+                    "active": scene.active_box_name == adj_name,
+                    "primary": False,
+                }
+            )
         return strip
 
     def _build_models_list() -> list[dict]:
@@ -243,40 +255,53 @@ def create_app(
         out = []
         for entry in discovered:
             name = entry["name"]
-            is_loaded   = name in loaded
-            is_primary  = (name == scene.primary_name)
+            is_loaded = name in loaded
+            is_primary = name == scene.primary_name
             is_adjacent = is_loaded and scene.is_adjacent(name)
-            compatible  = is_loaded and scene.is_compatible_for_overlay(name)
-            overlay_on  = is_loaded and not is_primary and not is_adjacent and loaded[name].visible
-            out.append({
-                "name":       name,
-                "path":       str(entry["par"]),
-                "loaded":     is_loaded,
-                "primary":    is_primary,
-                "compatible": compatible,
-                "overlay":    overlay_on,
-                "adjacent":   is_adjacent,
-            })
+            compatible = is_loaded and scene.is_compatible_for_overlay(name)
+            overlay_on = (
+                is_loaded
+                and not is_primary
+                and not is_adjacent
+                and loaded[name].visible
+            )
+            out.append(
+                {
+                    "name": name,
+                    "path": str(entry["par"]),
+                    "loaded": is_loaded,
+                    "primary": is_primary,
+                    "compatible": compatible,
+                    "overlay": overlay_on,
+                    "adjacent": is_adjacent,
+                }
+            )
         # Loaded-but-not-on-disk (e.g. primary model whose output dir wasn't scanned)
         for name, m in loaded.items():
             if not any(e["name"] == name for e in out):
                 is_adjacent = scene.is_adjacent(name)
-                out.append({
-                    "name": name, "path": str(m.path), "loaded": True,
-                    "primary": name == scene.primary_name,
-                    "compatible": scene.is_compatible_for_overlay(name),
-                    "overlay": m.visible and name != scene.primary_name and not is_adjacent,
-                    "adjacent": is_adjacent,
-                })
+                out.append(
+                    {
+                        "name": name,
+                        "path": str(m.path),
+                        "loaded": True,
+                        "primary": name == scene.primary_name,
+                        "compatible": scene.is_compatible_for_overlay(name),
+                        "overlay": m.visible
+                        and name != scene.primary_name
+                        and not is_adjacent,
+                        "adjacent": is_adjacent,
+                    }
+                )
         return out
 
-    server.state.models_list      = _build_models_list()
-    server.state.active_box_name  = scene.primary_name
-    server.state.box_strip_items  = []
-    server.state.model_loading    = False
+    server.state.models_list = _build_models_list()
+    server.state.active_box_name = scene.primary_name
+    server.state.box_strip_items = []
+    server.state.model_loading = False
     # Rotating quip shown on the "switching models" overlay. Updated by
     # an asyncio task that runs while model_loading is True.
-    server.state.model_quip       = "Switching models, please hold..."
+    server.state.model_quip = "Switching models, please hold..."
     _MODEL_QUIPS: list[str] = [
         "Reticulating splines...",
         "Herding electrons into formation...",
@@ -304,6 +329,7 @@ def create_app(
     async def _quip_loop():
         import asyncio as _asyncio
         import random as _random
+
         try:
             while bool(server.state.model_loading):
                 server.state.model_quip = _random.choice(_MODEL_QUIPS)
@@ -318,18 +344,21 @@ def create_app(
     @server.state.change("model_loading")
     def on_model_loading_change(model_loading, **_):
         import asyncio as _asyncio
+
         if model_loading:
             if _quip_task[0] is None or _quip_task[0].done():
                 _quip_task[0] = _asyncio.ensure_future(_quip_loop())
         else:
             if _quip_task[0] is not None and not _quip_task[0].done():
                 _quip_task[0].cancel()
-    server.state.model_fields     = scene.primary.fields_available
-    server.state.primary_model    = scene.primary.name
+
+    server.state.model_fields = scene.primary.fields_available
+    server.state.primary_model = scene.primary.name
     # Snackbar for overlay-compatibility errors etc.
-    server.state.notice_show      = False
-    server.state.notice_text      = ""
-    server.state.notice_color     = "warning"
+    server.state.notice_show = False
+    server.state.notice_text = ""
+    server.state.notice_color = "warning"
+
     # Per-model flags used by static menu items (dict keyed by name)
     def _model_flags() -> dict:
         loaded = {m.name: m for m in scene.list_models()}
@@ -338,20 +367,26 @@ def create_app(
             n = entry["name"]
             is_adjacent = scene.is_adjacent(n) if n in loaded else False
             out[n] = {
-                "primary":     n == scene.primary.name,
-                "loaded":      n in loaded,
-                "overlay":     n in loaded and loaded[n].visible and n != scene.primary.name and not is_adjacent,
-                "compatible":  scene.is_compatible_for_overlay(n) if n in loaded else True,
-                "adjacent":    is_adjacent,
+                "primary": n == scene.primary.name,
+                "loaded": n in loaded,
+                "overlay": n in loaded
+                and loaded[n].visible
+                and n != scene.primary.name
+                and not is_adjacent,
+                "compatible": (
+                    scene.is_compatible_for_overlay(n) if n in loaded else True
+                ),
+                "adjacent": is_adjacent,
             }
         return out
+
     server.state.model_flags = _model_flags()
 
     def _refresh_models_state() -> None:
-        server.state.models_list     = _build_models_list()
-        server.state.model_fields    = scene.primary.fields_available
-        server.state.primary_model   = scene.primary.name
-        server.state.model_flags     = _model_flags()
+        server.state.models_list = _build_models_list()
+        server.state.model_fields = scene.primary.fields_available
+        server.state.primary_model = scene.primary.name
+        server.state.model_flags = _model_flags()
         server.state.box_strip_items = _build_box_strip_items()
         server.state.flush()
 
@@ -360,9 +395,12 @@ def create_app(
     @server.controller.set("switch_model")
     async def on_switch_model(name: str):
         import asyncio
+
         server.state.model_loading = True
         server.state.flush()
-        await asyncio.sleep(0)   # yield so the browser receives model_loading=True
+        await asyncio.sleep(
+            0
+        )  # yield so the browser receives model_loading=True
         try:
             if not scene.has_model(name):
                 entry = discovered_by_name.get(name)
@@ -378,17 +416,20 @@ def create_app(
             # UI always reflects the new model, even when snap_num hasn't
             # changed numerically (e.g. both models share the same snap count).
             z0 = scene.primary.snap_count - 1
-            server.state.snap_max   = z0
-            server.state.snap_num   = z0
+            server.state.snap_max = z0
+            server.state.snap_num = z0
             server.state.snap_label = scene.snap_label
             _refresh_models_state()
 
     @server.controller.set("toggle_overlay")
     async def on_toggle_overlay(name: str):
         import asyncio
+
         server.state.model_loading = True
         server.state.flush()
-        await asyncio.sleep(0)   # yield so the browser receives model_loading=True
+        await asyncio.sleep(
+            0
+        )  # yield so the browser receives model_loading=True
         try:
             if not scene.has_model(name):
                 entry = discovered_by_name.get(name)
@@ -399,9 +440,9 @@ def create_app(
             # Try the toggle; capture any compatibility error
             err = scene.set_overlay_visible(name, not model.visible)
             if err is not None:
-                server.state.notice_text  = err
+                server.state.notice_text = err
                 server.state.notice_color = "warning"
-                server.state.notice_show  = True
+                server.state.notice_show = True
             elif model.visible:
                 model.loader.preload_all()
         finally:
@@ -411,6 +452,7 @@ def create_app(
     @server.controller.set("toggle_adjacent")
     async def on_toggle_adjacent(name: str):
         import asyncio
+
         entry = discovered_by_name.get(name)
         if entry is not None:
             par_path = entry["par"]
@@ -420,13 +462,15 @@ def create_app(
             return
         server.state.model_loading = True
         server.state.flush()
-        await asyncio.sleep(0)   # yield so the browser receives model_loading=True
+        await asyncio.sleep(
+            0
+        )  # yield so the browser receives model_loading=True
         try:
             is_now_adj, err = scene.toggle_adjacent(par_path)
             if err:
-                server.state.notice_text  = err
+                server.state.notice_text = err
                 server.state.notice_color = "warning"
-                server.state.notice_show  = True
+                server.state.notice_show = True
                 return
             if is_now_adj:
                 adj_m = scene._models.get(name)
@@ -514,7 +558,8 @@ def create_app(
     # `v-theme--<name>` class instantly when ui_theme changes.
     server.state.ui_theme = "dos_blue"
     with SinglePageLayout(
-        server, full_height=True,
+        server,
+        full_height=True,
         vuetify_config=_vuetify_config,
         theme=("ui_theme",),
         style="background:#000000;",
@@ -609,7 +654,10 @@ def create_app(
                             prepend_icon=(
                                 "m.overlay ? 'mdi-layers' : 'mdi-layers-plus'",
                             ),
-                            click=(server.controller.toggle_overlay, "[m.name]"),
+                            click=(
+                                server.controller.toggle_overlay,
+                                "[m.name]",
+                            ),
                             active=("m.overlay",),
                             color="cyan",
                             density="compact",
@@ -638,7 +686,10 @@ def create_app(
                                 "? 'mdi-check-circle-outline' "
                                 ": 'mdi-view-split-vertical'",
                             ),
-                            click=(server.controller.toggle_adjacent, "[m.name]"),
+                            click=(
+                                server.controller.toggle_adjacent,
+                                "[m.name]",
+                            ),
                             active=("m.adjacent",),
                             color="cyan",
                             density="compact",
@@ -696,7 +747,6 @@ def create_app(
 
             build_toolbar(server, scene)
 
-
         with layout.content:
             # Pixel-style monospace for the retro palettes — loaded via a
             # real <link> tag so the browser treats it as a normal external
@@ -715,17 +765,17 @@ def create_app(
 
             # ── Export catalogue dialog ────────────────────────────────────
             _SCOPE_ITEMS = [
-                {"title": "Current Filters",  "value": "filters"},
-                {"title": "Target Galaxy",    "value": "target"},
-                {"title": "Group Members",    "value": "group"},
-                {"title": "Coords Sphere",    "value": "coords"},
-                {"title": "Box Region",       "value": "box"},
+                {"title": "Current Filters", "value": "filters"},
+                {"title": "Target Galaxy", "value": "target"},
+                {"title": "Group Members", "value": "group"},
+                {"title": "Coords Sphere", "value": "coords"},
+                {"title": "Box Region", "value": "box"},
             ]
             _FMT_ITEMS = [
-                {"title": "CSV",  "value": "csv"},
+                {"title": "CSV", "value": "csv"},
                 {"title": "HDF5", "value": "hdf5"},
                 {"title": "FITS", "value": "fits"},
-                {"title": "TXT",  "value": "txt"},
+                {"title": "TXT", "value": "txt"},
             ]
             with v3.VDialog(
                 v_model=("export_dialog_show",),
@@ -745,8 +795,11 @@ def create_app(
                             "border-bottom:1px solid #374151;"
                         ),
                     ):
-                        v3.VIcon("mdi-database-export-outline",
-                                 color="cyan", size="small")
+                        v3.VIcon(
+                            "mdi-database-export-outline",
+                            color="cyan",
+                            size="small",
+                        )
                         html.Span(
                             "Export Galaxy Catalogue",
                             style=(
@@ -756,8 +809,10 @@ def create_app(
                         )
                         v3.VSpacer()
                         v3.VBtn(
-                            icon="mdi-close", size="x-small",
-                            variant="text", color="#9ca3af",
+                            icon="mdi-close",
+                            size="x-small",
+                            variant="text",
+                            color="#9ca3af",
                             click="export_dialog_show = false",
                         )
                     with v3.VCardText(
@@ -867,7 +922,9 @@ def create_app(
                 # Render window + loading overlay
                 with v3.VSheet(
                     style="position:relative;flex:1;height:100%;display:flex;min-width:0;",
-                    color="transparent", rounded=False, elevation=0,
+                    color="transparent",
+                    rounded=False,
+                    elevation=0,
                 ):
                     view = VtkRemoteView(
                         scene.plotter.ren_win,
@@ -921,7 +978,8 @@ def create_app(
                             "z-index:10;color:#e2e8f0;"
                             "resize:both;overflow:hidden;"
                         ),
-                        elevation=0, rounded=False,
+                        elevation=0,
+                        rounded=False,
                     ):
                         # Title bar — also the drag handle (cursor:move +
                         # ".sage-popout-handle" picked up by the global
@@ -945,17 +1003,17 @@ def create_app(
                             )
                             v3.VSpacer()
                             v3.VBtn(
-                                icon="mdi-close", size="x-small",
-                                variant="text", color="#9ca3af",
+                                icon="mdi-close",
+                                size="x-small",
+                                variant="text",
+                                color="#9ca3af",
                                 click=server.controller.console_toggle_popout,
                             )
                         # Terminal mode: xterm.js instance in the pop-out.
                         html.Div(
                             id=("'sage-pty-popout-' + console_active_id",),
                             v_show=("console_mode === 'terminal'",),
-                            style=(
-                                "flex:1 1 0;min-height:0;overflow:hidden;"
-                            ),
+                            style=("flex:1 1 0;min-height:0;overflow:hidden;"),
                         )
                         # Command mode: mirrored history + input.
                         with v3.VSheet(
@@ -1002,8 +1060,10 @@ def create_app(
                                 v3.VTextField(
                                     v_model=("console_input",),
                                     label="SAGE Commands",
-                                    hide_details=True, variant="outlined",
-                                    bg_color="#1a1a2e", density="compact",
+                                    hide_details=True,
+                                    variant="outlined",
+                                    bg_color="#1a1a2e",
+                                    density="compact",
                                     style="font-family:monospace;",
                                     keydown_enter=server.controller.console_submit,
                                 )
@@ -1022,7 +1082,9 @@ def create_app(
                     # Galaxy info panel — draggable card; drag handle is
                     # the title bar (sage-popout-handle picked up by JS).
                     with v3.VCard(
-                        v_show=("galinfo_show && nav_active_tab === 'target'",),
+                        v_show=(
+                            "galinfo_show && nav_active_tab === 'target'",
+                        ),
                         classes="sage-popout",
                         style=(
                             "position:absolute;top:32px;right:24px;"
@@ -1045,10 +1107,15 @@ def create_app(
                                 "border-bottom:1px solid #1f2937;"
                             ),
                         ):
-                            v3.VIcon("mdi-information-outline",
-                                     size="small", color="cyan",
-                                     style="margin-right:6px;")
-                            html.Span("Galaxy Information", style="color:#06b6d4;")
+                            v3.VIcon(
+                                "mdi-information-outline",
+                                size="small",
+                                color="cyan",
+                                style="margin-right:6px;",
+                            )
+                            html.Span(
+                                "Galaxy Information", style="color:#06b6d4;"
+                            )
                             v3.VSpacer()
                             v3.VBtn(
                                 icon="mdi-close",
@@ -1079,7 +1146,9 @@ def create_app(
                     # Group / cluster info panel — draggable, same initial
                     # position as the Galaxy info card (mutually exclusive).
                     with v3.VCard(
-                        v_show=("groupinfo_show && nav_active_tab === 'environment'",),
+                        v_show=(
+                            "groupinfo_show && nav_active_tab === 'environment'",
+                        ),
                         classes="sage-popout",
                         style=(
                             "position:absolute;top:32px;right:24px;"
@@ -1102,10 +1171,15 @@ def create_app(
                                 "border-bottom:1px solid #1f2937;"
                             ),
                         ):
-                            v3.VIcon("mdi-account-group-outline",
-                                     size="small", color="cyan",
-                                     style="margin-right:6px;")
-                            html.Span("Group Information", style="color:#06b6d4;")
+                            v3.VIcon(
+                                "mdi-account-group-outline",
+                                size="small",
+                                color="cyan",
+                                style="margin-right:6px;",
+                            )
+                            html.Span(
+                                "Group Information", style="color:#06b6d4;"
+                            )
                             v3.VSpacer()
                             v3.VBtn(
                                 icon="mdi-close",
@@ -1161,17 +1235,22 @@ def create_app(
                                 "padding:10px 12px 6px;cursor:move;"
                             ),
                         ):
-                            v3.VIcon("mdi-folder-multimedia-outline",
-                                     size="small", color="cyan",
-                                     style="margin-right:6px;")
+                            v3.VIcon(
+                                "mdi-folder-multimedia-outline",
+                                size="small",
+                                color="cyan",
+                                style="margin-right:6px;",
+                            )
                             html.Span("{{ item.name }}")
                             v3.VSpacer()
                             v3.VBtn(
                                 icon="mdi-close",
                                 size="x-small",
                                 variant="text",
-                                click=(server.controller.library_close_item,
-                                       "[item.id]"),
+                                click=(
+                                    server.controller.library_close_item,
+                                    "[item.id]",
+                                ),
                             )
                         v3.VDivider()
                         with v3.VCardText(style="padding:8px 12px;"):
@@ -1217,7 +1296,9 @@ def create_app(
                                 ),
                             )
                             v3.VProgressLinear(
-                                indeterminate=True, color="cyan", height=4,
+                                indeterminate=True,
+                                color="cyan",
+                                height=4,
                                 style="width:100%;",
                             )
                             v3.VLabel(
@@ -1231,7 +1312,9 @@ def create_app(
 
                     # Box strip — shown when at least one adjacent box is loaded
                     with html.Div(
-                        v_show=("box_strip_items && box_strip_items.length > 1",),
+                        v_show=(
+                            "box_strip_items && box_strip_items.length > 1",
+                        ),
                         style=(
                             "position:absolute;bottom:0;left:0;right:0;"
                             "z-index:10;height:44px;"
@@ -1243,7 +1326,10 @@ def create_app(
                         with html.Div(
                             v_for=("b in box_strip_items",),
                             key=("'bs-' + b.name",),
-                            click=(server.controller.set_active_box, "[b.name]"),
+                            click=(
+                                server.controller.set_active_box,
+                                "[b.name]",
+                            ),
                             style=(
                                 "b.active "
                                 "? 'display:flex;align-items:center;gap:6px;"
@@ -1271,7 +1357,10 @@ def create_app(
                                 size="x-small",
                                 variant="text",
                                 style="font-size:0.6rem;min-width:28px;color:#6b7280;",
-                                click=(server.controller.clear_box, "[b.name]"),
+                                click=(
+                                    server.controller.clear_box,
+                                    "[b.name]",
+                                ),
                             )
 
                 # Right panel — layers + navigation tabs.

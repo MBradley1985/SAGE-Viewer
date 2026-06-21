@@ -99,11 +99,13 @@ def main(argv: list[str] | None = None) -> None:
 
 def _launch_mode(args) -> None:
     from sage_viewer._version import __version__ as _ver
+
     print(f"\nSAGE-Viewer {_ver}  —  Launch Mode")
     print(f"Port     : {args.port}")
     print(f"\n  --> Open http://localhost:{args.port} in your browser\n")
 
     from sage_viewer.wizard.launch import create_launch_app
+
     server = create_launch_app(port=args.port)
     server.start(port=args.port, open_browser=False)
 
@@ -115,6 +117,7 @@ def _explore_mode(args) -> None:
         sys.exit(1)
 
     from sage_viewer._version import __version__ as _ver
+
     print(f"\nSAGE-Viewer {_ver}  —  Explore Mode")
     print(f"Par file : {par_path.resolve()}")
     print(f"Workers  : {args.n_jobs}")
@@ -137,7 +140,9 @@ def _explore_mode(args) -> None:
     print("[3/4] Building scene and Trame UI...")
     print(f"Snapshot : {scene.snap_label}")
     print(f"[4/4] Starting server on port {args.port}...")
-    print(f"         Background: preloading all {scene.snap_count} snapshots into memory...")
+    print(
+        f"         Background: preloading all {scene.snap_count} snapshots into memory..."
+    )
     print(f"\n  --> Open http://localhost:{args.port} in your browser\n")
 
     server.start(port=args.port, open_browser=False)

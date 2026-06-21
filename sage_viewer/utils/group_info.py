@@ -40,19 +40,19 @@ def build_group_info(
     if n_members == 0:
         return {}
 
-    sm   = galaxies.stellar_mass[members]
-    sfr  = galaxies.sfr[members]
-    bmm  = galaxies.bulge_mass[members]
-    cgm  = galaxies.cold_gas[members]
-    gt   = galaxies.gal_type[members]
-    pos  = galaxies.positions[members]
+    sm = galaxies.stellar_mass[members]
+    sfr = galaxies.sfr[members]
+    bmm = galaxies.bulge_mass[members]
+    cgm = galaxies.cold_gas[members]
+    gt = galaxies.gal_type[members]
+    pos = galaxies.positions[members]
 
-    total_sm   = float(sm.sum())
-    total_sfr  = float(sfr.sum())
-    total_cgm  = float(cgm.sum())
-    mean_bt    = float((bmm / np.maximum(sm, 1.0)).mean())
-    n_central  = int((gt == 0).sum())
-    n_sat      = n_members - n_central
+    total_sm = float(sm.sum())
+    total_sfr = float(sfr.sum())
+    total_cgm = float(cgm.sum())
+    mean_bt = float((bmm / np.maximum(sm, 1.0)).mean())
+    n_central = int((gt == 0).sum())
+    n_sat = n_members - n_central
     is_central = bool(galaxies.gal_type[idx] == 0)
 
     # Host Mvir from CentralMvir (Msun) if available, else from picked galaxy's mvir
@@ -74,18 +74,18 @@ def build_group_info(
 
     info: dict = {
         "Classification": classification,
-        "Members":        f"{n_members}  ({n_central} central, {n_sat} sat.)",
-        "Host Mvir":      f"{host_mvir:.2e} Msun",
+        "Members": f"{n_members}  ({n_central} central, {n_sat} sat.)",
+        "Host Mvir": f"{host_mvir:.2e} Msun",
         "Total Stellar Mass": f"{total_sm:.2e} Msun",
-        "Total Cold Gas":     f"{total_cgm:.2e} Msun",
-        "Total SFR":          f"{total_sfr:.2e} Msun/yr",
-        "Mean B/T":       f"{mean_bt:.2f}",
-        "Extent":         f"{extent:.2f} Mpc/h",
-        "Target role":    "Central" if is_central else "Satellite",
+        "Total Cold Gas": f"{total_cgm:.2e} Msun",
+        "Total SFR": f"{total_sfr:.2e} Msun/yr",
+        "Mean B/T": f"{mean_bt:.2f}",
+        "Extent": f"{extent:.2f} Mpc/h",
+        "Target role": "Central" if is_central else "Satellite",
     }
 
     # Optional: brightest / most massive member (the central, by definition)
-    cidx_local = int(np.argmin(gt))   # smallest type → most likely central (0)
+    cidx_local = int(np.argmin(gt))  # smallest type → most likely central (0)
     bcg_sm = float(sm[cidx_local])
     info["BCG Stellar Mass"] = f"{bcg_sm:.2e} Msun"
 
