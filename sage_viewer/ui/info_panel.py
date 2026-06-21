@@ -14,13 +14,14 @@ _DOUBLE_CLICK_THRESHOLD = 0.45   # seconds between two clicks to count as double
 def build_info_panel(server, scene: Scene) -> None:
     """Footer pick-info bar + double-click galaxy selection."""
     state = server.state
+    ctrl = server.controller
     state.pick_info = "Double-click any point to select the nearest galaxy"
 
     _last_click: list[float] = [0.0]
 
     def _push():
-        if hasattr(server.controller, "view_update"):
-            server.controller.view_update()
+        if hasattr(ctrl, "view_update"):
+            ctrl.view_update()
 
     def _on_pick(point):
         """Fires on every left-click; only selects on a fast second click."""
@@ -33,15 +34,14 @@ def build_info_panel(server, scene: Scene) -> None:
             if not np.all(np.abs(pt) < 1e-10):
                 clicked_box = scene.box_name_at(float(pt[0]))
                 if clicked_box != scene.active_box_name:
-                    if hasattr(server.controller, "set_active_box"):
-                        server.controller.set_active_box(clicked_box)
+                    if hasattr(ctrl, "set_active_box"):
+                        ctrl.set_active_box(clicked_box)
 
         if dt > _DOUBLE_CLICK_THRESHOLD:
-            # First click — ignore; wait for the matching second click.
+            # First click — wait for the matching second click.
             return
 
-        # Second click fired in time — reset the timer so the next click
-        # starts a fresh double-click cycle (avoids triple-click cascades).
+        # Second click fired in time — reset timer so triple-click won't cascade.
         _last_click[0] = 0.0
 
         if point is None:
@@ -50,57 +50,97 @@ def build_info_panel(server, scene: Scene) -> None:
         if np.all(np.abs(point) < 1e-10):
             return
 
-        # Use the active model so double-click selection works in any box.
         active = scene.active_model
         halos, galaxies = active.loader.get(active.current_snap)
         off = active.offset.astype(np.float64)
         lines = [f"({point[0]:.2f}, {point[1]:.2f}, {point[2]:.2f}) Mpc/h"]
 
-        # Nearest halo — record into nav_halo_idx so the Environment tab's
-        # halo selector reflects what the user just double-clicked.
-        # Camera halo index is built in world coords so point is used directly.
-        if halos.count > 0:
-            hidx = scene.camera._halo_index.nearest(tuple(point))
-            hm = halos.masses[hidx]
-            lines.append(f"Halo Mvir = {hm:.2e} Msun (idx {hidx})")
-            state.nav_halo_idx = int(hidx)
-
-        # Nearest galaxy — only among currently visible galaxies so that
-        # environment filters, focus regions, and slider filters are all
-        # respected: you can only click what you can see.
+        # ── Galaxy selection ──────────────────────────────────────────────
+        # Respect environment checkboxes and all other filters via _combined_mask.
+        # If combined_mask returns None (size mismatch during a snapshot transition),
+        # fall back to _filter_mask so environment checkboxes are always honoured.
+        gidx = None
+        gpos = None
         if galaxies.count > 0:
             mask = scene.galaxy_layer._combined_mask()
             if mask is None:
-                visible = np.arange(galaxies.count)
-            else:
-                visible = np.where(mask)[0]
+                mask = scene.galaxy_layer._filter_mask
+            visible = np.where(mask)[0] if mask is not None else np.arange(galaxies.count)
 
-            if len(visible) == 0:
-                gidx = None
-            else:
-                # Galaxy positions are model-local; add offset for world coords.
+            if len(visible) > 0:
                 gal_world = galaxies.positions[visible] + off
-                _, hit = KDTree(gal_world).query(point)
-                gidx = int(visible[hit])
 
-            if gidx is not None:
-                sm = galaxies.stellar_mass[gidx]
-                ss = galaxies.ssfr[gidx]
-                gt = "central" if galaxies.gal_type[gidx] == 0 else "satellite"
-                lines.append(
-                    f"Galaxy M* = {sm:.2e} Msun  sSFR = {ss:.2e} yr^-1  "
-                    f"({gt})  →  idx {gidx} selected"
-                )
-                state.nav_gal_idx = gidx
-                gpos = galaxies.positions[gidx] + off
-                scene.camera._add_circle_indicator(
-                    (float(gpos[0]), float(gpos[1]), float(gpos[2])), 0.0
-                )
+                # Two-stage selection for screen-space accuracy:
+                # 1. Find the 50 nearest in 3D world space (fast pre-filter).
+                # 2. Project those candidates to screen pixels and take the one
+                #    visually closest to the cursor — avoids picking a galaxy
+                #    that is 3D-near but hidden behind a visually closer one.
+                k = min(50, len(visible))
+                _, near_local = KDTree(gal_world).query(point, k=k)
+                if np.isscalar(near_local):
+                    near_local = [near_local]
 
-        state.flush()
-        _push()
+                renderer = scene.plotter.renderer
+                sx, sy = scene.plotter.iren.get_event_position()
+                best_dist2 = float("inf")
+                for local_i in near_local:
+                    abs_idx = int(visible[local_i])
+                    pos = galaxies.positions[abs_idx] + off
+                    renderer.SetWorldPoint(float(pos[0]), float(pos[1]), float(pos[2]), 1.0)
+                    renderer.WorldToDisplay()
+                    dp = renderer.GetDisplayPoint()
+                    d2 = (dp[0] - sx) ** 2 + (dp[1] - sy) ** 2
+                    if d2 < best_dist2:
+                        best_dist2 = d2
+                        gidx = abs_idx
+
+                if gidx is not None:
+                    gpos = galaxies.positions[gidx] + off
+
+        if gidx is not None:
+            sm = galaxies.stellar_mass[gidx]
+            ss = galaxies.ssfr[gidx]
+            gt = "central" if galaxies.gal_type[gidx] == 0 else "satellite"
+            lines.append(
+                f"Galaxy M* = {sm:.2e} Msun  sSFR = {ss:.2e} yr^-1  "
+                f"({gt})  →  idx {gidx} selected"
+            )
+            state.nav_gal_idx = gidx
+            scene.camera._add_circle_indicator(
+                (float(gpos[0]), float(gpos[1]), float(gpos[2])), 0.0
+            )
+            # Force info panel refresh even when the same galaxy is re-selected
+            # (Trame's @state.change won't fire if the value didn't change).
+            if bool(state.galinfo_show):
+                ctrl.show_galaxy_info()
+            elif bool(state.groupinfo_show):
+                ctrl.show_group_info()
+
+        # ── Halo selection ────────────────────────────────────────────────
+        # Search nearest VISIBLE halo to the selected galaxy position rather than
+        # the raw click point — ensures halo and galaxy are from the same
+        # environment and avoids landing on a halo from a filtered-out type.
+        if halos.count > 0:
+            search_pt = tuple(gpos) if gpos is not None else tuple(point)
+            hmask = scene.halo_layer._combined_mask()
+            if hmask is not None:
+                h_visible = np.where(hmask)[0]
+                hidx = None
+                if len(h_visible) > 0:
+                    h_world = halos.positions[h_visible] + off
+                    _, hhit = KDTree(h_world).query(search_pt)
+                    hidx = int(h_visible[hhit])
+            else:
+                hidx = scene.camera._halo_index.nearest(search_pt)
+
+            if hidx is not None:
+                hm = halos.masses[hidx]
+                lines.append(f"Halo Mvir = {hm:.2e} Msun (idx {hidx})")
+                state.nav_halo_idx = int(hidx)
 
         state.pick_info = "   |   ".join(lines)
+        state.flush()
+        _push()
 
     # Picker is on globally: a double-click anywhere selects the nearest
     # galaxy and halo, placing a circle indicator but NOT moving the
