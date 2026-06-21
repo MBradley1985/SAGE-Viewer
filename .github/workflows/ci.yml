@@ -35,7 +35,7 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Start virtual display for headless VTK
         run: |
-          sudo apt-get install -y libgl1-mesa-glx xvfb
+          sudo apt-get install -y libgl1 xvfb
           Xvfb :99 -screen 0 1024x768x24 &
           echo "DISPLAY=:99" >> $GITHUB_ENV
       - name: Run tests
