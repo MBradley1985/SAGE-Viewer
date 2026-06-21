@@ -181,14 +181,13 @@ class Scene:
         return self._active_box_name
 
     def set_active_box(self, name: str) -> None:
-        """Switch which box the UI controls and refocus the camera on it.
+        """Switch which box the UI controls.
         Profile save/restore is handled by the app layer."""
         if name not in self._models:
             return
         self._active_box_name = name
         self._camera_names = {name}
         self._update_rings()
-        self._focus_camera()
         self._plotter.render()
 
     def toggle_camera_box(self, name: str) -> None:
@@ -240,7 +239,6 @@ class Scene:
             self._recompute_offsets()
             self._update_labels()
             self._update_rings()
-            self._focus_camera()
             self._plotter.render()
             for cb in self._on_model_change:
                 cb()
@@ -259,7 +257,6 @@ class Scene:
             model.visible = True
             self._update_labels()
             self._update_rings()
-            self._focus_camera()
             self._plotter.render()
             for cb in self._on_model_change:
                 cb()
