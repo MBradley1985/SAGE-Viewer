@@ -34,7 +34,7 @@ SAGE-Viewer's browser UI has three main regions and a number of overlays that ap
 
 ## Right tabs panel
 
-Seven tabs across a 3-column wrap layout:
+Nine tabs across a 3-column wrap layout:
 
 | Tab | Purpose |
 |---|---|
@@ -43,10 +43,22 @@ Seven tabs across a 3-column wrap layout:
 | Record      | Screenshots (PNG / JPG / TIFF) and movies (GIF / MOV / PNG sequence) |
 | Target      | Fly to halo / galaxy by index, focus-zoom presets, Galaxy Info, Highlight Galaxy |
 | Environment | Halo selector, env-class checkboxes, Group Info, Highlight Members |
-| Coords      | Fly to arbitrary (x, y, z) |
-| Box         | Zoom to axis-aligned sub-box |
+| Coords      | Fly to arbitrary (x, y, z); **Draw Sphere** for interactive focus region |
+| Box         | Zoom to axis-aligned sub-box; **Draw Box** for interactive focus region |
+| Console     | PTY-backed xterm.js terminal + Python REPL + SAGE command mode; multiple sessions; pop-out window |
+| Library     | Browse screenshots and movies; double-click a row to open as a floating card over the viewport |
 
-Above the tabs sit two row-spanning controls — **Reset Camera**, **Focus toggle**, and **Centre** — that work regardless of which tab is active.
+Above the tabs sit three row-spanning controls — **Reset Camera**, **Focus toggle**, and **Centre** — that work regardless of which tab is active.
+
+## Multi-box strip
+
+When two or more SAGE models are loaded side-by-side (via `+SBS` in the hamburger menu), a **box strip** appears at the bottom of the viewport. Each box is shown as a labelled chip:
+
+- Click any chip to make that box **active** (label turns green)
+- All right-panel tab controls then target the active box
+- **CLR** in the strip resets that box to default settings without affecting others
+
+The box strip is hidden in single-model mode.
 
 ## Render-window overlays
 

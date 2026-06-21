@@ -37,7 +37,7 @@ sage-viewer --par input/millennium.par --n-jobs -1
 1. The scene loads at the requested snapshot (default: z=0, snap 63).
 2. Use the **timeline slider** in the toolbar to jump to any snapshot.
 3. Press **▶ Play** to animate through cosmic time.
-4. Toggle **Dark Matter Haloes** or **Galaxies** off in the left panel.
+4. Toggle **Dark Matter Haloes** or **Galaxies** off in the **Structure** tab (right panel).
 5. Change **Colour by** to `ssfr` to highlight star-forming galaxies.
-6. In the right panel, enter a halo index and press **Go** to fly there.
-7. Click any point in the scene to see its properties in the status bar.
+6. In the **Target** tab, enter a halo index and press **Go** to fly there.
+7. **Double-click** any point in the scene to select the nearest galaxy and see its properties in the info bar.

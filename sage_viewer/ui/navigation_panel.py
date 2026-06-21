@@ -1687,7 +1687,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         if pf != last_url:
                             last_url = pf
                             raw = base64.b64decode(pf.split(",", 1)[1])
-                            last_frame = _PIL.open(_io.BytesIO(raw)).convert("RGB")
+                            _img = _PIL.open(_io.BytesIO(raw)).convert("RGB")
+                            sc = _record_state.get("scale", 1)
+                            if sc > 1:
+                                try:
+                                    _rs = _PIL.Resampling.LANCZOS
+                                except AttributeError:
+                                    _rs = _PIL.LANCZOS
+                                _img = _img.resize(
+                                    (_img.width * sc, _img.height * sc), _rs
+                                )
+                            last_frame = _img
                         if last_frame is not None:
                             outpath = (
                                 _record_state["dir"]
@@ -1820,6 +1830,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     img = _PilGif.open(str(p)).convert("RGB")
                     if need_crop:
                         img = img.crop((0, 0, ew, eh))
+                    # Resize to canonical size if a frame is unexpectedly
+                    # different (e.g. live-VTK frames at 2× vs native
+                    # playback frames before the scale fix took effect).
+                    if img.size != (ew, eh):
+                        try:
+                            _gif_rs = _PilGif.Resampling.LANCZOS
+                        except AttributeError:
+                            _gif_rs = _PilGif.LANCZOS
+                        img = img.resize((ew, eh), _gif_rs)
                     imgs.append(_np_gif.array(img))  # copy; allows img to be freed
                     img.close()
                 # loop=0 = infinite, loop=1 = play once

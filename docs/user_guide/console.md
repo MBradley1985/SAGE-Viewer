@@ -8,33 +8,21 @@ The **Console** tab is a multi-mode terminal embedded in the viewer's right pane
 |---|---|---|
 | **Terminal** (default) | (active on open) | `host:basename user$` |
 | **Python REPL** | type `python` / `python3` / `py` | `>>>` |
-| **SAGE commands** | type `command` / `cmd` | `cmd>` |
+| **SAGE commands** | click **SAGE Cmds** button | `cmd>` |
 
-Type `exit`, `quit`, or `terminal` from any non-default mode to return to the terminal prompt.
+Type `terminal` from any non-default mode to return to the shell. Type `exit` or `quit` from REPL or SAGE command mode to return to the shell.
 
 ## Terminal mode
 
-Each line is passed to your `$SHELL` via `asyncio.create_subprocess_shell` with the active session's `cwd` and `env`. Output streams line-by-line into the history entry as the process runs. Globs, pipes, redirects, `&` backgrounding, and `$VAR` expansion all work as in a normal interactive shell.
+The terminal is backed by a real PTY (`$SHELL -l`), so full ANSI colour, cursor control, and interactive programs (`vim`, `top`, `htop`, `less`, ncurses apps) all work exactly as they would in your local terminal.
 
-Three built-ins are intercepted in-process so they persist between commands (a subprocess can't change the parent's cwd):
+Three built-ins are intercepted in-process so they persist between commands:
 
 | Built-in | Behaviour |
 |---|---|
-| `cd <path>` / `cd` | Change directory (no arg → `~`). Updates the session cwd; the prompt's `basename` segment refreshes accordingly. |
+| `cd <path>` / `cd` | Change directory (no arg → `~`). Updates the session cwd; the prompt refreshes accordingly. |
 | `pwd` | Print the session cwd. |
 | `export FOO=bar` | Set an env var on the session; future commands inherit it. `export FOO=` clears the var. |
-
-Commands stream output line-by-line as they run — you see each output line appear in the history entry in real time rather than waiting for the process to finish. There is a 300 s timeout. For fire-and-forget jobs, background with `&`:
-
-```
-mbradley$ python plot.py &
-```
-
-The prompt returns immediately; backgrounded output won't stream back (redirect to a log file if you need to capture it).
-
-### Limitations
-
-There's no pty, so anything that needs raw terminal control (`vim`, `top`, `less`, ncurses apps) won't render properly. For an HPC workflow `sbatch`, `squeue`, `ls`, `cat`, `python ...`, `tail file.log`, etc. all work fine.
 
 ## Python REPL mode
 
@@ -86,12 +74,13 @@ The same parser that backed the previous Console tab. Useful for one-shot comman
 
 Click the `+` button in the tab strip at the top to spawn another console. Each session has its own:
 
+- PTY process (`$SHELL -l`)
 - Command history
 - Mode (one can be in Python while another is in shell)
 - Shell `cwd` and `env`
 - Python interpreter (variables defined in Console 1 are not visible in Console 2)
 
-Close a session via its `×` (only shown when more than one exists).
+Close a session via its `×` (only shown when more than one exists). All PTY sessions are cleaned up automatically when the viewer exits.
 
 ## Load Script
 

@@ -426,10 +426,6 @@ Do not re-order steps 1–6 or the old box's state leaks into the new one.
 
 ---
 
-## Likely next-up things
-
-- **`HALO_CB` / `GAL_CB` colour-by descriptors** still hard-coded — could be derived from `model_fields` so unsupported fields don't even appear in the dropdown.
-
 ---
 
 ## Style / housekeeping

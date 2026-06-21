@@ -104,9 +104,13 @@ Both supported automatically — point at the `.par` file and SAGE-Viewer figure
 ## Quick start
 
 ```bash
-pip install sage-viewer
+git clone https://github.com/MBradley1985/SAGE-Viewer
+cd SAGE-Viewer
+pip install -e .
 sage-viewer --par /path/to/millennium.par
 ```
+
+> **Note:** PyPI publishing is coming with v1.0. Until then, install from source as above.
 
 Open the printed URL in any browser. To launch on a remote cluster and view locally, use SSH port-forwarding:
 
@@ -156,10 +160,7 @@ then `sage-viewer --par input/millennium.par` discovers all three models automat
 ## Installation
 
 ```bash
-# From PyPI
-pip install sage-viewer
-
-# From source
+# From source (PyPI release coming with v1.0)
 git clone https://github.com/MBradley1985/SAGE-Viewer
 cd SAGE-Viewer
 pip install -e ".[dev]"
