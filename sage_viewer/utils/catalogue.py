@@ -77,8 +77,8 @@ def _build_metadata(
     n_galaxies: int,
     scope_label: str,
     scope_bounds: dict | None,
-    cfg: "SimConfig | None",
-    snap_table: "SnapshotTable | None",
+    cfg: SimConfig | None,
+    snap_table: SnapshotTable | None,
 ) -> dict[str, str]:
     """Build an ordered metadata dict covering export info, simulation
     parameters, cosmology, and selection bounds."""
@@ -150,8 +150,8 @@ def write_catalogue(
     hubble_h: float = 0.73,
     scope_label: str = "",
     scope_bounds: dict | None = None,
-    cfg: "SimConfig | None" = None,
-    snap_table: "SnapshotTable | None" = None,
+    cfg: SimConfig | None = None,
+    snap_table: SnapshotTable | None = None,
 ) -> str:
     """Export raw SAGE HDF5 galaxy rows to *out_path* in format *fmt*.
 

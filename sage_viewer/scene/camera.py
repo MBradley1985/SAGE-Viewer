@@ -61,7 +61,7 @@ class CameraController:
         self._member_actors.clear()
         self._selected_actors.clear()
 
-    def _add_central_gold_indicator(self, position: "np.ndarray") -> None:
+    def _add_central_gold_indicator(self, position: np.ndarray) -> None:
         """Gold splat for the FOF central galaxy — appended to _member_actors so it clears with the group."""
         cloud = pv.PolyData(np.asarray([position], dtype=np.float64))
         a = self._pl.add_mesh(
@@ -78,8 +78,8 @@ class CameraController:
 
     def _add_member_indicators(
         self,
-        positions: "np.ndarray",
-        regimes: "np.ndarray | None" = None,
+        positions: np.ndarray,
+        regimes: np.ndarray | None = None,
     ) -> None:
         """Splats for FOF group members coloured by CGM/hot regime."""
         for a in self._member_actors:
@@ -113,9 +113,9 @@ class CameraController:
 
     def _add_selected_indicator(
         self,
-        position: "np.ndarray",
-        regime: "int | None" = None,
-        color: "str | None" = None,
+        position: np.ndarray,
+        regime: int | None = None,
+        color: str | None = None,
     ) -> None:
         """Selected galaxy: white border sphere + coloured fill sphere.
 

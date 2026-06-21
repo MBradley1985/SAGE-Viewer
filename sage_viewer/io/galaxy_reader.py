@@ -70,7 +70,7 @@ class GalaxySnapshot:
         return len(self.positions)
 
     @classmethod
-    def empty(cls, snap_num: int) -> "GalaxySnapshot":
+    def empty(cls, snap_num: int) -> GalaxySnapshot:
         z   = np.empty(0, dtype=np.float32)
         zi  = np.empty(0, dtype=np.int32)
         zi64 = np.empty(0, dtype=np.int64)

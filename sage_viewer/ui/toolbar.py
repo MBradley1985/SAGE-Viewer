@@ -203,7 +203,7 @@ def build_toolbar(server, scene: Scene) -> None:
         ):
             _rotate_task[0] = asyncio.ensure_future(_rotate_loop())
 
-    def _capture_frame() -> "np.ndarray":
+    def _capture_frame() -> np.ndarray:
         """Grab the current render-window image as an (H, W, 3) uint8 array.
         Uses vtkWindowToImageFilter directly because the remote-view plotter
         is never .show()n, so pyvista's screenshot() refuses to run."""

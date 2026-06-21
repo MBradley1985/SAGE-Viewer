@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 import pyvista as pv
@@ -576,8 +576,8 @@ class Scene:
         self,
         halo_layer: HaloLayer,
         gal_layer: GalaxyLayer,
-        halo_pos: "np.ndarray",
-        gal_pos: "np.ndarray",
+        halo_pos: np.ndarray,
+        gal_pos: np.ndarray,
     ) -> None:
         r = self._focus_region
         if r is None:

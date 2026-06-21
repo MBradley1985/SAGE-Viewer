@@ -103,7 +103,7 @@ class Model:
 
     def _detect_fields(self) -> dict[str, bool]:
         """Probe the SAGE HDF5 to see which optional fields exist."""
-        out = {k: False for k in _OPTIONAL_FIELDS}
+        out = dict.fromkeys(_OPTIONAL_FIELDS, False)
         out["mean_age"] = False
         try:
             with h5py.File(self.cfg.hdf5_path, "r") as f:
@@ -170,7 +170,7 @@ class Model:
         return self._offset.copy()
 
     @offset.setter
-    def offset(self, v: "np.ndarray") -> None:
+    def offset(self, v: np.ndarray) -> None:
         self._offset = np.asarray(v, dtype=np.float64)
         f32 = self._offset.astype(np.float32)
         self.halo_layer.set_offset(f32)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import math as _math
+import pathlib
 
 from trame.widgets import html
 from trame.widgets import vuetify3 as v3
@@ -1154,7 +1155,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.export_status       = ""          # last result path or error
     state.export_busy         = False
 
-    def _resolve_export_indices(scope: str) -> "tuple[np.ndarray, dict]":
+    def _resolve_export_indices(scope: str) -> tuple:  # noqa: F821
         """Return (gal_indices_into_snapshot, scope_bounds_dict)."""
         import numpy as np
         _, galaxies = scene._loader.get(scene.current_snap)
@@ -1389,7 +1390,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     _RES_SCALE = {"native": 1, "hd": 2, "uhd": 4}
 
-    def _get_session_dir() -> "pathlib.Path":
+    def _get_session_dir() -> pathlib.Path:
         """Lazily create one session folder per app launch."""
         import datetime
         if _session_state["dir"] is None:
@@ -1592,7 +1593,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         writer.SetInputData(image)
         writer.Write()
 
-    def _make_outdir(sub: str) -> "pathlib.Path":
+    def _make_outdir(sub: str) -> pathlib.Path:
         import pathlib
         # Anchor outputs inside the SAGE-Viewer repo (gitignored)
         # __file__ = .../SAGE-Viewer/sage_viewer/ui/navigation_panel.py
@@ -2931,7 +2932,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         "font-weight:700;"
                     ),
                     color=(
-                        "nav_active_tab === '{}' ? 'cyan' : '#6b7280'".format(value),
+                        f"nav_active_tab === '{value}' ? 'cyan' : '#6b7280'",
                     ),
                     variant="text",
                     density="compact",

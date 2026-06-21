@@ -61,12 +61,12 @@ class FofLinkLayer:
         if self._visible:
             self._rebuild()
 
-    def set_offset(self, offset: "np.ndarray") -> None:
+    def set_offset(self, offset: np.ndarray) -> None:
         self._offset = np.asarray(offset, dtype=np.float32)
         if self._visible and self._snapshot is not None:
             self._rebuild()
 
-    def sync_masks(self, visible_positions: "np.ndarray | None") -> None:
+    def sync_masks(self, visible_positions: np.ndarray | None) -> None:
         """Update the visible-halo-position filter and rebuild once.
 
         ``visible_positions`` — float32 (N, 3) array of halo positions that

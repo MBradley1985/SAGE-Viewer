@@ -171,7 +171,7 @@ class GalaxyLayer:
         if self._snapshot is not None:
             self._redraw()
 
-    def set_offset(self, offset: "np.ndarray") -> None:
+    def set_offset(self, offset: np.ndarray) -> None:
         self._offset = np.asarray(offset, dtype=np.float32)
         if self._snapshot is not None:
             self._redraw()
@@ -180,23 +180,23 @@ class GalaxyLayer:
         self._snapshot = snapshot
         self._redraw()
 
-    def set_mask(self, mask: "np.ndarray | None") -> None:
+    def set_mask(self, mask: np.ndarray | None) -> None:
         """Backwards-compatible: sets the focus mask."""
         self.set_focus_mask(mask)
 
-    def set_focus_mask(self, mask: "np.ndarray | None") -> None:
+    def set_focus_mask(self, mask: np.ndarray | None) -> None:
         """Spatial focus mask (from sphere/box zoom). None = no focus."""
         self._focus_mask = mask
         if self._snapshot is not None:
             self._redraw()
 
-    def set_filter_mask(self, mask: "np.ndarray | None") -> None:
+    def set_filter_mask(self, mask: np.ndarray | None) -> None:
         """Property filter mask (from Filters tab). None = no filtering."""
         self._filter_mask = mask
         if self._snapshot is not None:
             self._redraw()
 
-    def _combined_mask(self) -> "np.ndarray | None":
+    def _combined_mask(self) -> np.ndarray | None:
         if self._focus_mask is None:
             return self._filter_mask
         if self._filter_mask is None:
@@ -345,7 +345,7 @@ class GalaxyLayer:
         self,
         snap: GalaxySnapshot,
         radii: np.ndarray,
-        positions: "np.ndarray | None" = None,
+        positions: np.ndarray | None = None,
     ) -> None:
         """Multi-layer physically-suggestive galaxy rendering.
 

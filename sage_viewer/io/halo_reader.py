@@ -73,7 +73,7 @@ class HaloSnapshot:
         return len(self.positions)
 
     @classmethod
-    def empty(cls, snap_num: int) -> "HaloSnapshot":
+    def empty(cls, snap_num: int) -> HaloSnapshot:
         z = np.empty(0, dtype=np.float32)
         return cls(
             positions=np.empty((0, 3), dtype=np.float32),

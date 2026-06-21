@@ -85,7 +85,7 @@ class HaloLayer:
         if self._snapshot is not None:
             self._redraw()
 
-    def set_offset(self, offset: "np.ndarray") -> None:
+    def set_offset(self, offset: np.ndarray) -> None:
         self._offset = np.asarray(offset, dtype=np.float32)
         if self._snapshot is not None:
             self._redraw()
@@ -94,20 +94,20 @@ class HaloLayer:
         self._snapshot = snapshot
         self._redraw()
 
-    def set_mask(self, mask: "np.ndarray | None") -> None:
+    def set_mask(self, mask: np.ndarray | None) -> None:
         self.set_focus_mask(mask)
 
-    def set_focus_mask(self, mask: "np.ndarray | None") -> None:
+    def set_focus_mask(self, mask: np.ndarray | None) -> None:
         self._focus_mask = mask
         if self._snapshot is not None:
             self._redraw()
 
-    def set_filter_mask(self, mask: "np.ndarray | None") -> None:
+    def set_filter_mask(self, mask: np.ndarray | None) -> None:
         self._filter_mask = mask
         if self._snapshot is not None:
             self._redraw()
 
-    def _combined_mask(self) -> "np.ndarray | None":
+    def _combined_mask(self) -> np.ndarray | None:
         if self._focus_mask is None:
             return self._filter_mask
         if self._filter_mask is None:
