@@ -14,16 +14,6 @@ from sage_viewer.scene.model import Model
 # Gap between adjacent boxes as a fraction of the primary box size.
 _BOX_GAP_FRACTION = 0.05
 
-# Floor-ring radii as fractions of the box size.
-_RING_INNER = 0.32
-_RING_OUTER = 0.42
-
-# Colours for active vs idle floor rings.
-_RING_ACTIVE_COLOR   = "#00ffff"
-_RING_ACTIVE_OPACITY = 0.65
-_RING_IDLE_COLOR     = "#2d3748"
-_RING_IDLE_OPACITY   = 0.25
-
 
 class Scene:
     """Owner of the PyVista plotter and a dict of Models.
@@ -74,9 +64,8 @@ class Scene:
         self._adjacent_order: list[str] = []   # names in placement order
         self._active_box_name: str = primary.name
 
-        # Floor ring and label actors keyed by model name
-        self._ring_actors:  dict[str, object] = {}
-        self._label_actors: dict[str, list]   = {}
+        # Label actors keyed by model name (only shown when multiple boxes are loaded)
+        self._label_actors: dict[str, list] = {}
 
         self._camera = CameraController(self._plotter, primary.box_size)
 
@@ -173,7 +162,6 @@ class Scene:
         if name not in self._models:
             return
         self._active_box_name = name
-        self._update_rings()
 
     # ------------------------------------------------------------------
     # Adjacent-box management
@@ -205,10 +193,8 @@ class Scene:
                 self._active_box_name = self._primary_name
             model.offset = np.zeros(3)
             model.visible = False
-            self._remove_ring(name)
             self._remove_label(name)
             self._recompute_offsets()
-            self._update_rings()
             self._update_labels()
             self._plotter.reset_camera()
             self._plotter.render()
@@ -221,7 +207,6 @@ class Scene:
             self._recompute_offsets()
             model.set_snapshot(model.snap_count - 1)
             model.visible = True
-            self._update_rings()
             self._update_labels()
             self._plotter.reset_camera()
             self._plotter.render()
@@ -252,71 +237,26 @@ class Scene:
         raise KeyError(par_path)
 
     # ------------------------------------------------------------------
-    # Floor rings (active = cyan glow, idle = dim grey)
+    # 3-D text labels (model name + redshift, below each box)
+    # Shown only when multiple boxes are loaded.
     # ------------------------------------------------------------------
 
     def _box_center_xz(self, name: str) -> tuple[float, float, float]:
-        """Return (cx, 0, cz) — the floor-centre of the named box."""
+        """Return (cx, 0, cz) — the XZ centre of the named box."""
         m = self._models[name]
         off = m.offset
         bs  = m.box_size
-        return float(off[0] + bs / 2), 0.0, float(bs / 2)
-
-    def _make_ring_mesh(self, name: str) -> pv.PolyData:
-        cx, _, cz = self._box_center_xz(name)
-        bs = self._models[name].box_size
-        return pv.Disc(
-            center=(cx, 0.0, cz),
-            normal=(0, 1, 0),
-            inner=bs * _RING_INNER,
-            outer=bs * _RING_OUTER,
-            c_res=64,
-            r_res=1,
-        )
-
-    def _add_ring(self, name: str, active: bool) -> None:
-        mesh = self._make_ring_mesh(name)
-        color   = _RING_ACTIVE_COLOR   if active else _RING_IDLE_COLOR
-        opacity = _RING_ACTIVE_OPACITY if active else _RING_IDLE_OPACITY
-        actor = self._plotter.add_mesh(
-            mesh, color=color, opacity=opacity,
-            style="surface", emissive=active,
-            show_scalar_bar=False, render=False, reset_camera=False,
-        )
-        self._ring_actors[name] = actor
-
-    def _remove_ring(self, name: str) -> None:
-        actor = self._ring_actors.pop(name, None)
-        if actor is not None:
-            self._plotter.remove_actor(actor, render=False)
-
-    def _update_rings(self) -> None:
-        """Rebuild all floor rings to reflect the current active box."""
-        # All boxes that should have a ring: primary + adjacent
-        ring_names = [self._primary_name] + list(self._adjacent_order)
-        # Remove rings for boxes no longer in scope
-        for name in list(self._ring_actors):
-            if name not in ring_names:
-                self._remove_ring(name)
-        # Add or update each ring
-        for name in ring_names:
-            self._remove_ring(name)   # always rebuild so position is fresh
-            self._add_ring(name, active=(name == self._active_box_name))
-        self._plotter.render()
-
-    # ------------------------------------------------------------------
-    # 3-D text labels (model name + redshift, below each box)
-    # ------------------------------------------------------------------
+        return float(off[0] + bs / 2), 0.0, float(off[2] + bs / 2)
 
     def _label_position(self, name: str) -> np.ndarray:
         cx, _, cz = self._box_center_xz(name)
         m = self._models[name]
-        return np.array([[cx, -m.box_size * 0.04, cz]])
+        return np.array([[cx, -m.box_size * 0.12, cz]])
 
     def _label_text(self, name: str) -> str:
         m = self._models[name]
         snap = max(0, m.current_snap)
-        return f"{m.name}\n{m.snap_table.label(snap)}"
+        return f"{m.name}  {m.snap_table.label(snap)}"
 
     def _remove_label(self, name: str) -> None:
         for actor in self._label_actors.pop(name, []):
@@ -327,11 +267,11 @@ class Scene:
         text = self._label_text(name)
         actor = self._plotter.add_point_labels(
             pts, [text],
-            font_size=11,
+            font_size=12,
             text_color="white",
             bold=False,
             always_visible=True,
-            shadow=True,
+            shadow=False,
             point_size=0,
             shape=None,
             render=False,
@@ -340,7 +280,13 @@ class Scene:
         self._label_actors[name] = [actor] if not isinstance(actor, list) else actor
 
     def _update_labels(self) -> None:
-        """Rebuild labels for primary + all adjacent boxes."""
+        """Rebuild labels for all boxes — only when more than one box is loaded."""
+        if len(self._adjacent_order) == 0:
+            # Back to a single box: remove any lingering labels
+            for name in list(self._label_actors):
+                self._remove_label(name)
+            self._plotter.render()
+            return
         label_names = [self._primary_name] + list(self._adjacent_order)
         for name in list(self._label_actors):
             if name not in label_names:
@@ -352,6 +298,8 @@ class Scene:
 
     def refresh_label(self, name: str) -> None:
         """Refresh just one label (e.g. after a snapshot change)."""
+        if len(self._adjacent_order) == 0:
+            return
         if name in self._label_actors or name in (
             [self._primary_name] + self._adjacent_order
         ):
@@ -391,7 +339,6 @@ class Scene:
         model.shutdown()
         if name in self._adjacent_order:
             self._adjacent_order.remove(name)
-        self._remove_ring(name)
         self._remove_label(name)
         for cb in self._on_model_change:
             cb()
@@ -436,7 +383,6 @@ class Scene:
 
         # Recompute adjacent offsets relative to new primary
         self._recompute_offsets()
-        self._update_rings()
         self._update_labels()
 
         if self._focus_region is not None:
