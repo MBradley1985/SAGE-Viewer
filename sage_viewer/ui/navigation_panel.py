@@ -770,6 +770,63 @@ def build_navigation_panel(server, scene: Scene) -> None:
     _draw_sphere_widget: list = [None]   # vtkSphereWidget or None
     _draw_sphere_actor:  list = [None]   # custom 5-ring mesh actor or None
     _draw_box_widget:    list = [None]   # vtkBoxWidget2 or None
+    _box_cam_obs:        list = [None]   # camera observer tag for handle rescaling
+
+    _BOX_HANDLE_PIXELS = 8   # target handle radius in screen pixels
+
+    def _rescale_box_handles():
+        """Rescale box widget handles to a constant screen-space pixel size.
+
+        vtkBoxRepresentation sizes handles as a fraction of the bounding-box
+        diagonal, so they grow with the box and with camera zoom.  This
+        function converts _BOX_HANDLE_PIXELS into the correct world fraction
+        for the current camera position and FOV using VTK's own coordinate
+        transforms, then calls SetHandleSize so the result is always the
+        same number of pixels on screen regardless of zoom level or box size.
+        """
+        widget = _draw_box_widget[0]
+        if widget is None:
+            return
+        try:
+            rep = widget.GetRepresentation()
+            bounds = rep.GetBounds()
+            dx = bounds[1] - bounds[0]
+            dy = bounds[3] - bounds[2]
+            dz = bounds[5] - bounds[4]
+            diag = (dx**2 + dy**2 + dz**2) ** 0.5
+            if diag < 1e-10:
+                return
+            ren = scene.plotter.renderer
+            cx = (bounds[0] + bounds[1]) * 0.5
+            cy = (bounds[2] + bounds[3]) * 0.5
+            cz = (bounds[4] + bounds[5]) * 0.5
+            ren.SetWorldPoint(cx, cy, cz, 1.0)
+            ren.WorldToDisplay()
+            sx, sy, sz_d = ren.GetDisplayPoint()
+            ren.SetDisplayPoint(sx + _BOX_HANDLE_PIXELS, sy, sz_d)
+            ren.DisplayToWorld()
+            wx, wy, wz, ww = ren.GetWorldPoint()
+            if abs(ww) < 1e-10:
+                return
+            world_r = ((wx/ww - cx)**2 + (wy/ww - cy)**2 + (wz/ww - cz)**2) ** 0.5
+            rep.SetHandleSize(world_r / diag)
+        except Exception:
+            pass
+
+    def _attach_box_cam_observer():
+        _detach_box_cam_observer()
+        cam = scene.plotter.renderer.GetActiveCamera()
+        _box_cam_obs[0] = cam.AddObserver(
+            "ModifiedEvent", lambda *_: _rescale_box_handles()
+        )
+
+    def _detach_box_cam_observer():
+        if _box_cam_obs[0] is not None:
+            try:
+                scene.plotter.renderer.GetActiveCamera().RemoveObserver(_box_cam_obs[0])
+            except Exception:
+                pass
+            _box_cam_obs[0] = None
 
     def _remove_sphere_actor() -> None:
         if _draw_sphere_actor[0] is not None:
@@ -1916,6 +1973,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 scene.plotter.clear_box_widgets()
             except Exception:
                 pass
+            _detach_box_cam_observer()
             _draw_box_widget[0] = None
             state.draw_box_active = False
         xmin, xmax = float(state.nav_box_xmin), float(state.nav_box_xmax)
@@ -1943,6 +2001,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 scene.plotter.clear_box_widgets()
             except Exception:
                 pass
+            _detach_box_cam_observer()
             _draw_box_widget[0] = None
             state.draw_box_active = False
             state.flush()
@@ -1986,6 +2045,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 state.nav_box_zmin = round(min(zs), 2)
                 state.nav_box_zmax = round(max(zs), 2)
                 state.flush()
+                _rescale_box_handles()
 
             try:
                 _draw_box_widget[0] = scene.plotter.add_box_widget(
@@ -1995,6 +2055,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     rotation_enabled=False,
                 )
                 state.draw_box_active = True
+                _rescale_box_handles()
+                _attach_box_cam_observer()
             except Exception:
                 pass
             state.flush()
@@ -2022,6 +2084,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 scene.plotter.clear_box_widgets()
             except Exception:
                 pass
+            _detach_box_cam_observer()
             _draw_box_widget[0] = None
             state.draw_box_active = False
             state.flush()
