@@ -1248,7 +1248,7 @@ def create_app(
                                 size="x-small",
                                 variant="text",
                                 style="font-size:0.6rem;min-width:28px;color:#6b7280;",
-                                raw_attrs=['@click.stop="$ctrl.clear_box(b.name)"'],
+                                click=(server.controller.clear_box, "[b.name]"),
                             )
 
                 # Right panel — layers + navigation tabs.

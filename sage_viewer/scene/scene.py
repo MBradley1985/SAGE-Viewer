@@ -12,7 +12,7 @@ from sage_viewer.scene.halo_layer import HaloLayer
 from sage_viewer.scene.model import Model
 
 # Gap between adjacent boxes as a fraction of the primary box size.
-_BOX_GAP_FRACTION = 0.05
+_BOX_GAP_FRACTION = 0.20
 
 
 class Scene:
@@ -205,6 +205,12 @@ class Scene:
             # Add it
             self._adjacent_order.append(name)
             self._recompute_offsets()
+            # Always start adjacent boxes with default color/colormap so they
+            # don't inherit whatever the primary box had been set to.
+            model.halo_layer.color_mode  = "mvir"
+            model.halo_layer.colormap    = "plasma"
+            model.galaxy_layer.color_mode = "structure"
+            model.galaxy_layer.colormap   = "plasma"
             model.set_snapshot(model.snap_count - 1)
             model.visible = True
             self._update_labels()
@@ -265,7 +271,7 @@ class Scene:
     def _add_label(self, name: str) -> None:
         pts  = self._label_position(name)
         text = self._label_text(name)
-        actor = self._plotter.add_point_labels(
+        raw = self._plotter.add_point_labels(
             pts, [text],
             font_size=12,
             text_color="white",
@@ -273,11 +279,21 @@ class Scene:
             always_visible=True,
             shadow=False,
             point_size=0,
-            shape=None,
+            shape="none",
             render=False,
             reset_camera=False,
         )
-        self._label_actors[name] = [actor] if not isinstance(actor, list) else actor
+        actors = [raw] if not isinstance(raw, list) else raw
+        for a in actors:
+            try:
+                a.GetTextProperty().SetJustificationToCentered()
+            except Exception:
+                pass
+            try:
+                a.GetMapper().GetLabelTextProperty().SetJustificationToCentered()
+            except Exception:
+                pass
+        self._label_actors[name] = actors
 
     def _update_labels(self) -> None:
         """Rebuild labels for all boxes — only when more than one box is loaded."""
