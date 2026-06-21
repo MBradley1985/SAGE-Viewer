@@ -354,9 +354,6 @@ class CameraController:
         delta = d * (self._box_size * float(step_frac))
         cam.position    = tuple(pos + delta)
         cam.focal_point = tuple(focal + delta)
-        # Keep near/far planes around the scene so nothing gets clipped as we
-        # move through it — this is what stops geometry vanishing mid-box.
-        self._pl.renderer.ResetCameraClippingRange()
 
     def go_to_coords(
         self,

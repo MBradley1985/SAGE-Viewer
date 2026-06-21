@@ -907,34 +907,62 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     # Keyboard fly movement (WASD / arrow keys). A held key is pressed/
     # released via the hidden cam-press-*/cam-release-* buttons; a single
-    # server loop flies every currently-held direction each tick. Driving it
-    # off held-state (not per-key clicks) means movement stops the instant
-    # the key is released — no queued-click drift.
+    # server loop flies every currently-held direction each tick.
+    #
+    # Ghost-frame prevention (two layers):
+    # 1. on_cam_release cancels the asyncio task immediately so the loop
+    #    exits during either sleep rather than after a ghost fly() call.
+    # 2. A 3 ms grace sleep before each fly() gives any in-flight keyup
+    #    WebSocket message time to arrive and trigger the cancel before we
+    #    commit to another movement step (localhost RTT ~1-2 ms).
     _held_dirs: set[str] = set()
     _fly_task: list = [None]
 
     async def _fly_loop():
-        while _held_dirs:
-            for d in list(_held_dirs):
-                if d in _held_dirs:
-                    scene.camera.fly(d, step_frac=0.008)
-            _push()
-            await asyncio.sleep(0.033)
-            await asyncio.sleep(0)   # drain pending cam_release before re-checking
-        _fly_task[0] = None
+        try:
+            first_tick = True
+            while True:
+                # Main tick sleep (skipped on the very first iteration so the
+                # first movement is immediate).  The task cancel in
+                # on_cam_release fires here if the key is released mid-sleep.
+                if not first_tick:
+                    await asyncio.sleep(0.031)
+                first_tick = False
+
+                # Grace period: localhost WebSocket RTT is ~1-2 ms, so
+                # sleeping 3 ms gives any in-flight keyup message time to
+                # arrive and be processed before we commit to another fly().
+                await asyncio.sleep(0.003)
+                if not _held_dirs:
+                    break
+
+                for d in list(_held_dirs):
+                    if d in _held_dirs:
+                        scene.camera.fly(d, step_frac=0.008)
+                scene.plotter.renderer.ResetCameraClippingRange()
+                _push()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            _fly_task[0] = None
 
     @ctrl.set("cam_press")
     def on_cam_press(direction=None, **_):
         if not direction:
             return
         _held_dirs.add(str(direction))
-        if _fly_task[0] is None or _fly_task[0].done():
+        t = _fly_task[0]
+        if t is None or t.done() or t.cancelled():
             _fly_task[0] = asyncio.ensure_future(_fly_loop())
 
     @ctrl.set("cam_release")
     def on_cam_release(direction=None, **_):
         _held_dirs.discard(str(direction))
         if not _held_dirs:
+            # Cancel mid-sleep immediately — don't wait for the tick to finish.
+            t = _fly_task[0]
+            if t and not t.done():
+                t.cancel()
             _push()   # confirm final stopped position to the client
 
     @ctrl.set("go_to_env_halo")
@@ -2738,7 +2766,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 color="transparent",
                 v_show=("nav_active_tab === 'layers'",),
             ):
-                v3.VLabel(
+                html.Div(
                     "DARK MATTER HALOES",
                     style=(
                         "font-size:0.95rem;font-weight:700;letter-spacing:0.08em;"
@@ -2775,12 +2803,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ):
                         v3.VLabel(
                             "{{ halo_cbar_min }}",
-                            style="font-size:0.58rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
+                            style="font-size:0.6rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
                         )
                         v3.VSheet(style=("halo_cbar_style",), color="transparent")
                         v3.VLabel(
                             "{{ halo_cbar_max }}",
-                            style="font-size:0.58rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
+                            style="font-size:0.6rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
                         )
 
                 v3.VDivider(style="margin:14px 0;")
@@ -2827,12 +2855,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ):
                         v3.VLabel(
                             "{{ gal_cbar_min }}",
-                            style="font-size:0.58rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
+                            style="font-size:0.6rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
                         )
                         v3.VSheet(style=("gal_cbar_style",), color="transparent")
                         v3.VLabel(
                             "{{ gal_cbar_max }}",
-                            style="font-size:0.58rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
+                            style="font-size:0.6rem;color:#6b7280;white-space:nowrap;flex-shrink:0;",
                         )
 
                 v3.VDivider(style="margin:14px 0 10px;")
@@ -2894,7 +2922,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VLabel(
                     "Zoom radius (Mpc/h)",
                     style=(
-                        "font-size:0.68rem;color:#9ca3af;"
+                        "font-size:0.6rem;color:#9ca3af;"
                         "display:block;padding:10px 0 4px;"
                     ),
                 )
@@ -3519,17 +3547,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v_show=("nav_active_tab === 'filters'",),
             ):
                 _FSEC_HALO = (
-                    "font-size:0.78rem;font-weight:700;letter-spacing:0.08em;"
+                    "font-size:0.85rem;font-weight:700;letter-spacing:0.06em;"
                     "color:#c084fc;padding:2px 0 2px;display:block;"
                     "text-align:center;"
                 )
                 _FSEC_GAL = (
-                    "font-size:0.78rem;font-weight:700;letter-spacing:0.08em;"
+                    "font-size:0.85rem;font-weight:700;letter-spacing:0.06em;"
                     "color:#FFD700;padding:2px 0 2px;display:block;"
                     "text-align:center;"
                 )
                 _FLBL = (
-                    "font-size:0.6rem;color:#9ca3af;display:block;"
+                    "font-size:0.8rem;color:#9ca3af;display:block;"
                     "padding:2px 0 0;text-align:center;"
                 )
                 _FSLD = (
@@ -3540,7 +3568,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 _FSEL = (
                     "--v-input-control-height:30px;"
-                    "font-size:0.7rem;margin-top:1px;"
+                    "--v-field-font-size:0.8rem;"
+                    "margin-top:1px;"
                 )
                 # Explicit heights so each section scrolls independently
                 # while the panel itself never needs an outer scrollbar.
@@ -3549,7 +3578,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 # ── Halo section ──────────────────────────────
                 v3.VLabel("DARK MATTER HALOES", style=_FSEC_HALO)
                 with html.Div(style=_SH + "height:120px;"):
-                    v3.VLabel("Mvir  (log10 Msun)", style=_FLBL)
+                    html.Div("Mvir  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_mvir",),
                         min=10.0, max=15.0, step=0.1,
@@ -3558,7 +3587,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Rvir  (Mpc/h)", style=_FLBL)
+                    html.Div("Rvir  (Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_rvir",),
                         min=0.0, max=3.0, step=0.05,
@@ -3567,7 +3596,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Vvir  (km/s)", style=_FLBL)
+                    html.Div("Vvir  (km/s)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_vvir",),
                         min=0.0, max=1000.0, step=10.0,
@@ -3576,7 +3605,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Vmax  (km/s)", style=_FLBL)
+                    html.Div("Vmax  (km/s)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_vmax",),
                         min=0.0, max=1000.0, step=10.0,
@@ -3586,7 +3615,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Len  (DM particles)", style=_FLBL)
+                    html.Div("Len  (DM particles)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_len",),
                         min=0, max=10000, step=100,
@@ -3596,7 +3625,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Concentration  (NFW)", style=_FLBL)
+                    html.Div("Concentration  (NFW)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_conc",),
                         min=0.0, max=50.0, step=0.5,
@@ -3606,7 +3635,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Spin  (dimensionless)", style=_FLBL)
+                    html.Div("Spin  (dimensionless)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_halo_spin",),
                         min=0.0, max=0.2, step=0.002,
@@ -3620,10 +3649,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VDivider(style="margin:4px 0 2px;")
 
                 # ── Galaxy section ────────────────────────────
-                v3.VLabel("GALAXIES", style=_FSEC_GAL)
+                html.Div("GALAXIES", style=_FSEC_GAL)
                 with html.Div(style=_SH + "height:185px;"):
                     # ── Top 5 ──────────────────────────────────────
-                    v3.VLabel("Stellar mass  (log10 Msun)", style=_FLBL)
+                    html.Div("Stellar mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_smass",),
                         min=0.0, max=14.0, step=0.1,
@@ -3632,7 +3661,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("SFR  (log10 Msun/yr,  -6 = quenched)", style=_FLBL)
+                    html.Div("SFR  (log10 Msun/yr,  -6 = quenched)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr",),
                         min=-6.0, max=5.0, step=0.1,
@@ -3641,7 +3670,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("sSFR  (log10 yr^-1)", style=_FLBL)
+                    html.Div("sSFR  (log10 yr^-1)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ssfr",),
                         min=-14.0, max=0.0, step=0.1,
@@ -3650,7 +3679,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("B / T  (BulgeMass / StellarMass)", style=_FLBL)
+                    html.Div("B / T  (BulgeMass / StellarMass)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_bt",),
                         min=0.0, max=1.0, step=0.02,
@@ -3659,7 +3688,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Stellar age  (Gyr, mass-weighted)", style=_FLBL)
+                    html.Div("Stellar age  (Gyr, mass-weighted)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_age",),
                         min=0.0, max=14.0, step=0.1,
@@ -3670,7 +3699,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         classes="sage-fslider", style=_FSLD,
                     )
                     # ── Alphabetical ──────────────────────────────
-                    v3.VLabel("BH mass  (log10 Msun)", style=_FLBL)
+                    html.Div("BH mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_bhmass",),
                         min=0.0, max=14.0, step=0.1,
@@ -3680,7 +3709,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Bulge mass  (log10 Msun)", style=_FLBL)
+                    html.Div("Bulge mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_bulge",),
                         min=0.0, max=14.0, step=0.1,
@@ -3689,7 +3718,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Bulge radius  (log10 Mpc/h)", style=_FLBL)
+                    html.Div("Bulge radius  (log10 Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_bulgerad",),
                         min=-4.0, max=1.0, step=0.05,
@@ -3699,7 +3728,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("CGM gas  (log10 Msun)", style=_FLBL)
+                    html.Div("CGM gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_cgmgas",),
                         min=0.0, max=14.0, step=0.1,
@@ -3709,7 +3738,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Cold gas  (log10 Msun)", style=_FLBL)
+                    html.Div("Cold gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_coldgas",),
                         min=0.0, max=14.0, step=0.1,
@@ -3718,7 +3747,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Cooling  (log10 SAGE units)", style=_FLBL)
+                    html.Div("Cooling  (log10 SAGE units)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_cooling",),
                         min=-7.0, max=7.0, step=0.1,
@@ -3728,7 +3757,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Disk radius  (log10 Mpc/h)", style=_FLBL)
+                    html.Div("Disk radius  (log10 Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_diskrad",),
                         min=-4.0, max=1.0, step=0.05,
@@ -3738,7 +3767,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Ejected mass  (log10 Msun)", style=_FLBL)
+                    html.Div("Ejected mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ejected",),
                         min=0.0, max=14.0, step=0.1,
@@ -3748,7 +3777,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("H1 gas  (log10 Msun)", style=_FLBL)
+                    html.Div("H1 gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_h1gas",),
                         min=0.0, max=14.0, step=0.1,
@@ -3758,7 +3787,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("H2 gas  (log10 Msun)", style=_FLBL)
+                    html.Div("H2 gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_h2",),
                         min=0.0, max=14.0, step=0.1,
@@ -3768,7 +3797,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Heating  (log10 SAGE units)", style=_FLBL)
+                    html.Div("Heating  (log10 SAGE units)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_heating",),
                         min=-7.0, max=7.0, step=0.1,
@@ -3778,7 +3807,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Hot gas  (log10 Msun)", style=_FLBL)
+                    html.Div("Hot gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_hotgas",),
                         min=0.0, max=14.0, step=0.1,
@@ -3788,7 +3817,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Instability bulge mass  (log10 Msun)", style=_FLBL)
+                    html.Div("Instability bulge mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ib_mass",),
                         min=0.0, max=14.0, step=0.1,
@@ -3798,7 +3827,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Instability bulge radius  (log10 Mpc/h)", style=_FLBL)
+                    html.Div("Instability bulge radius  (log10 Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ib_rad",),
                         min=-4.0, max=1.0, step=0.05,
@@ -3808,7 +3837,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("ICS mass  (log10 Msun)", style=_FLBL)
+                    html.Div("ICS mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_ics",),
                         min=0.0, max=14.0, step=0.1,
@@ -3818,7 +3847,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Mass loading  (log10 OutflowRate/SFR)", style=_FLBL)
+                    html.Div("Mass loading  (log10 OutflowRate/SFR)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_massload",),
                         min=-3.0, max=5.0, step=0.05,
@@ -3828,7 +3857,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Merger bulge mass  (log10 Msun)", style=_FLBL)
+                    html.Div("Merger bulge mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_mb_mass",),
                         min=0.0, max=14.0, step=0.1,
@@ -3838,7 +3867,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Merger bulge radius  (log10 Mpc/h)", style=_FLBL)
+                    html.Div("Merger bulge radius  (log10 Mpc/h)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_mb_rad",),
                         min=-4.0, max=1.0, step=0.05,
@@ -3848,7 +3877,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Metals — bulge mass  (log10 Msun)", style=_FLBL)
+                    html.Div("Metals — bulge mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_bm",),
                         min=-2.0, max=12.0, step=0.1,
@@ -3858,7 +3887,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Metals — CGM gas  (log10 Msun)", style=_FLBL)
+                    html.Div("Metals — CGM gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_cgm",),
                         min=-2.0, max=12.0, step=0.1,
@@ -3868,7 +3897,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Metals — cold gas  (log10 Msun)", style=_FLBL)
+                    html.Div("Metals — cold gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_cg",),
                         min=-2.0, max=12.0, step=0.1,
@@ -3878,7 +3907,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Metals — ejected mass  (log10 Msun)", style=_FLBL)
+                    html.Div("Metals — ejected mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_em",),
                         min=-2.0, max=12.0, step=0.1,
@@ -3888,7 +3917,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Metals — hot gas  (log10 Msun)", style=_FLBL)
+                    html.Div("Metals — hot gas  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_hg",),
                         min=-2.0, max=12.0, step=0.1,
@@ -3898,7 +3927,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Metals — ICS  (log10 Msun)", style=_FLBL)
+                    html.Div("Metals — ICS  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_ics",),
                         min=-2.0, max=12.0, step=0.1,
@@ -3908,7 +3937,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Metals — stellar mass  (log10 Msun)", style=_FLBL)
+                    html.Div("Metals — stellar mass  (log10 Msun)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_met_sm",),
                         min=-2.0, max=12.0, step=0.1,
@@ -3918,7 +3947,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("Outflow rate  (log10 Msun/yr)", style=_FLBL)
+                    html.Div("Outflow rate  (log10 Msun/yr)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_outflow",),
                         min=-6.0, max=5.0, step=0.1,
@@ -3928,7 +3957,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("SFR bulge  (log10 Msun/yr)", style=_FLBL)
+                    html.Div("SFR bulge  (log10 Msun/yr)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr_bulge",),
                         min=-6.0, max=5.0, step=0.1,
@@ -3938,7 +3967,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("SFR bulge Z  (log10 dimensionless)", style=_FLBL)
+                    html.Div("SFR bulge Z  (log10 dimensionless)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr_blg_z",),
                         min=-6.0, max=1.0, step=0.1,
@@ -3948,7 +3977,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("SFR disk  (log10 Msun/yr)", style=_FLBL)
+                    html.Div("SFR disk  (log10 Msun/yr)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr_disk",),
                         min=-6.0, max=5.0, step=0.1,
@@ -3958,7 +3987,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         thumb_size=10, track_size=2,
                         classes="sage-fslider", style=_FSLD,
                     )
-                    v3.VLabel("SFR disk Z  (log10 dimensionless)", style=_FLBL)
+                    html.Div("SFR disk Z  (log10 dimensionless)", style=_FLBL)
                     v3.VRangeSlider(
                         v_model=("filter_gal_sfr_dsk_z",),
                         min=-6.0, max=1.0, step=0.1,
@@ -3972,9 +4001,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 v3.VDivider(style="margin:4px 0 2px;")
 
                 # ── Categorical section ───────────────────────
-                v3.VLabel("CATEGORICAL", style=_FSEC_GAL)
-                with html.Div(style=_SH):
-                    v3.VLabel("Type", style=_FLBL)
+                html.Div("CATEGORICAL", style=_FSEC_GAL)
+                with html.Div(style="padding-top:18px;"):
+                    html.Div("Type", style=_FLBL)
                     v3.VSelect(
                         v_model=("filter_gal_type",),
                         items=([
@@ -3986,7 +4015,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         color="#FFD700", density="compact",
                         style=_FSEL,
                     )
-                    v3.VLabel("FFB regime", style=_FLBL)
+                    html.Div("FFB regime", style=_FLBL)
                     v3.VSelect(
                         v_model=("filter_gal_ffb",),
                         items=([
@@ -3999,7 +4028,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         disabled=("!model_fields.ffb_regime",),
                         style=_FSEL,
                     )
-                    v3.VLabel("CGM / Hot regime", style=_FLBL)
+                    html.Div("CGM / Hot regime", style=_FLBL)
                     v3.VSelect(
                         v_model=("filter_gal_cgm",),
                         items=([
@@ -4080,7 +4109,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 v3.VLabel(
                     "{{ last_screenshot ? 'Last: ' + last_screenshot : '' }}",
-                    style="font-size:0.58rem;color:#6b7280;display:block;word-break:break-all;",
+                    style="font-size:0.6rem;color:#6b7280;display:block;word-break:break-all;",
                 )
 
                 v3.VDivider(style="margin:14px 0;")
@@ -4105,7 +4134,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     )
                 v3.VLabel(
                     "FPS (output)  {{ '— ' + movie_fps }}",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:4px 0 2px;",
+                    style="font-size:0.6rem;color:#9ca3af;display:block;padding:4px 0 2px;",
                 )
                 v3.VSlider(
                     v_model=("movie_fps",),
@@ -4116,7 +4145,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 v3.VLabel(
                     "Resolution",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                    style="font-size:0.6rem;color:#9ca3af;display:block;padding:10px 0 2px;",
                 )
                 v3.VSelect(
                     v_model=("movie_resolution",),
@@ -4131,7 +4160,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 v3.VLabel(
                     "Output format",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                    style="font-size:0.6rem;color:#9ca3af;display:block;padding:10px 0 2px;",
                 )
                 v3.VSelect(
                     v_model=("movie_format",),
@@ -4176,9 +4205,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 v3.VLabel(
                     "{{ recording_active ? '● Recording — ' + recording_frames + ' frames' : 'Idle' }}",
-                    style="font-size:0.68rem;color:#9ca3af;display:block;padding:10px 0 2px;",
+                    style="font-size:0.6rem;color:#9ca3af;display:block;padding:10px 0 2px;",
                 )
                 v3.VLabel(
                     "{{ last_movie ? 'Last: ' + last_movie : '' }}",
-                    style="font-size:0.58rem;color:#6b7280;display:block;word-break:break-all;padding:4px 0;",
+                    style="font-size:0.6rem;color:#6b7280;display:block;word-break:break-all;padding:4px 0;",
                 )
