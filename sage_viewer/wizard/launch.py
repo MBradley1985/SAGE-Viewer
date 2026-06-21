@@ -22,6 +22,17 @@ def create_launch_app(port: int):
         "scripts": ["sage_static/sage_viewer.js"],
     })
 
+    # xterm.js — required for the wizard terminal in Launch Mode.
+    server.enable_module({
+        "styles":  [
+            "https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css",
+        ],
+        "scripts": [
+            "https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js",
+            "https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js",
+        ],
+    })
+
     _vuetify_config = {
         "theme": {
             "defaultTheme": "dos_blue",
