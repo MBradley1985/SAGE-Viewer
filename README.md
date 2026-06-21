@@ -195,7 +195,7 @@ sage-viewer --par /path/to/millennium.par --port 8080
 
 ## Documentation
 
-Full documentation at [sage-viewer.readthedocs.io](https://sage-viewer.readthedocs.io/en/latest/).
+Full documentation at [mbradley1985.github.io/SAGE-Viewer](https://mbradley1985.github.io/SAGE-Viewer/).
 
 ## Tabs at a glance
 

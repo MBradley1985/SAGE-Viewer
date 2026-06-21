@@ -53,7 +53,7 @@ sage-viewer = "sage_viewer.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/MBradley1985/SAGE-Viewer"
-Documentation = "https://sage-viewer.readthedocs.io/en/latest/"
+Documentation = "https://mbradley1985.github.io/SAGE-Viewer/"
 Repository = "https://github.com/MBradley1985/SAGE-Viewer"
 Issues = "https://github.com/MBradley1985/SAGE-Viewer/issues"
 
