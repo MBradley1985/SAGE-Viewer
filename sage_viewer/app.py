@@ -398,6 +398,8 @@ def create_app(
                 server.state.notice_text  = err
                 server.state.notice_color = "warning"
                 server.state.notice_show  = True
+            elif model.visible:
+                model.loader.preload_all()
         finally:
             server.state.model_loading = False
             _refresh_models_state()
@@ -424,6 +426,8 @@ def create_app(
                 adj_m = scene._models.get(name)
                 if adj_m and name not in _profiles:
                     _profiles[name] = default_profile(adj_m.snap_count)
+                if adj_m:
+                    adj_m.loader.preload_all()
             else:
                 _profiles.pop(name, None)
                 server.state.active_box_name = scene.active_box_name
