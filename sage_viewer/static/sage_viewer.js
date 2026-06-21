@@ -400,7 +400,7 @@
       if (typeof Terminal === 'undefined') return;
       var term = new Terminal({
         theme: {
-          background: '#000000', foreground: '#e2e8f0',
+          background: '#000000', foreground: '#ffffff',
           cursor: '#06b6d4', selectionBackground: 'rgba(6,182,212,0.25)',
         },
         fontSize: 12,

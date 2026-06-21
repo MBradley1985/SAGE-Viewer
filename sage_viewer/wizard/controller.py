@@ -20,8 +20,8 @@ _KIND_ANSI: dict[str, str] = {
     "warn":  "\x1b[33m",      # yellow
     "err":   "\x1b[1;31m",    # bold red
     "cmd":   "\x1b[36m",      # cyan
-    "out":   "\x1b[90m",      # dark gray
-    "sep":   "\x1b[38;5;240m",# darker gray
+    "out":   "",               # white (default)
+    "sep":   "",               # white (default)
     "info":  "",               # default
 }
 
