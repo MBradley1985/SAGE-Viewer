@@ -72,3 +72,4 @@ sage_library/
 !docs/images/*.gif
 !sage_viewer/static/*.jpg
 !sage_viewer/static/*.png
+.pypirc

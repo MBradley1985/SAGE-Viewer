@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/SAGElogo.jpg" alt="SAGE-Viewer logo" width="220"/>
+  <img src="https://raw.githubusercontent.com/MBradley1985/SAGE-Viewer/main/docs/images/SAGElogo.jpg" alt="SAGE-Viewer logo" width="220"/>
 </p>
 
 # SAGE-Viewer
@@ -8,7 +8,7 @@ An interactive 3D visualization package for [SAGE26](https://github.com/MBradley
 
 Renders dark matter haloes and SAGE galaxies together in a browser-based interactive viewer powered by [PyVista](https://pyvista.org) and [Trame](https://kitware.github.io/trame/).
 
-![SAGE-Viewer](docs/images/hero.png)
+![SAGE-Viewer](https://raw.githubusercontent.com/MBradley1985/SAGE-Viewer/main/docs/images/hero.png)
 
 ## Features
 
@@ -20,7 +20,7 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - Colour-by dropdowns are model-aware — only modes whose underlying field is present in the loaded model appear in the list; they update automatically on model switch
 - Full still-quality rendering at all times — no resolution drop during camera drag or playback
 
-![Structure mode](docs/images/structure_mode.png)
+![Structure mode](https://raw.githubusercontent.com/MBradley1985/SAGE-Viewer/main/docs/images/structure_mode.png)
 
 ### Playback & camera
 - Play / Pause / Stop / Reverse / Repeat transport at 0.1× – 5× speeds
@@ -39,7 +39,7 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - **Double-click any point** in the viewport (any tab) to populate the Target tab's halo + galaxy IDs and draw a red marker on the selection. Only currently visible galaxies (passing all filters and focus) are selectable. If Focus is active, the camera carries to the new selection at the last-used radius.
 - **Enter to run** in every input field — Halo idx, Galaxy idx, Coords X/Y/Z, Box bounds, Console command, script path, screenshot/movie label all submit on Enter, equivalent to clicking the paired Go / Zoom / Run / Take Screenshot button
 
-![Filters in action](docs/images/filters.gif)
+![Filters in action](https://raw.githubusercontent.com/MBradley1985/SAGE-Viewer/main/docs/images/filters.gif)
 
 ### Filtering
 - Halo filters: Mvir (log10), Rvir (Mpc/h), Vvir (km/s)
@@ -213,7 +213,7 @@ When multiple boxes are loaded a **box strip** appears at the bottom of the view
 | Console    | Live xterm.js shell terminal (PTY-backed) + SAGE natural-language command mode. Multiple sessions, pop-out window |
 | Library    | Browse stored screenshots / movies; double-click a row to open as a movable, resizable floating card over the viewport (multiple items open simultaneously); per-row delete button removes the file from disk immediately |
 
-![Draw Sphere](docs/images/draw_sphere.gif)
+![Draw Sphere](https://raw.githubusercontent.com/MBradley1985/SAGE-Viewer/main/docs/images/draw_sphere.gif)
 
 <!-- Library pop-out screenshot: drop docs/images/library_popup.png here once captured -->
 
