@@ -1637,14 +1637,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
     _record_task: list = [None]   # asyncio.Task | None
 
     async def _record_loop():
-        """Capture frames for recording.
+        """Capture frames for recording at the target FPS.
 
         Two modes depending on whether playback is active:
-        - Playback active: poll state.playback_frame at 25 Hz and save each
-          *unique* JPEG data URL as a PNG frame.  This captures exactly what
-          the user sees in the HTML overlay without touching the VTK window.
+        - Playback active: write a frame every 1/fps seconds. Decode the
+          playback_frame data URL only when it changes; reuse the cached PIL
+          image otherwise. This means slow playback (0.25x) produces many
+          duplicate frames between snapshots, giving the output video the same
+          apparent speed as the on-screen playback.
         - Playback inactive: capture the VTK render window (off-screen mode)
-          at the user-set FPS, giving a live view of whatever is on screen.
+          at the target FPS.
         """
         import asyncio
         import base64
@@ -1653,41 +1655,45 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         record_interval = 1.0 / max(1, int(_record_state["fps"]))
         last_url: str | None = None
+        last_frame = None   # cached decoded PIL image — reused when URL unchanged
 
         try:
             while _record_state["active"]:
+                t0 = asyncio.get_event_loop().time()
                 try:
                     pb_active = bool(getattr(state, "playback_active", False))
                     pf = str(getattr(state, "playback_frame", "") or "")
 
-                    if pb_active and pf.startswith("data:image") and pf != last_url:
-                        # New unique playback frame — composite overlays on top.
-                        last_url = pf
-                        outpath = (
-                            _record_state["dir"]
-                            / f"frame_{_record_state['frames']:05d}.png"
-                        )
-                        raw = base64.b64decode(pf.split(",", 1)[1])
-                        frame = _PIL.open(_io.BytesIO(raw)).convert("RGB")
-                        frame = _composite_overlays(frame)
-                        frame.save(str(outpath))
-                        _record_state["frames"] += 1
-                        state.recording_frames = _record_state["frames"]
-                        state.flush()
-                        # Poll fast to catch every playback frame (max ~15 fps)
-                        await asyncio.sleep(0.04)
-                        continue
+                    if pb_active and pf.startswith("data:image"):
+                        # Decode only when the frame changes; duplicate otherwise.
+                        if pf != last_url:
+                            last_url = pf
+                            raw = base64.b64decode(pf.split(",", 1)[1])
+                            last_frame = _PIL.open(_io.BytesIO(raw)).convert("RGB")
+                        if last_frame is not None:
+                            outpath = (
+                                _record_state["dir"]
+                                / f"frame_{_record_state['frames']:05d}.jpg"
+                            )
+                            _composite_overlays(last_frame).save(
+                                str(outpath), "JPEG", quality=95
+                            )
+                            _record_state["frames"] += 1
+                            state.recording_frames = _record_state["frames"]
+                            state.flush()
 
-                    if not pb_active:
+                    elif not pb_active:
                         # Live view — capture VTK then composite HTML overlays.
                         last_url = None
+                        last_frame = None
                         outpath = (
                             _record_state["dir"]
-                            / f"frame_{_record_state['frames']:05d}.png"
+                            / f"frame_{_record_state['frames']:05d}.jpg"
                         )
                         frame = _vtk_to_pil(scale=_record_state["scale"])
-                        frame = _composite_overlays(frame)
-                        frame.save(str(outpath))
+                        _composite_overlays(frame).save(
+                            str(outpath), "JPEG", quality=95
+                        )
                         _record_state["frames"] += 1
                         state.recording_frames = _record_state["frames"]
                         state.flush()
@@ -1697,7 +1703,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     state.flush()
                     break
 
-                await asyncio.sleep(record_interval)
+                # Sleep for whatever is left of the target interval.
+                # Always sleep at least 1 ms so the event loop can process
+                # button clicks even when capture takes longer than 1/fps.
+                elapsed = asyncio.get_event_loop().time() - t0
+                await asyncio.sleep(max(0.001, record_interval - elapsed))
         except asyncio.CancelledError:
             pass
 
@@ -1774,11 +1784,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
         if fmt == "gif":
             try:
                 import imageio.v2 as imageio
-                pngs = sorted(frames_dir.glob("frame_*.png"))
-                if not pngs:
+                frames = sorted(frames_dir.glob("frame_*.jpg"))
+                if not frames:
                     _remove_dir(frames_dir)
                     return "ERROR: no frames captured"
-                imgs = [imageio.imread(p) for p in pngs]
+                imgs = [imageio.imread(p) for p in frames]
                 # loop=0 = infinite, loop=1 = play once with no further repeats
                 imageio.mimsave(out_path, imgs, fps=fps, loop=0 if gif_loop else 1)
                 _remove_dir(frames_dir)
@@ -1790,7 +1800,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             cmd = [
                 "ffmpeg", "-y",
                 "-framerate", str(fps),
-                "-i", str(frames_dir / "frame_%05d.png"),
+                "-i", str(frames_dir / "frame_%05d.jpg"),
                 "-c:v", "libx264", "-pix_fmt", "yuv420p",
                 "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
                 str(out_path),
@@ -1814,20 +1824,27 @@ def build_navigation_panel(server, scene: Scene) -> None:
             return
         _record_state["active"] = False
         state.recording_active = False
+        state.last_movie = "Encoding…"
         state.flush()
-        # Cancel the capture task so no new frames get written before finalize
+        # Cancel the capture task so no new frames get written before finalize.
         if _record_task[0] is not None and not _record_task[0].done():
             _record_task[0].cancel()
-        result = _finalize_movie(
-            frames_dir=_record_state["dir"],
-            session_dir=_record_state["session"],
-            movie_base=_record_state["movie_base"],
-            fps=_record_state["fps"],
-            fmt=_record_state["format"],
-            gif_loop=bool(state.movie_loop),
-        )
-        state.last_movie = result
-        state.flush()
+        # Finalize (imageio / ffmpeg) can take seconds — run in a thread so
+        # the event loop stays responsive while encoding.
+        import threading
+        snap = dict(_record_state)   # copy current state before thread starts
+        def _do_finalize():
+            result = _finalize_movie(
+                frames_dir=snap["dir"],
+                session_dir=snap["session"],
+                movie_base=snap["movie_base"],
+                fps=snap["fps"],
+                fmt=snap["format"],
+                gif_loop=bool(state.movie_loop),
+            )
+            state.last_movie = result
+            state.flush()
+        threading.Thread(target=_do_finalize, daemon=True).start()
 
     @ctrl.set("go_to_coords")
     def on_go_to_coords():
