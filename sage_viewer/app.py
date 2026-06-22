@@ -574,21 +574,27 @@ def create_app(
 
         def _fetch_latest() -> str:
             import ssl
+
             try:
                 import certifi
+
                 ctx = ssl.create_default_context(cafile=certifi.where())
             except ImportError:
                 ctx = ssl.create_default_context()
             try:
                 with urllib.request.urlopen(
-                    "https://pypi.org/pypi/sage-viewer/json", timeout=8, context=ctx
+                    "https://pypi.org/pypi/sage-viewer/json",
+                    timeout=8,
+                    context=ctx,
                 ) as r:
                     return json.loads(r.read())["info"]["version"]
             except ssl.SSLError:
                 # macOS Python may lack system CA certs; retry unverified
                 ctx = ssl._create_unverified_context()
                 with urllib.request.urlopen(
-                    "https://pypi.org/pypi/sage-viewer/json", timeout=8, context=ctx
+                    "https://pypi.org/pypi/sage-viewer/json",
+                    timeout=8,
+                    context=ctx,
                 ) as r:
                     return json.loads(r.read())["info"]["version"]
 
@@ -620,7 +626,12 @@ def create_app(
 
         try:
             proc = await asyncio.create_subprocess_exec(
-                sys.executable, "-m", "pip", "install", "--upgrade", "sage-viewer",
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--upgrade",
+                "sage-viewer",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
