@@ -358,6 +358,10 @@ def create_app(
     server.state.notice_show = False
     server.state.notice_text = ""
     server.state.notice_color = "warning"
+    server.state.notice_timeout = 4500
+
+    # Update checker
+    server.state.update_checking = False
 
     # Per-model flags used by static menu items (dict keyed by name)
     def _model_flags() -> dict:
@@ -553,6 +557,95 @@ def create_app(
         server.state.wiz_active = True
         server.state.flush()
 
+    @server.controller.set("check_for_updates")
+    async def _on_check_for_updates():
+        import asyncio
+        import json
+        import sys
+        import urllib.request
+
+        from sage_viewer._version import __version__ as _current
+
+        server.state.update_checking = True
+        server.state.flush()
+        await asyncio.sleep(0)
+
+        loop = asyncio.get_event_loop()
+
+        def _fetch_latest() -> str:
+            import ssl
+            try:
+                import certifi
+                ctx = ssl.create_default_context(cafile=certifi.where())
+            except ImportError:
+                ctx = ssl.create_default_context()
+            try:
+                with urllib.request.urlopen(
+                    "https://pypi.org/pypi/sage-viewer/json", timeout=8, context=ctx
+                ) as r:
+                    return json.loads(r.read())["info"]["version"]
+            except ssl.SSLError:
+                # macOS Python may lack system CA certs; retry unverified
+                ctx = ssl._create_unverified_context()
+                with urllib.request.urlopen(
+                    "https://pypi.org/pypi/sage-viewer/json", timeout=8, context=ctx
+                ) as r:
+                    return json.loads(r.read())["info"]["version"]
+
+        try:
+            latest = await loop.run_in_executor(None, _fetch_latest)
+        except Exception as exc:
+            server.state.notice_text = f"Update check failed: {exc}"
+            server.state.notice_color = "error"
+            server.state.notice_timeout = 5000
+            server.state.notice_show = True
+            server.state.update_checking = False
+            server.state.flush()
+            return
+
+        if latest == _current:
+            server.state.notice_text = f"SAGE-Viewer {_current} is up to date."
+            server.state.notice_color = "success"
+            server.state.notice_timeout = 4500
+            server.state.notice_show = True
+            server.state.update_checking = False
+            server.state.flush()
+            return
+
+        server.state.notice_text = f"Updating {_current} → {latest}…"
+        server.state.notice_color = "info"
+        server.state.notice_timeout = -1
+        server.state.notice_show = True
+        server.state.flush()
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-m", "pip", "install", "--upgrade", "sage-viewer",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await proc.communicate()
+            if proc.returncode == 0:
+                server.state.notice_text = (
+                    f"Updated to {latest}. Restart SAGE-Viewer to apply."
+                )
+                server.state.notice_color = "success"
+                server.state.notice_timeout = -1
+            else:
+                server.state.notice_text = (
+                    f"pip failed: {stderr.decode(errors='replace')[:140]}"
+                )
+                server.state.notice_color = "error"
+                server.state.notice_timeout = 7000
+        except Exception as exc:
+            server.state.notice_text = f"Install failed: {exc}"
+            server.state.notice_color = "error"
+            server.state.notice_timeout = 7000
+
+        server.state.notice_show = True
+        server.state.update_checking = False
+        server.state.flush()
+
     # `theme=("ui_theme",)` reactively binds the active Vuetify theme to
     # our state variable — Vuetify swaps the entire palette plus the root
     # `v-theme--<name>` class instantly when ui_theme changes.
@@ -737,6 +830,18 @@ def create_app(
                 title="Export galaxy catalogue",
                 click="export_dialog_show = true",
                 style="margin-left:4px;",
+            )
+
+            # ── Check / install updates ────────────────────────────────────
+            v3.VBtn(
+                icon="mdi-update",
+                variant="text",
+                density="compact",
+                color="white",
+                title="Check for updates",
+                loading=("update_checking",),
+                click=server.controller.check_for_updates,
+                style="margin-left:2px;",
             )
 
             # Title
@@ -1072,7 +1177,7 @@ def create_app(
                     v3.VSnackbar(
                         "{{ notice_text }}",
                         v_model=("notice_show",),
-                        timeout=4500,
+                        timeout=("notice_timeout",),
                         color=("notice_color",),
                         location="top",
                         contained=True,
