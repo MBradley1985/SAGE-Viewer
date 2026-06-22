@@ -185,12 +185,12 @@ export PATH="$HOME/Library/Python/3.12/bin:$PATH"
 
 Movie recording in MOV format requires `ffmpeg` in your `PATH`.
 
-### From source (development)
+### From source
 
 ```bash
 git clone https://github.com/MBradley1985/SAGE-Viewer
 cd SAGE-Viewer
-pip install -e ".[dev]"
+pip install .
 ```
 
 ### HPC / supercomputer
