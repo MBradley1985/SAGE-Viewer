@@ -360,12 +360,19 @@ class CameraController:
             (0.0, 1.0, 0.0),
         ]
 
-    def go_to_box_center(self) -> None:
-        """Place the camera AT the box centre, looking along +z."""
+    def go_to_box_center(
+        self,
+        offset: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        box_size: float | None = None,
+    ) -> None:
+        """Place the camera AT the active box centre, looking along +z."""
         self._clear_indicator()
-        half = self._box_size / 2.0
-        self._pl.camera.focal_point = (half, half, half + 1.0)
-        self._pl.camera.position = (half, half, half)
+        bs = box_size if box_size is not None else self._box_size
+        ox, oy, oz = offset
+        half = bs / 2.0
+        cx, cy, cz = ox + half, oy + half, oz + half
+        self._pl.camera.focal_point = (cx, cy, cz + 1.0)
+        self._pl.camera.position = (cx, cy, cz)
         self._pl.camera.up = (0.0, 1.0, 0.0)
 
     # ------------------------------------------------------------------

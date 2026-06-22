@@ -388,7 +388,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     state.galaxy_colormap = scene.galaxy_layer.colormap
 
     def _rebuild_color_mode_lists() -> None:
-        fields = dict(scene.primary.fields_available)
+        fields = dict(scene.active_model.fields_available)
         state.halo_color_modes = _filter_modes(_HALO_MODES, fields)
         state.galaxy_color_modes = _filter_modes(_GALAXY_MODES, fields)
 
@@ -405,7 +405,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         (filter sliders, focus sphere/box, snapshot change, halo toggle).
         Passes None when every halo is visible so _filter_segments skips
         the position lookup entirely."""
-        fl = scene.primary.fof_layer
+        fl = scene.active_model.fof_layer
         if not fl.visible:
             return
         hl = scene.halo_layer
@@ -430,7 +430,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
     def _apply_filters() -> None:
         import numpy as np
 
-        halos, galaxies = scene._loader.get(scene.current_snap)
+        halos, galaxies = scene.active_model.loader.get(scene.current_snap)
 
         # Halo filters
         m_lo, m_hi = state.filter_halo_mvir
@@ -532,7 +532,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             elif t == "satellite":
                 g_mask &= galaxies.gal_type > 0
 
-            fields = scene.primary.fields_available
+            fields = scene.active_model.fields_available
 
             # ── Conditional filters ────────────────────────────────────────────
             if fields.get("bh_mass", False):
@@ -835,7 +835,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         should_show_fof = bool(halos_visible) and bool(state.fof_links_on)
         if should_show_fof:
             _sync_fof_layer()  # update masks before the visible setter triggers _rebuild
-        scene.primary.fof_layer.visible = should_show_fof
+        scene.active_model.fof_layer.visible = should_show_fof
         _push()
 
     @state.change("galaxies_visible")
@@ -1172,7 +1172,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             d = float(state.nav_distance)
         except (TypeError, ValueError):
             return
-        halos, galaxies = scene._loader.get(scene.current_snap)
+        halos, galaxies = scene.active_model.loader.get(scene.current_snap)
         if hidx < 0 or hidx >= halos.count:
             return  # invalid halo index — silently bail
         try:
@@ -1184,7 +1184,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
         import numpy as np
 
         if galaxies.count > 0:
-            d2 = np.sum((galaxies.positions - np.array(halo_pos)) ** 2, axis=1)
+            off = scene.active_model.offset
+            d2 = np.sum(((galaxies.positions + off) - np.array(halo_pos)) ** 2, axis=1)
             state.nav_gal_idx = int(np.argmin(d2))
         # Always engage focus on Go in the Environment tab
         scene.set_focus_sphere(
@@ -1203,14 +1204,14 @@ def build_navigation_panel(server, scene: Scene) -> None:
             gidx = int(state.nav_gal_idx)
         except (TypeError, ValueError):
             return
-        _, galaxies = scene._loader.get(scene.current_snap)
+        _, galaxies = scene.active_model.loader.get(scene.current_snap)
         if gidx < 0 or gidx >= galaxies.count:
             return
 
         # Show the info panel only — do NOT move the camera or change focus.
         info = build_galaxy_info(
             galaxies=galaxies,
-            fields_available=scene.primary.fields_available,
+            fields_available=scene.active_model.fields_available,
             idx=gidx,
             snap_table=scene._snap_table,
             hubble_h=scene._cfg.hubble_h,
@@ -1264,12 +1265,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
             gidx = int(state.nav_gal_idx)
         except (TypeError, ValueError):
             return
-        _, galaxies = scene._loader.get(scene.current_snap)
+        _, galaxies = scene.active_model.loader.get(scene.current_snap)
         if gidx < 0 or gidx >= galaxies.count:
             return
         info = build_group_info(
             galaxies=galaxies,
-            fields_available=scene.primary.fields_available,
+            fields_available=scene.active_model.fields_available,
             idx=gidx,
             hubble_h=scene._cfg.hubble_h,
         )
@@ -1286,11 +1287,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
             galaxies, gidx
         )
         if central_pos is not None:
+            off = scene.active_model.offset
             scene.camera._add_circle_indicator(
                 (
-                    float(central_pos[0]),
-                    float(central_pos[1]),
-                    float(central_pos[2]),
+                    float(central_pos[0] + off[0]),
+                    float(central_pos[1] + off[1]),
+                    float(central_pos[2] + off[2]),
                 ),
                 0.0,
             )
@@ -1318,7 +1320,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         """Return (gal_indices_into_snapshot, scope_bounds_dict)."""
         import numpy as np
 
-        _, galaxies = scene._loader.get(scene.current_snap)
+        _, galaxies = scene.active_model.loader.get(scene.current_snap)
         if galaxies.count == 0:
             raise ValueError("No galaxies loaded.")
 
@@ -1413,7 +1415,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             return np.where(mask)[0].astype(np.int64), bounds
 
         # default: "filters" — use the active filter mask on the galaxy layer
-        fmask = scene.primary.galaxy_layer._filter_mask
+        fmask = scene.galaxy_layer._filter_mask
         if fmask is None:
             gal_indices = np.arange(galaxies.count, dtype=np.int64)
         else:
@@ -1444,7 +1446,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         try:
             gal_indices, scope_bounds = _resolve_export_indices(scope)
-            _, galaxies = scene._loader.get(scene.current_snap)
+            _, galaxies = scene.active_model.loader.get(scene.current_snap)
             sage_idx = galaxies.sage_indices[gal_indices]
 
             cfg = scene.primary.cfg
@@ -1511,6 +1513,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         "gidx": -1,
         "snap": -1,
         "central_idx": -1,
+        "box_name": None,
     }
 
     @ctrl.set("highlight_group_members")
@@ -1534,12 +1537,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
             return
 
         cur_snap = scene.current_snap
+        cur_box = scene.active_box_name
         cached = (
             _highlight_cache["positions"] is not None
             and _highlight_cache["gidx"] == gidx
             and _highlight_cache["snap"] == cur_snap
+            and _highlight_cache["box_name"] == cur_box
         )
-        _, galaxies = scene._loader.get(cur_snap)
+        active = scene.active_model
+        off = active.offset
+        _, galaxies = active.loader.get(cur_snap)
         if not cached:
             if gidx < 0 or gidx >= galaxies.count:
                 return
@@ -1556,8 +1563,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
             )
             # others excludes only the selected galaxy (central stays in for regime colouring)
             others = members[members != gidx]
-            positions = galaxies.positions[others].copy()
-            has_regime = scene.primary.fields_available.get(
+            # Store world-space positions so indicators land on the correct box
+            positions = (galaxies.positions[others] + off).copy()
+            has_regime = scene.active_model.fields_available.get(
                 "cgm_regime", False
             )
             regimes = (
@@ -1568,6 +1576,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
             _highlight_cache["gidx"] = gidx
             _highlight_cache["snap"] = cur_snap
             _highlight_cache["central_idx"] = central_idx
+            _highlight_cache["box_name"] = cur_box
 
         central_idx = _highlight_cache["central_idx"]
         # Draw all members (including central) with regime colours
@@ -1577,19 +1586,19 @@ def build_navigation_panel(server, scene: Scene) -> None:
         )
         # Paint gold on top of the central's regime dot (larger point wins the depth fight)
         if 0 <= central_idx < galaxies.count and central_idx != gidx:
-            cam._add_central_gold_indicator(galaxies.positions[central_idx])
+            cam._add_central_gold_indicator(galaxies.positions[central_idx] + off)
         # Selected galaxy: gold if it IS the central, else regime colour
         if 0 <= gidx < galaxies.count:
             if gidx == central_idx:
                 cam._add_selected_indicator(
-                    galaxies.positions[gidx], color="gold"
+                    galaxies.positions[gidx] + off, color="gold"
                 )
             else:
-                has_regime = scene.primary.fields_available.get(
+                has_regime = scene.active_model.fields_available.get(
                     "cgm_regime", False
                 )
                 regime = int(galaxies.cgm_regime[gidx]) if has_regime else None
-                cam._add_selected_indicator(galaxies.positions[gidx], regime)
+                cam._add_selected_indicator(galaxies.positions[gidx] + off, regime)
         _push()
 
     # ------------------------------------------------------------------
@@ -2622,7 +2631,15 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @ctrl.set("reset_camera")
     def on_reset():
         _clear_draw_widgets()
-        scene.camera.reset()
+        regions = [(0.0, 0.0, 0.0, scene.primary.box_size)]
+        for name in scene._adjacent_order:
+            m = scene._models.get(name)
+            if m is not None:
+                off = m.offset
+                regions.append(
+                    (float(off[0]), float(off[1]), float(off[2]), m.box_size)
+                )
+        scene.camera.focus_on_boxes(regions)
         scene.clear_focus()
         state.focus_active = False
         _sync_fof_layer()
@@ -2630,7 +2647,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     @ctrl.set("center_camera")
     def on_center_camera():
-        scene.camera.go_to_box_center()
+        active = scene.active_model
+        off = tuple(float(v) for v in active.offset)
+        scene.camera.go_to_box_center(offset=off, box_size=active.box_size)
         _push()
 
     # ------------------------------------------------------------------
@@ -3195,11 +3214,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
             gidx = int(state.nav_gal_idx)
         except (TypeError, ValueError):
             return
-        _, galaxies = scene._loader.get(scene.current_snap)
+        _, galaxies = scene.active_model.loader.get(scene.current_snap)
         if gidx < 0 or gidx >= galaxies.count:
             return
+        off = scene.active_model.offset
         cam._add_selected_indicator(
-            galaxies.positions[gidx], color="limegreen"
+            galaxies.positions[gidx] + off, color="limegreen"
         )
         _push()
 
@@ -3218,7 +3238,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         # Turning ON — engage focus appropriate to the active tab so the
         # button behaves naturally wherever the user is in the UI.
         tab = state.nav_active_tab
-        halos, galaxies = scene._loader.get(scene.current_snap)
+        halos, galaxies = scene.active_model.loader.get(scene.current_snap)
 
         if tab == "target":
             try:

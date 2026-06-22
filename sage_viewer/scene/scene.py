@@ -568,10 +568,11 @@ class Scene:
             zmin=zmin,
             zmax=zmax,
         )
-        halos, galaxies = self.primary.loader.get(self._current_snap)
+        active = self.active_model
+        halos, galaxies = active.loader.get(active.current_snap)
         self._apply_focus_masks_for_layer(
-            self.primary.halo_layer,
-            self.primary.galaxy_layer,
+            active.halo_layer,
+            active.galaxy_layer,
             halos.positions,
             galaxies.positions,
         )
@@ -582,18 +583,21 @@ class Scene:
         radius: float,
     ) -> None:
         self._focus_region = dict(type="sphere", center=center, radius=radius)
-        halos, galaxies = self.primary.loader.get(self._current_snap)
+        active = self.active_model
+        halos, galaxies = active.loader.get(active.current_snap)
+        off = active.offset.astype(np.float32)
         self._apply_focus_masks_for_layer(
-            self.primary.halo_layer,
-            self.primary.galaxy_layer,
-            halos.positions,
-            galaxies.positions,
+            active.halo_layer,
+            active.galaxy_layer,
+            halos.positions + off,
+            galaxies.positions + off,
         )
 
     def clear_focus(self) -> None:
         self._focus_region = None
-        self.primary.halo_layer.set_mask(None)
-        self.primary.galaxy_layer.set_mask(None)
+        for m in self._models.values():
+            m.halo_layer.set_mask(None)
+            m.galaxy_layer.set_mask(None)
 
     def _apply_focus_masks_for_layer(
         self,
