@@ -1701,10 +1701,28 @@ def build_navigation_panel(server, scene: Scene) -> None:
         return _PIL.fromarray(arr.astype(_np2.uint8), "RGB")
 
     def _composite_overlays(pil_img):
-        """Composite all visible HTML overlays: library cards, then console pop-out."""
+        """Composite all visible HTML overlays: library cards, info panels, console pop-out."""
         lib_items = list(getattr(state, "library_items", []))
         if lib_items:
             pil_img = _draw_library_cards(pil_img, lib_items)
+        # Galaxy Info — only visible when Target tab is active
+        if (
+            bool(getattr(state, "galinfo_show", False))
+            and str(getattr(state, "nav_active_tab", "")) == "target"
+        ):
+            items = list(getattr(state, "galinfo_items", []))
+            if items:
+                pil_img = _draw_info_panel(
+                    pil_img, items, "Galaxy Information"
+                )
+        # Group Info — only visible when Environment tab is active
+        elif (
+            bool(getattr(state, "groupinfo_show", False))
+            and str(getattr(state, "nav_active_tab", "")) == "environment"
+        ):
+            items = list(getattr(state, "groupinfo_items", []))
+            if items:
+                pil_img = _draw_info_panel(pil_img, items, "Group Information")
         if bool(getattr(state, "console_popout_show", False)):
             pil_img = _draw_console_popout(pil_img)
         return pil_img
@@ -1825,6 +1843,74 @@ def build_navigation_panel(server, scene: Scene) -> None:
         base.paste(overlay, (pop_x, pop_y), overlay)
         return base.convert("RGB")
 
+    def _draw_info_panel(pil_img, items, title):
+        """Composite a Galaxy Info or Group Info card at the top-right corner.
+
+        Matches the UI card CSS: right:24px, top:32px, width 260-320px."""
+        from PIL import Image as _PIL, ImageDraw, ImageFont
+        import platform
+
+        W, H = pil_img.size
+        pan_w = min(300, max(240, int(W * 0.22)))
+        row_h = 18
+        title_h = 30
+        pad = 8
+        n_rows = max(1, len(items))
+        pan_h = title_h + pad // 2 + n_rows * row_h + pad
+        pan_x = W - 24 - pan_w
+        pan_y = 32
+        font_sz = 11
+        try:
+            if platform.system() == "Darwin":
+                _lf = ImageFont.truetype(
+                    "/System/Library/Fonts/Helvetica.ttc", font_sz
+                )
+                _vf = ImageFont.truetype(
+                    "/System/Library/Fonts/Supplemental/Courier New.ttf",
+                    font_sz,
+                )
+            else:
+                try:
+                    _lf = ImageFont.truetype("DejaVuSans.ttf", font_sz)
+                    _vf = ImageFont.truetype("DejaVuSansMono.ttf", font_sz)
+                except Exception:
+                    _lf = ImageFont.load_default()
+                    _vf = _lf
+        except Exception:
+            _lf = ImageFont.load_default()
+            _vf = _lf
+        overlay = _PIL.new("RGBA", (pan_w, pan_h), (17, 24, 39, 216))
+        draw = ImageDraw.Draw(overlay)
+        draw.rectangle(
+            [0, 0, pan_w - 1, pan_h - 1], outline=(55, 65, 81), width=1
+        )
+        draw.rectangle([1, 1, pan_w - 2, title_h - 1], fill=(20, 20, 45, 255))
+        draw.line(
+            [1, title_h - 1, pan_w - 2, title_h - 1], fill=(31, 41, 55, 255)
+        )
+        ty = (title_h - font_sz) // 2
+        draw.text((pad, ty), "i", fill=(6, 182, 212), font=_lf)
+        draw.text((pad + 14, ty), title, fill=(6, 182, 212), font=_lf)
+        y = title_h + pad // 2
+        for row in items:
+            label = str(row.get("label", ""))
+            value = str(row.get("value", ""))
+            draw.text((pad, y), label, fill=(156, 163, 175), font=_lf)
+            try:
+                bbox = draw.textbbox((0, 0), value, font=_vf)
+                val_w = bbox[2] - bbox[0]
+            except AttributeError:
+                val_w = int(len(value) * font_sz * 0.6)
+            draw.text(
+                (pan_w - pad - val_w, y), value, fill=(226, 232, 240), font=_vf
+            )
+            y += row_h
+            if y + row_h > pan_h:
+                break
+        base = pil_img.convert("RGBA")
+        base.paste(overlay, (pan_x, pan_y), overlay)
+        return base.convert("RGB")
+
     def _save_image(image, path) -> None:
         """Write a vtkImageData to disk; format inferred from extension."""
         import vtk
@@ -1856,8 +1942,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                 ts = datetime.datetime.now().strftime("%H%M%S")
                 path = sess / f"{name}_{ts}.{ext}"
+            pb_active = bool(getattr(state, "playback_active", False))
             pf = str(getattr(state, "playback_frame", "") or "")
-            if pf.startswith("data:image"):
+            if pb_active and pf.startswith("data:image"):
                 import base64
                 import io as _io
                 from PIL import Image as _PIL
