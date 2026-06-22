@@ -6,6 +6,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.8] — 2026-06-22
+
+### Added
+
+- **Galaxy Info and Group Info panels now appear in screenshots and recordings** — the info card is composited as a PIL overlay (matching its on-screen position at top-right) whenever it is visible at capture time, same technique already used for the console pop-out and library cards
+- **Highlight actors (Highlight Galaxy / Highlight Members) now appear in playback recordings** — the pre-rendered frame cache is invalidated whenever the indicator state changes, so pressing Play after adding highlights always re-renders with them included
+
+### Fixed
+
+- Screenshots taken while **not** in playback no longer use a stale pre-rendered JPEG from a previous playback session; they always capture the live VTK render window
+
+---
+
 ## [1.0.7] — 2026-06-22
 
 ### Fixed

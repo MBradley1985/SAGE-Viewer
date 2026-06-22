@@ -217,6 +217,7 @@ def build_toolbar(server, scene: Scene) -> None:
             hl.colormap,
             scene.fof_links_visible,
             str(scene._focus_region),
+            scene.camera.has_member_indicators,
         ]
         return hash(tuple(parts))
 
