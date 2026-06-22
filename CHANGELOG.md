@@ -6,6 +6,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.4] — 2026-06-22
+
+### Fixed
+
+- Launch Mode: clicking **×** to close now properly stops the server (`asyncio.ensure_future` instead of bare `await` in sync handler, which caused a `RuntimeWarning: coroutine was never awaited` and left the process running)
+
+---
+
+## [1.0.3] — 2026-06-22
+
+### Fixed
+
+- Launch Mode: **×** button now calls `server.stop()` to shut down the process when running standalone; previously it only hid the wizard UI without terminating the server
+
+---
+
 ## [1.0.1] — 2026-06-22
 
 ### Fixed
