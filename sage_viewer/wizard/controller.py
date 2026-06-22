@@ -760,7 +760,10 @@ class WizardController:
     async def _step_clone(self) -> None:
         self._st.wiz_step = 2
         self._emit("Choose where to clone SAGE26:", "info")
-        self._emit("  A 'SAGE26' folder will be created inside the chosen directory.", "info")
+        self._emit(
+            "  A 'SAGE26' folder will be created inside the chosen directory.",
+            "info",
+        )
         self._emit("", "info")
         self._st.wiz_clone_dir = str(Path.home())
         self._st.wiz_clone_dir_show = True
@@ -956,7 +959,11 @@ class WizardController:
         content = _MILLENNIUM_PAR_TEMPLATE.format(
             output_dir=sage26 / "output" / "millennium" / "",
             sim_dir=sage26 / "input" / "millennium" / "trees" / "",
-            snaplist=sage26 / "input" / "millennium" / "trees" / "millennium.a_list",
+            snaplist=sage26
+            / "input"
+            / "millennium"
+            / "trees"
+            / "millennium.a_list",
         )
         dest.write_text(content)
         self._par_path = dest
