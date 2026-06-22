@@ -384,15 +384,13 @@ class GalaxyLayer:
     ) -> None:
         """Multi-layer physically-suggestive galaxy rendering.
 
-        For every galaxy:
-          • a black "BH" core sized by BlackHoleMass
-          • a blue cold-gas envelope sized by ColdGas
-          • scattered "stellar" particles (coolwarm) inside the envelope,
-            count scaled by stellar mass
-          • a green CGM (Regime == 0) or red HotGas (Regime == 1) outer
-            envelope, sized by CGMgas / HotGas respectively
-          • coolwarm scatter through the outer envelope, fewer than the
-            inner one
+        Always rendered (all galaxies):
+          • blue cold-gas envelope sized by ColdGas
+          • green CGM (Regime == 0) or red HotGas (Regime == 1) outer envelope
+
+        Only when a focus region is active:
+          • cyan disk layer  (StellarMass − BulgeMass), user-configurable colour
+          • amber bulge layer (BulgeMass), user-configurable colour
 
         All layers share the per-galaxy world-space `radii` envelope so the
         overall splat size stays consistent with the standard rendering.
@@ -482,6 +480,48 @@ class GalaxyLayer:
         # (Per-galaxy star scatter and BH accretion-disk cores both
         # removed — invisible / negligible at typical zoom levels and
         # together they were the bulk of the per-frame splat cost.)
+
+        # ---- (3) Focus-only inner stellar layers ---------------------
+        # Only rendered when a focus region is active (sphere or box).
+        # At full-scene scale these would be invisible; in focus they add
+        # meaningful structural detail showing the bulge/disk mass split.
+        if self._focus_mask is not None:
+            disk_mass = np.maximum(snap.stellar_mass - snap.bulge_mass, 0.0)
+            disk_scalar = _logn(disk_mass, 7.0, 12.0)
+            bulge_scalar = _logn(snap.bulge_mass, 6.0, 12.0)
+
+            r_disk = (r_outer * 0.22 * (0.35 + 0.65 * disk_scalar)).astype(
+                np.float32
+            )
+            r_bulge = (r_outer * 0.12 * (0.30 + 0.70 * bulge_scalar)).astype(
+                np.float32
+            )
+
+            for scalar, radii_arr, cmap in [
+                (disk_scalar, r_disk, "Blues_r"),
+                (bulge_scalar, r_bulge, "RdBu"),
+            ]:
+                cloud = pv.PolyData(pos)
+                cloud["scalar"] = scalar.astype(np.float32)
+                cloud["radius"] = radii_arr
+                actor = self._pl.add_mesh(
+                    cloud,
+                    scalars="scalar",
+                    cmap=cmap,
+                    clim=[0.0, 1.0],
+                    style="points_gaussian",
+                    emissive=False,
+                    opacity=max(0.5, self._opacity * 0.75),
+                    show_scalar_bar=False,
+                    render=False,
+                    reset_camera=False,
+                )
+                mp = actor.mapper
+                mp.SetScaleArray("radius")
+                mp.SetScaleFactor(1.0)
+                if not self._visible:
+                    actor.SetVisibility(False)
+                self._actors.append(actor)
 
     def _render_outer_property(
         self,
