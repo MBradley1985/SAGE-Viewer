@@ -1457,8 +1457,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 else f"snap{snap_num}"
             )
 
-            repo_root = pathlib.Path(__file__).resolve().parents[2]
-            out_dir = repo_root / "sage_outputs" / "catalogues"
+            out_dir = pathlib.Path.cwd() / "sage_outputs" / "catalogues"
             if not stem:
                 ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 stem = f"catalogue_{scope}_{ts}"
@@ -1843,12 +1842,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         writer.Write()
 
     def _make_outdir(sub: str) -> pathlib.Path:
-        import pathlib
-
-        # Anchor outputs inside the SAGE-Viewer repo (gitignored)
-        # __file__ = .../SAGE-Viewer/sage_viewer/ui/navigation_panel.py
-        repo_root = pathlib.Path(__file__).resolve().parents[2]
-        outdir = repo_root / sub
+        outdir = pathlib.Path.cwd() / sub
         outdir.mkdir(parents=True, exist_ok=True)
         return outdir
 

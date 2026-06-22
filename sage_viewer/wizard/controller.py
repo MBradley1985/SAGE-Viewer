@@ -104,8 +104,8 @@ _MILLENNIUM_PAR_TEMPLATE = """\
 %------------------------------------------
 
 FileNameGalaxies   model
-%OutputDir         /<absolute>/<root>/<path>/sage-model/output/millennium/
-OutputDir   /Users/mbradley/Documents/PhD/SAGE26/output/millennium/
+%OutputDir         /<absolute>/<path>/SAGE26/output/millennium/
+OutputDir   {output_dir}
 
 FirstFile         0
 LastFile          7
@@ -129,10 +129,10 @@ TreeName              trees_063   % assumes the trees are named TreeName.n where
 TreeType              lhalo_binary % 'genesis_lhalo_hdf5', 'lhalo_binary', 'consistentrees_ascii', 'consistentrees_hdf5', 'lhalo_ascii', 'lhalo_hdf5'
 NumSimulationTreeFiles 8 % Number of files the trees are split over. This can be different to `FirstFile` -> `LastFile` range.
 
-%SimulationDir      /<absolute>/<root>/<path>/sage-home/sage-model/input/millennium/trees/
-SimulationDir   /Users/mbradley/Documents/PhD/SAGE26/input/millennium/trees/
-%FileWithSnapList   /<absolute>/<root>/<path>/sage-home/sage-model/input/millennium/trees/millennium.a_list
-FileWithSnapList /Users/mbradley/Documents/PhD/SAGE26/input/millennium/trees/millennium.a_list
+%SimulationDir      /<absolute>/<path>/SAGE26/input/millennium/trees/
+SimulationDir   {sim_dir}
+%FileWithSnapList   /<absolute>/<path>/SAGE26/input/millennium/trees/millennium.a_list
+FileWithSnapList {snaplist}
 LastSnapShotNr        63
 
 Omega           0.25
@@ -263,6 +263,8 @@ class WizardController:
         self._st.wiz_pty_data = ""  # base64 PTY chunk → xterm.js
         self._st.wiz_pty_seq = 0  # monotonically increasing
         self._st.wiz_pty_buf = ""  # base64 full replay buffer
+        self._st.wiz_clone_dir_show = False
+        self._st.wiz_clone_dir = str(Path.home())
 
         server.controller.set("wiz_choose")(self._on_choice)
         server.controller.set("wiz_close")(self._on_close)
@@ -287,6 +289,8 @@ class WizardController:
         self._st.wiz_filename_show = False
         self._st.wiz_filename = "millennium"
         self._st.wiz_pty_buf = ""
+        self._st.wiz_clone_dir_show = False
+        self._st.wiz_clone_dir = str(Path.home())
         # Push a clear sequence as the first "chunk" so a late-mounting xterm
         # clears itself before replaying buffered output.
         self._push_bytes(b"\x1b[2J\x1b[H")
@@ -338,6 +342,7 @@ class WizardController:
         self._st.wiz_busy = True
         self._st.wiz_par_show = False
         self._st.wiz_filename_show = False
+        self._st.wiz_clone_dir_show = False
         self._st.flush()
 
     async def _run_cmd(self, cmd: list[str], cwd: Path | None = None) -> int:
@@ -593,6 +598,9 @@ class WizardController:
         elif value == "clone_sage26":
             await self._step_clone()
 
+        elif value == "confirm_clone":
+            await self._do_clone()
+
         elif value == "compile_sage26":
             await self._step_compile()
 
@@ -751,7 +759,55 @@ class WizardController:
 
     async def _step_clone(self) -> None:
         self._st.wiz_step = 2
-        parent = Path.cwd().parent
+        self._emit("Choose where to clone SAGE26:", "info")
+        self._emit("  A 'SAGE26' folder will be created inside the chosen directory.", "info")
+        self._emit("", "info")
+        self._st.wiz_clone_dir = str(Path.home())
+        self._st.wiz_clone_dir_show = True
+        self._st.flush()
+        self._set_choices(
+            [
+                {
+                    "label": "Clone Here",
+                    "value": "confirm_clone",
+                    "icon": "mdi-git",
+                    "disabled": False,
+                },
+                {
+                    "label": "Back",
+                    "value": self._back,
+                    "icon": "mdi-arrow-left",
+                    "disabled": False,
+                },
+            ]
+        )
+
+    async def _do_clone(self) -> None:
+        self._st.wiz_step = 2
+        raw_dir = str(self._st.wiz_clone_dir or "").strip() or str(Path.home())
+        parent = Path(raw_dir).expanduser().resolve()
+        if not parent.is_dir():
+            self._emit(f"Directory not found: {parent}", "err")
+            self._emit("Please enter a valid directory path.", "info")
+            self._st.wiz_clone_dir_show = True
+            self._st.flush()
+            self._set_choices(
+                [
+                    {
+                        "label": "Clone Here",
+                        "value": "confirm_clone",
+                        "icon": "mdi-git",
+                        "disabled": False,
+                    },
+                    {
+                        "label": "Back",
+                        "value": self._back,
+                        "icon": "mdi-arrow-left",
+                        "disabled": False,
+                    },
+                ]
+            )
+            return
         target = parent / "SAGE26"
         self._emit(f"Cloning SAGE26 into {target} ...", "info")
         rc = await self._run_cmd(
@@ -896,7 +952,13 @@ class WizardController:
         inp_dir.mkdir(parents=True, exist_ok=True)
         dest = inp_dir / name
         self._emit(f"Creating config file: {dest}", "info")
-        dest.write_text(_MILLENNIUM_PAR_TEMPLATE)
+        sage26 = self._sage26_dir or Path.cwd()
+        content = _MILLENNIUM_PAR_TEMPLATE.format(
+            output_dir=sage26 / "output" / "millennium" / "",
+            sim_dir=sage26 / "input" / "millennium" / "trees" / "",
+            snaplist=sage26 / "input" / "millennium" / "trees" / "millennium.a_list",
+        )
+        dest.write_text(content)
         self._par_path = dest
         self._emit(
             "Template written. Edit the paths to the right, then Save & Run.",
