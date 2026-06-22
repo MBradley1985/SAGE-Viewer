@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# Launcher — run from the SAGE-Viewer directory or add this directory to PATH.
-# Explicitly adds user site-packages to PYTHONPATH so dependencies installed
-# via 'pip install --user' (e.g. trame) are found by the system python3.
-_USER_SITE="$(python3 -m site --user-site 2>/dev/null)"
-PYTHONPATH="${_USER_SITE}${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m sage_viewer.cli "$@"
+# Launcher — finds whichever Python has trame installed and uses that.
+# Needed on macOS where multiple Python versions coexist and the shell's
+# default python3 may differ from the one pip used.
+for _py in python3.12 python3.13 python3.11 python3.10 python3; do
+    if command -v "$_py" >/dev/null 2>&1 && "$_py" -c "import trame" 2>/dev/null; then
+        exec "$_py" -m sage_viewer.cli "$@"
+    fi
+done
+echo "Error: trame not found. Install with: pip install sage-viewer" >&2
+exit 1
