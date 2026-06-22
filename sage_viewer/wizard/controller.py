@@ -295,7 +295,7 @@ class WizardController:
 
     def _on_close(self, **_) -> None:
         if self._standalone:
-            self._sv.stop()
+            asyncio.ensure_future(self._sv.stop())
         else:
             self._st.wiz_active = False
             self._st.flush()
