@@ -36,6 +36,7 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - **Galaxy Info** panel (Target tab) — GalaxyID, type, halo Mvir, stellar mass, sSFR, cold gas, B/T, BH mass, H2 mass, gas regime, FFB regime, environment classification, mass-weighted stellar age
 - **Group Info** panel (Environment tab) — FOF-aggregate stats: classification, member breakdown (centrals vs satellites), host Mvir, total stellar / cold gas / SFR, mean B/T, spatial extent, target role, BCG stellar mass
 - **Highlight Galaxy** / **Highlight Members** buttons add regime-coloured splat overlays — CGM-regime members in dodgerblue, Hot-regime in tomato; the selected galaxy is marked with a white border ring
+- Galaxy Info, Group Info, and highlight splats all appear in screenshots and recordings — info panels are composited as overlays; highlight actors are baked into the pre-rendered playback frames
 - **Double-click any point** in the viewport (any tab) to populate the Target tab's halo + galaxy IDs and draw a red marker on the selection. Only currently visible galaxies (passing all filters and focus) are selectable. If Focus is active, the camera carries to the new selection at the last-used radius.
 - **Enter to run** in every input field — Halo idx, Galaxy idx, Coords X/Y/Z, Box bounds, Console command, script path, screenshot/movie label all submit on Enter, equivalent to clicking the paired Go / Zoom / Run / Take Screenshot button
 
@@ -48,7 +49,7 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - Filters auto-disable when the loaded model doesn't contain the underlying field
 - Reset Filters button restores defaults
 - **FoF links are filter-aware** — satellite→central gold lines are only drawn for halos that pass the active filter mask, focus sphere/box, and the halos-visible toggle; they stay correct during playback and recording
-- **Playback respects all scene state** — the pre-render frame cache is keyed on filter values, focus region, layer visibility/opacity/color-mode, and FoF state; changing any of these and pressing Play again always produces fresh frames
+- **Playback respects all scene state** — the pre-render frame cache is keyed on filter values, focus region, layer visibility/opacity/color-mode, FoF state, and highlight indicator state; changing any of these and pressing Play again always produces fresh frames
 
 ### Side-by-side multi-box comparison
 - Load two or more SAGE models side-by-side in a single viewport with `+SBS` in the Models section of the hamburger menu
@@ -71,6 +72,7 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - Movie recording in GIF / MOV (H.264, via ffmpeg) / PNG sequence
 - Configurable FPS (1 – 60) and resolution (Native / 2× / 4× supersampled)
 - Optional user-typed label per capture; everything saves into `sage_outputs/session_<timestamp>/` in your current working directory
+- **Overlay compositing** — Galaxy Info, Group Info, console pop-out, and open Library cards are all composited into screenshots and recordings exactly as they appear on screen
 - Catalogue export (CSV, HDF5, FITS, TXT) for the current filter selection, target, or box region — saves to `sage_outputs/catalogues/`
 
 ### Launch Mode wizard
@@ -82,8 +84,6 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - Par file editor opens side-by-side with the terminal when a `.par` file needs editing — both panels visible simultaneously
 - Screenshots, recordings, and catalogue exports all save to `sage_outputs/` in the directory you launched from
 - Wizard always resets cleanly when reopened from Explore Mode
-
-<!-- Console screenshot: drop docs/images/console.png here once captured -->
 
 ### Embedded console (Console tab)
 - **Terminal mode** — a live xterm.js terminal backed by a real PTY (`$SHELL -l`); full ANSI colour, cursor control, and interactive programs (`vim`, `top`, `htop`, `less`) all work
@@ -230,7 +230,7 @@ When multiple boxes are loaded a **box strip** appears at the bottom of the view
 |---|---|
 | Structure  | Layer visibility, opacity, colour-by mode, colormap (with inline colorbar) |
 | Filters    | Range sliders for halo and galaxy properties |
-| Record     | Screenshots and movie recording |
+| Record     | Screenshots (PNG/JPG/TIFF) and movie recording (GIF/MOV/PNG); overlays composite into captures |
 | Target     | Halo / galaxy navigation, focus zoom, Galaxy Info, Highlight Galaxy |
 | Environment| Halo selector, environment-class checkboxes, Group Info, Highlight Members |
 | Coords     | Fly to arbitrary (x, y, z) — "Use Current Position" populates from camera; **Draw Sphere** places an interactive two-handle sphere (drag centre ball to translate, drag edge ball to resize); **Lock Sphere** commits it as the focus region |
@@ -239,8 +239,6 @@ When multiple boxes are loaded a **box strip** appears at the bottom of the view
 | Library    | Browse stored screenshots / movies; double-click a row to open as a movable, resizable floating card over the viewport (multiple items open simultaneously); per-row delete button removes the file from disk immediately |
 
 ![Draw Sphere](https://raw.githubusercontent.com/MBradley1985/SAGE-Viewer/main/docs/images/draw_sphere.gif)
-
-<!-- Library pop-out screenshot: drop docs/images/library_popup.png here once captured -->
 
 The **Focus button** (top of the right panel) is tab-aware: it focuses on whatever's active in the current tab (target galaxy, environment halo, coords point, or box region).
 
