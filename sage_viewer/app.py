@@ -485,6 +485,16 @@ def create_app(
                 # Stop any active rotation — it can't be per-box with a shared camera
                 if getattr(server.state, "rotate_mode", "off") != "off":
                     server.state.rotate_mode = "off"
+                # Reframe to show all loaded boxes
+                regions = [(0.0, 0.0, 0.0, scene.primary.box_size)]
+                for adj_name in scene._adjacent_order:
+                    m = scene._models.get(adj_name)
+                    if m is not None:
+                        off = m.offset
+                        regions.append(
+                            (float(off[0]), float(off[1]), float(off[2]), m.box_size)
+                        )
+                scene.camera.focus_on_boxes(regions)
             else:
                 _profiles.pop(name, None)
                 server.state.active_box_name = scene.active_box_name
