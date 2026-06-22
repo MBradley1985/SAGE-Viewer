@@ -70,14 +70,17 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - Screenshots in PNG / JPG / TIFF
 - Movie recording in GIF / MOV (H.264, via ffmpeg) / PNG sequence
 - Configurable FPS (1 – 60) and resolution (Native / 2× / 4× supersampled)
-- Optional user-typed label per capture; everything goes into a single session folder per app launch
+- Optional user-typed label per capture; everything saves into `sage_outputs/session_<timestamp>/` in your current working directory
+- Catalogue export (CSV, HDF5, FITS, TXT) for the current filter selection, target, or box region — saves to `sage_outputs/catalogues/`
 
 ### Launch Mode wizard
-- Guided setup flow for configuring and launching SAGE26, accessible from the top-left Launch Mode menu or the Explore Mode hamburger
+- Guided setup flow for configuring and launching SAGE26, accessible standalone (`sage-viewer` with no `--par`) or from the Explore Mode hamburger menu
 - Step chips in the header track progress (cyan = current step, green = done, white = pending)
 - **Rescan** button re-runs the environment scan from scratch at any point
-- **Create config file** option generates a new `.par` from the built-in millennium.par template; choose a custom filename before writing
+- **Clone SAGE26** option clones the SAGE26 repository from GitHub — prompts for the parent directory (defaults to home folder) before cloning
+- **Create config file** option generates a new `.par` from a template pre-filled with paths for your SAGE26 directory; choose a custom filename before writing
 - Par file editor opens side-by-side with the terminal when a `.par` file needs editing — both panels visible simultaneously
+- Screenshots, recordings, and catalogue exports all save to `sage_outputs/` in the directory you launched from
 - Wizard always resets cleanly when reopened from Explore Mode
 
 <!-- Console screenshot: drop docs/images/console.png here once captured -->
@@ -134,7 +137,7 @@ ssh -L 8080:localhost:8080 user@cluster
 ## Command-line options
 
 ```text
---par FILE              Path to a SAGE .par file (required)
+--par FILE              Path to a SAGE .par file — omit to launch in Launch Mode (wizard)
 --par-dir DIR           Directory to scan for additional .par files
                         (defaults to the parent of --par; used for the
                         multi-model dropdown)
@@ -167,14 +170,28 @@ then `sage-viewer --par input/millennium.par` discovers all three models automat
 
 ## Installation
 
+### PyPI (recommended)
+
 ```bash
-# From source (PyPI release coming with v1.0)
+pip install sage-viewer
+```
+
+Requires Python ≥ 3.10. After install, `sage-viewer` is available as a command. If your shell can't find it, add the user bin directory to your PATH:
+
+```bash
+# macOS (Python 3.12 user install)
+export PATH="$HOME/Library/Python/3.12/bin:$PATH"
+```
+
+Movie recording in MOV format requires `ffmpeg` in your `PATH`.
+
+### From source (development)
+
+```bash
 git clone https://github.com/MBradley1985/SAGE-Viewer
 cd SAGE-Viewer
 pip install -e ".[dev]"
 ```
-
-Requires Python ≥ 3.10. Movie recording in MOV format requires `ffmpeg` in your `PATH`.
 
 ### HPC / supercomputer
 
@@ -191,9 +208,9 @@ module load python/3.12.0
 ./install_hpc.sh /scratch/$USER/sage-viewer-env
 ```
 
-The install is editable (`pip install -e .`) so a `git pull` updates the code immediately with no reinstall. `ffmpeg` is checked separately — load it via your module system if you need MOV recording.
+The install is editable (`pip install -e .`) so a `git pull` updates the code immediately with no reinstall. Load `ffmpeg` via your module system if you need MOV recording.
 
-Then in every session:
+In every session:
 
 ```bash
 source .venv/bin/activate
