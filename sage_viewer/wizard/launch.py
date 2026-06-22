@@ -58,7 +58,7 @@ def create_launch_app(port: int):
         }
     }
 
-    ctrl = WizardController(server, port)
+    ctrl = WizardController(server, port, standalone=True)
     # JS polls for wiz_active changing from null/undefined → True to mount
     # the xterm.js wizard terminal.  launch.py has no Explore-mode wrapper
     # that would trigger this transition, so we set it explicitly here.

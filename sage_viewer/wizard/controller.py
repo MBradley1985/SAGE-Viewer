@@ -231,10 +231,12 @@ class WizardController:
         scene=None,
         on_model_loaded=None,
         auto_start: bool = True,
+        standalone: bool = False,
     ) -> None:
         self._sv = server
         self._st = server.state
         self._port = port
+        self._standalone = standalone
         self._scene = scene  # None in Launch Mode
         self._on_model_loaded = (
             on_model_loaded  # called on completion in Explore Mode
@@ -292,8 +294,11 @@ class WizardController:
         asyncio.ensure_future(self._step_scan())
 
     def _on_close(self, **_) -> None:
-        self._st.wiz_active = False
-        self._st.flush()
+        if self._standalone:
+            self._sv.stop()
+        else:
+            self._st.wiz_active = False
+            self._st.flush()
 
     def _on_rescan(self, **_) -> None:
         self.reset_and_start()
