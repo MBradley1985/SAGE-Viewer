@@ -6,6 +6,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.9] — 2026-06-22
+
+### Fixed
+
+- GIF recordings no longer show visible contour lines around gaussian splat points — switched from `imageio` (no dithering) to PIL's native GIF writer with Floyd-Steinberg dithering, which distributes colour quantisation error across neighbouring pixels and produces smooth gradients instead of hard bands
+
+---
+
 ## [1.0.8] — 2026-06-22
 
 ### Added
