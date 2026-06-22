@@ -6,6 +6,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.7] — 2026-06-22
+
+### Fixed
+
+- Library tab now scans `sage_library/` and `sage_outputs/` relative to the **working directory** instead of the package install location — items are found correctly when installed via `pip`
+- `sage_library/` folder is created in the working directory on startup (alongside `sage_outputs/`)
+- `./sage-viewer` launcher now finds whichever Python version has `trame` installed, instead of assuming the shell's default `python3` — fixes failures on macOS where multiple Python versions coexist
+
+---
+
 ## [1.0.6] — 2026-06-22
 
 ### Fixed

@@ -2893,8 +2893,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     import pathlib as _pathlib
 
-    _repo_root = _pathlib.Path(__file__).resolve().parents[2]
-    _LIBRARY_DIR = _repo_root / "sage_library"
+    _cwd = _pathlib.Path.cwd()
+    _LIBRARY_DIR = _cwd / "sage_library"
     _LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
 
     _MEDIA_EXTS = {
@@ -2910,7 +2910,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     def _scan_library() -> list[dict]:
         out: list[dict] = []
-        roots = [_LIBRARY_DIR, _repo_root / "sage_outputs"]
+        roots = [_LIBRARY_DIR, _cwd / "sage_outputs"]
         for root in roots:
             if not root.exists():
                 continue
@@ -2926,7 +2926,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 except OSError:
                     continue
                 try:
-                    rel = p.relative_to(_repo_root)
+                    rel = p.relative_to(_cwd)
                 except ValueError:
                     rel = p
                 out.append(
@@ -4162,8 +4162,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 )
                 v3.VLabel(
-                    "Screenshots and movies from <SAGE-Viewer>/sage_library/ and "
-                    "<SAGE-Viewer>/sage_outputs/.  Double-click a row to open as a floating viewer.",
+                    "Screenshots and movies from sage_library/ and "
+                    "sage_outputs/ in your working directory.  Double-click a row to open as a floating viewer.",
                     style=(
                         "font-size:0.6rem;color:#9ca3af;line-height:1.35;"
                         "display:block;padding:0 0 4px;flex-shrink:0;"
