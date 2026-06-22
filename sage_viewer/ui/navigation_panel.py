@@ -2166,8 +2166,6 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         if fmt == "gif":
             try:
-                import imageio.v2 as imageio
-                import numpy as _np_gif
                 from PIL import Image as _PilGif
 
                 frames = sorted(frames_dir.glob("frame_*.jpg"))
@@ -2181,7 +2179,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 ew = _w0 if _w0 % 2 == 0 else _w0 - 1
                 eh = _h0 if _h0 % 2 == 0 else _h0 - 1
                 need_crop = ew != _w0 or eh != _h0
-                imgs = []
+                # Floyd-Steinberg dithering distributes quantisation error to
+                # neighbouring pixels, which prevents hard contour lines on
+                # smooth gaussian-splat gradients (a visible artefact with the
+                # default median-cut quantiser and no dithering).
+                try:
+                    _dither = _PilGif.Dither.FLOYDSTEINBERG
+                    _adaptive = _PilGif.Palette.ADAPTIVE
+                except AttributeError:
+                    _dither = 3  # FLOYDSTEINBERG numeric value
+                    _adaptive = 1  # ADAPTIVE numeric value
+                pil_frames = []
                 for p in frames:
                     img = _PilGif.open(str(p)).convert("RGB")
                     if need_crop:
@@ -2195,13 +2203,19 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         except AttributeError:
                             _gif_rs = _PilGif.LANCZOS
                         img = img.resize((ew, eh), _gif_rs)
-                    imgs.append(
-                        _np_gif.array(img)
-                    )  # copy; allows img to be freed
+                    pil_frames.append(
+                        img.convert("P", palette=_adaptive, dither=_dither)
+                    )
                     img.close()
+                duration_ms = max(1, int(1000 / fps))
                 # loop=0 = infinite, loop=1 = play once
-                imageio.mimsave(
-                    str(out_path), imgs, fps=fps, loop=0 if gif_loop else 1
+                pil_frames[0].save(
+                    str(out_path),
+                    save_all=True,
+                    append_images=pil_frames[1:],
+                    optimize=False,
+                    loop=0 if gif_loop else 1,
+                    duration=duration_ms,
                 )
                 _remove_dir(frames_dir)
                 return str(out_path)
