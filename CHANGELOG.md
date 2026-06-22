@@ -6,6 +6,20 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.6] — 2026-06-22
+
+### Fixed
+
+- Screenshots, recordings, GIFs, and catalogue exports now save to a `sage_outputs/` folder in the **current working directory** rather than inside the Python package installation (a `site-packages` subfolder), which made them inaccessible when installed via `pip`
+- `.par` template no longer contains hardcoded personal paths — `OutputDir`, `SimulationDir`, and `FileWithSnapList` are now filled in dynamically from the detected or cloned SAGE26 directory
+- README: replaced 47 MB and 13 MB embedded GIFs (which overran PyPI's image proxy) with text links to the animated demos on GitHub
+
+### Added
+
+- Launch Mode wizard: **Clone SAGE26** step now prompts for the parent directory (defaults to home folder) before cloning, so pip-installed users can choose where SAGE26 lands rather than having it hardcoded relative to CWD
+
+---
+
 ## [1.0.4] — 2026-06-22
 
 ### Fixed

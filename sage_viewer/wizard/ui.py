@@ -172,6 +172,21 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                                     "font-family:monospace;" "max-width:320px;"
                                 ),
                             )
+                        # Clone directory input — shown before cloning SAGE26
+                        with html.Div(
+                            v_show=("wiz_clone_dir_show",),
+                            style="display:flex;align-items:center;gap:8px;",
+                        ):
+                            v3.VTextField(
+                                v_model=("wiz_clone_dir",),
+                                label="Parent directory (SAGE26 will be created inside)",
+                                variant="outlined",
+                                density="compact",
+                                color="cyan",
+                                bg_color="#000000",
+                                hide_details=True,
+                                style="font-family:monospace;max-width:520px;",
+                            )
                         with html.Div(
                             v_show=("!wiz_busy && wiz_choices.length > 0",),
                             style=(

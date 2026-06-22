@@ -4,8 +4,6 @@ Launch Mode is a guided setup flow for configuring and running SAGE26, accessibl
 
 ## Entering Launch Mode
 
-Run `sage-viewer` from your SAGE26 root directory so the wizard can find your `.par` files and executable automatically:
-
 ```bash
 cd /path/to/SAGE26
 sage-viewer
@@ -14,6 +12,21 @@ sage-viewer
 Then open the printed URL in your browser. The wizard launches directly.
 
 You can also enter Launch Mode from inside Explore Mode via the hamburger menu → **Launch Mode**.
+
+## Where sage-viewer looks for things
+
+The working directory you launch from is the anchor for the entire session:
+
+| What | Where |
+|---|---|
+| SAGE26 executable & source | Searched in CWD, parent of CWD, then home folder |
+| `.par` files | `<SAGE26>/input/` and `<CWD>/input/` |
+| Existing models | `<SAGE26>/output/`, `<CWD>/output/`, `<CWD>/sage_outputs/` |
+| Screenshots / recordings / exports | `<CWD>/sage_outputs/session_<timestamp>/` |
+
+**First-time install (no SAGE26 yet):** run `sage-viewer` from the folder where you want SAGE26 to live, then use **Clone SAGE26** in the wizard. The wizard will ask which parent directory to clone into (defaulting to your home folder), and will use that cloned directory for the rest of the session.
+
+**Existing SAGE26:** run from the SAGE26 root and the wizard finds everything automatically.
 
 ## Step indicator
 
