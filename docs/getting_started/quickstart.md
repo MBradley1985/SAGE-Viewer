@@ -1,12 +1,23 @@
 # Quickstart
 
-## Launch on miniMillennium
+## Two ways to launch
 
-From your SAGE26 root directory:
+**Explore Mode** — view existing SAGE26 results using a full path to your `.par` file:
 
 ```bash
-sage-viewer --par input/millennium.par
+sage-viewer --par /path/to/SAGE26/input/millennium.par
 ```
+
+**Launch Mode** (wizard) — configure and run SAGE26. Run from your SAGE26 root so the wizard can find your `.par` files and executable automatically:
+
+```bash
+cd /path/to/SAGE26
+sage-viewer
+```
+
+## Explore Mode examples
+
+### miniMillennium
 
 Open the printed URL (default `http://localhost:8080`) in any browser.
 
