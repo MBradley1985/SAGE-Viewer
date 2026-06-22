@@ -5126,7 +5126,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             click=ctrl.screenshot_tiff,
                         )
                 v3.VLabel(
-                    "Saved to <SAGE-Viewer>/sage_outputs/session_*/",
+                    "Saved to sage_outputs/session_*/ in your working directory",
                     style="font-size:0.62rem;color:#6b7280;display:block;padding:6px 0 2px;",
                 )
                 v3.VLabel(
