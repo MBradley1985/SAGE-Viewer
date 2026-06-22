@@ -307,10 +307,10 @@ Every typed field now Enter-submits the same as clicking its action button. Wiri
 - Screenshots: PNG / JPG / TIFF.
 - Movies: GIF / MOV (ffmpeg) / PNG sequence; 1–60 fps; Native / 2× / 4× supersample.
 - High-res (2×/4×) uses PIL LANCZOS upscaling instead of VTK tiled rendering to eliminate the grid-seam artifact that appeared at the end of supersample movies.
-- One session folder per app launch under `<repo>/sage_outputs/session_*`.
+- One session folder per app launch under `<cwd>/sage_outputs/session_*`.
 
 ### Library tab
-- Browse stored screenshots / movies from `<repo>/sage_library/` and `sage_outputs/`.
+- Browse stored screenshots / movies from `<cwd>/sage_library/` and `<cwd>/sage_outputs/`.
 - **Double-click** a row to open it as a draggable floating card over the 3D viewport.
 - Multiple items can be open simultaneously — each card is independently movable (drag the title bar).
 - Per-item close (×) button on each card; "Close all" in the Library tab dismisses everything.
