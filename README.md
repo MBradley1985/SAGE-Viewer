@@ -104,13 +104,21 @@ Both supported automatically — point at the `.par` file and SAGE-Viewer figure
 ## Quick start
 
 ```bash
-git clone https://github.com/MBradley1985/SAGE-Viewer
-cd SAGE-Viewer
-pip install -e .
-sage-viewer --par /path/to/millennium.par
+pip install sage-viewer
 ```
 
-> **Note:** PyPI publishing is coming with v1.0. Until then, install from source as above.
+**Explore Mode** — view existing SAGE26 results by pointing at a `.par` file:
+
+```bash
+sage-viewer --par /path/to/SAGE26/input/millennium.par
+```
+
+**Launch Mode** — configure and run SAGE26 via the guided wizard. Run from your SAGE26 root so the wizard can find your `.par` files and executable automatically:
+
+```bash
+cd /path/to/SAGE26
+sage-viewer
+```
 
 Open the printed URL in any browser. To launch on a remote cluster and view locally, use SSH port-forwarding:
 

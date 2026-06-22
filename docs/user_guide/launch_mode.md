@@ -4,8 +4,16 @@ Launch Mode is a guided setup flow for configuring and running SAGE26, accessibl
 
 ## Entering Launch Mode
 
-- From the **top-left Launch Mode** menu button, or
-- From inside Explore Mode via the hamburger menu → **Launch Mode**
+Run `sage-viewer` from your SAGE26 root directory so the wizard can find your `.par` files and executable automatically:
+
+```bash
+cd /path/to/SAGE26
+sage-viewer
+```
+
+Then open the printed URL in your browser. The wizard launches directly.
+
+You can also enter Launch Mode from inside Explore Mode via the hamburger menu → **Launch Mode**.
 
 ## Step indicator
 
