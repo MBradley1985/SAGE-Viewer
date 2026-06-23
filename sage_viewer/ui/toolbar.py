@@ -124,6 +124,7 @@ def build_toolbar(server, scene: Scene) -> None:
     state.is_reverse = False
     state.is_repeat = False
     state.rotate_mode = "off"
+    state.flythrough_active = False
     state.preload_status = ""  # non-empty while the snapshot cache warms
     # Pre-rendered playback: frames are rendered once on play, then flipped
     # through as images for stutter-free playback.
@@ -139,6 +140,7 @@ def build_toolbar(server, scene: Scene) -> None:
     _stop_evt: list[asyncio.Event | None] = [None]
     _play_task: list[asyncio.Task | None] = [None]
     _rotate_task: list[asyncio.Task | None] = [None]
+    _flythrough_task: list[asyncio.Task | None] = [None]
     # While True, internal snapshot changes (the pre-render sweep) don't push
     # snap_num / snap_label to the client, so the slider and the redshift/scale
     # readout stay still during loading.
@@ -597,8 +599,232 @@ def build_toolbar(server, scene: Scene) -> None:
             if _rotate_task[0] is not None and not _rotate_task[0].done():
                 _rotate_task[0].cancel()
             return
+        # Stop fly-through if rotation is engaged
+        if bool(getattr(state, "flythrough_active", False)):
+            state.flythrough_active = False
         if _rotate_task[0] is None or _rotate_task[0].done():
             _rotate_task[0] = asyncio.ensure_future(_rotate_loop())
+
+    # ------------------------------------------------------------------
+    # Fly-through mode — cinematic tour of the simulation box:
+    #   1. Approach     : fly-in from reset position to box centre
+    #   2. Galaxy visit : fly to most massive galaxy, spin around it
+    #   3. Group visit  : fly to most massive group,   spin around it
+    #   4. Cluster visit: fly to most massive cluster, spin around it
+    #   5. Return       : fly back to box orbit + continuous orbit
+    # ------------------------------------------------------------------
+
+    _FT_FPS = 15            # render rate during fly-through
+    _FT_APPROACH_SECS = 10.0  # fly-in duration (reset → box centre)
+    _FT_BOX_DPS = 8.0         # box orbit speed deg/s (return orbit)
+    _FT_GROUP_RADIUS = 15.0   # standoff radius for group spin
+    _FT_CLUSTER_RADIUS = 30.0 # standoff radius for cluster spin
+    _FT_GROUP_DPS = 10.0      # group spin speed deg/s
+    _FT_CLUSTER_DPS = 8.0     # cluster spin speed deg/s
+
+    async def _flythrough_loop():
+        import numpy as _np
+
+        try:
+            interval = 1.0 / _FT_FPS
+            bs = scene._cfg.box_size
+            half = bs / 2.0
+            cx, cy, cz = half, half, half
+            orbit_r = bs * 1.7  # same standoff as the reset/focus-on-box view
+            cam = scene.plotter.camera
+
+            def _active():
+                return bool(getattr(state, "flythrough_active", False))
+
+            # ── Shared helper: smooth camera move (ease-in / ease-out) ────
+            async def _smooth_move(p0, f0, p1, f1, secs):
+                n = max(1, int(secs * _FT_FPS))
+                for i in range(n):
+                    if not _active():
+                        return False
+                    t = (i + 1) / n
+                    ts = t * t * (3.0 - 2.0 * t)
+                    cam.position = tuple(p0 + ts * (p1 - p0))
+                    cam.focal_point = tuple(f0 + ts * (f1 - f0))
+                    cam.up = (0.0, 1.0, 0.0)
+                    _push()
+                    await asyncio.sleep(interval)
+                return True
+
+            # ── Orbit around a point in the XZ plane ──────────────────────
+            # Continues from the camera's current position — no jump.
+            async def _orbit_around(target, radius, spin_degs, dps):
+                t3 = _np.array(target, dtype=float)
+                diff = _np.array(cam.position, dtype=float) - t3
+                diff[1] = 0.0
+                nrm = _np.linalg.norm(diff)
+                theta = _np.arctan2(diff[0], diff[2]) if nrm > 1e-6 else 0.0
+                deg_step = dps * interval
+                n = max(1, int(spin_degs / dps * _FT_FPS))
+                for _ in range(n):
+                    if not _active():
+                        return False
+                    theta += _np.deg2rad(deg_step)
+                    cam.position = (
+                        t3[0] + radius * _np.sin(theta),
+                        t3[1],
+                        t3[2] + radius * _np.cos(theta),
+                    )
+                    cam.focal_point = tuple(t3)
+                    cam.up = (0.0, 1.0, 0.0)
+                    _push()
+                    await asyncio.sleep(interval)
+                return True
+
+            # ── Fly to orbit-start position around a target ────────────────
+            # Picks the approach angle that keeps the camera on its current
+            # bearing so there is no sudden direction flip.
+            async def _fly_to_orbit(target, radius, secs):
+                t3 = _np.array(target, dtype=float)
+                diff = _np.array(cam.position, dtype=float) - t3
+                diff[1] = 0.0
+                nrm = _np.linalg.norm(diff)
+                if nrm > 1e-6:
+                    diff = diff / nrm * radius
+                else:
+                    diff = _np.array([0.0, 0.0, radius])
+                dest_pos = _np.array([t3[0] + diff[0], t3[1], t3[2] + diff[2]])
+                return await _smooth_move(
+                    _np.array(cam.position, dtype=float),
+                    _np.array(cam.focal_point, dtype=float),
+                    dest_pos, t3, secs,
+                )
+
+            # ── Snap to reset and begin ────────────────────────────────────
+            cam.position = (half, half, bs * 2.2)
+            cam.focal_point = (cx, cy, cz)
+            cam.up = (0.0, 1.0, 0.0)
+            _push()
+            await asyncio.sleep(interval)
+
+            # ── Phase 1: Approach — reset → box centre ────────────────────
+            # Focal ends slightly past centre (-z) so position never equals
+            # focal_point at the final frame (degenerate camera causes a flash).
+            if not await _smooth_move(
+                _np.array([half, half, bs * 2.2]),
+                _np.array([cx, cy, cz]),
+                _np.array([cx, cy, cz]),
+                _np.array([cx, cy, cz - 0.5]),
+                _FT_APPROACH_SECS,
+            ):
+                return
+
+            deg_step = _FT_BOX_DPS * interval
+
+            # ── Load simulation data for target selection ─────────────────
+            halos, galaxies = scene.active_model.loader.get(scene.current_snap)
+            off = _np.array(scene.active_model.offset, dtype=float)
+
+            group_pos = None
+            cluster_positions = []
+
+            if halos.count > 0:
+                log_m = _np.log10(_np.maximum(
+                    _np.array(halos.masses, dtype=float), 1.0
+                ))
+                h_pos = _np.array(halos.positions, dtype=float) + off
+
+                grp_mask = (log_m >= 12.5) & (log_m < 14.0)
+                if grp_mask.any():
+                    best = int(_np.argmax(
+                        _np.where(grp_mask, halos.masses, 0.0)
+                    ))
+                    group_pos = h_pos[best]
+
+                # All clusters, sorted most-to-least massive
+                clu_mask = log_m >= 14.0
+                if clu_mask.any():
+                    clu_idx = _np.where(clu_mask)[0]
+                    clu_idx = clu_idx[_np.argsort(halos.masses[clu_idx])[::-1]]
+                    cluster_positions = [h_pos[i] for i in clu_idx]
+
+            # ── Phase 2: Most massive group ───────────────────────────────
+            if group_pos is not None:
+                if not await _fly_to_orbit(group_pos, _FT_GROUP_RADIUS, 8.0):
+                    return
+                if not await _orbit_around(
+                    group_pos, _FT_GROUP_RADIUS, 360.0, _FT_GROUP_DPS
+                ):
+                    return
+
+            # ── Phase 3: All clusters (most → least massive) ──────────────
+            for cpos in cluster_positions:
+                if not await _fly_to_orbit(cpos, _FT_CLUSTER_RADIUS, 10.0):
+                    return
+                # Enable focus while stationary; orbit loop's _push() renders it
+                scene.set_focus_sphere(tuple(cpos), _FT_CLUSTER_RADIUS)
+                state.focus_active = True
+                if not await _orbit_around(
+                    cpos, _FT_CLUSTER_RADIUS, 360.0, _FT_CLUSTER_DPS
+                ):
+                    scene.clear_focus()
+                    state.focus_active = False
+                    return
+                # Clear focus while stationary; next _fly_to_orbit renders it
+                scene.clear_focus()
+                state.focus_active = False
+
+            # ── Phase 5: Return to box orbit ──────────────────────────────
+            # Pick the orbit angle that minimises the fly-back distance.
+            diff = _np.array(cam.position, dtype=float) - _np.array([cx, cy, cz])
+            diff[1] = 0.0
+            nrm = _np.linalg.norm(diff)
+            theta = _np.arctan2(diff[0], diff[2]) if nrm > 1e-6 else 0.0
+            rtn_pos = _np.array([
+                cx + orbit_r * _np.sin(theta),
+                cy,
+                cz + orbit_r * _np.cos(theta),
+            ])
+            if not await _smooth_move(
+                _np.array(cam.position, dtype=float),
+                _np.array(cam.focal_point, dtype=float),
+                rtn_pos,
+                _np.array([cx, cy, cz]),
+                10.0,
+            ):
+                return
+
+            # ── Phase 6: Continuous orbit ─────────────────────────────────
+            while _active():
+                theta += _np.deg2rad(deg_step)
+                cam.position = (
+                    cx + orbit_r * _np.sin(theta),
+                    cy,
+                    cz + orbit_r * _np.cos(theta),
+                )
+                cam.focal_point = (cx, cy, cz)
+                cam.up = (0.0, 1.0, 0.0)
+                _push()
+                await asyncio.sleep(interval)
+
+        except asyncio.CancelledError:
+            pass
+        finally:
+            if bool(getattr(state, "flythrough_active", False)):
+                state.flythrough_active = False
+                state.flush()
+
+    @state.change("flythrough_active")
+    def on_flythrough_active(flythrough_active, **_):
+        if not flythrough_active:
+            t = _flythrough_task[0]
+            if t is not None and not t.done():
+                t.cancel()
+            return
+        # Stop rotation if active
+        if _ctl["rotate_mode"] != "off":
+            state.rotate_mode = "off"
+        if _flythrough_task[0] is None or _flythrough_task[0].done():
+            _flythrough_task[0] = asyncio.ensure_future(_flythrough_loop())
+
+    @ctrl.set("toggle_flythrough")
+    def on_toggle_flythrough():
+        state.flythrough_active = not bool(getattr(state, "flythrough_active", False))
 
     # ------------------------------------------------------------------
     # Snapshot preloading — warm the whole cache in the background so

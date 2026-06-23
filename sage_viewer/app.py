@@ -853,6 +853,17 @@ def create_app(
                 style="margin-left:4px;",
             )
 
+            # ── Fly-through button ─────────────────────────────────────────
+            v3.VBtn(
+                icon="mdi-rotate-orbit",
+                variant="text",
+                density="compact",
+                color=("flythrough_active ? 'cyan' : 'white'",),
+                title="Fly-through: approach box then orbit (click to stop)",
+                click=server.controller.toggle_flythrough,
+                style="margin-left:2px;",
+            )
+
             # ── Check / install updates ────────────────────────────────────
             v3.VBtn(
                 icon="mdi-update",
