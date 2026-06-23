@@ -756,16 +756,30 @@ def build_toolbar(server, scene: Scene) -> None:
             for cpos in cluster_positions:
                 if not await _fly_to_orbit(cpos, _FT_CLUSTER_RADIUS, 10.0):
                     return
-                # Enable focus while stationary; orbit loop's _push() renders it
+                # Focus ON — render one stationary frame so focus is visible
+                # before any rotation starts.
                 scene.set_focus_sphere(tuple(cpos), _FT_CLUSTER_RADIUS)
                 state.focus_active = True
+                _push()
+                await asyncio.sleep(interval)
+                if not _active():
+                    scene.clear_focus()
+                    state.focus_active = False
+                    return
                 if not await _orbit_around(
                     cpos, _FT_CLUSTER_RADIUS, 360.0, _FT_CLUSTER_DPS
                 ):
                     scene.clear_focus()
                     state.focus_active = False
                     return
-                # Clear focus while stationary; next _fly_to_orbit renders it
+                # Focus OFF — render one stationary frame after rotation stops,
+                # before clearing focus and moving on.
+                _push()
+                await asyncio.sleep(interval)
+                if not _active():
+                    scene.clear_focus()
+                    state.focus_active = False
+                    return
                 scene.clear_focus()
                 state.focus_active = False
 
