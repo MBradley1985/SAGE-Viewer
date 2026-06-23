@@ -122,17 +122,20 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                         "`flex:1;min-width:0;"
                         "max-width:${wiz_par_show ? '860px' : '1100px'};"
                         "background:#000000;border:2px solid #06b6d4;"
-                        "display:flex;flex-direction:column;"
+                        "display:grid;grid-template-rows:1fr auto;"
                         "overflow:hidden;position:relative;`",
                     ),
                     elevation=0,
                     rounded=False,
                 ):
-                    # xterm.js terminal — receives raw PTY bytes from the server
+                    # xterm.js terminal — receives raw PTY bytes from the server.
+                    # grid-template-rows:1fr auto gives this a hard pixel height
+                    # (card height minus action-bar height) so fitAddon.fit()
+                    # always sees the correct dimensions without JS timing tricks.
                     html.Div(
                         id="sage-wiz-pty",
                         style=(
-                            "flex:1;min-height:0;overflow:hidden;"
+                            "min-height:0;overflow:hidden;"
                             "background:#000000;"
                         ),
                     )

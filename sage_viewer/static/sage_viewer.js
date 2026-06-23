@@ -391,13 +391,24 @@
     function _initWizTerm(attempt) {
       if (_wizTerm) return;
       var container = document.getElementById('sage-wiz-pty');
-      if (!container || container.offsetWidth === 0) {
-        if ((attempt || 0) < 20) {
+      // Wait until the container has BOTH a real width AND a real height.
+      // The card is flex:1 inside a column — height resolves after width,
+      // so checking only offsetWidth lets us proceed with a zero-height
+      // container, and fitAddon.fit() then produces a 1-row sliver.
+      if (!container || container.offsetWidth === 0 || container.offsetHeight < 50) {
+        if ((attempt || 0) < 50) {
           setTimeout(function () { _initWizTerm((attempt || 0) + 1); }, 100);
         }
         return;
       }
-      if (typeof Terminal === 'undefined') return;
+      // xterm.js is loaded from CDN — retry until it arrives rather than
+      // silently giving up if the script hasn't loaded yet.
+      if (typeof Terminal === 'undefined') {
+        if ((attempt || 0) < 50) {
+          setTimeout(function () { _initWizTerm((attempt || 0) + 1); }, 100);
+        }
+        return;
+      }
       var term = new Terminal({
         theme: {
           background: '#000000', foreground: '#ffffff',
@@ -412,9 +423,21 @@
       var fitAddon = FitCtor ? new FitCtor() : null;
       if (fitAddon) term.loadAddon(fitAddon);
       term.open(container);
-      if (fitAddon) fitAddon.fit();
       _wizTerm = term;
       _wizFit  = fitAddon;
+      // The container height is now set by CSS grid (1fr row) so it always has
+      // a real pixel height before open() is called.  Still defer the first
+      // fit() to the next paint so xterm has measured its font metrics.
+      function _doFit() { if (_wizFit) { try { _wizFit.fit(); } catch (e) {} } }
+      requestAnimationFrame(function () {
+        _doFit();
+        setTimeout(_doFit, 200);
+      });
+      // Re-fit whenever the container is resized (window resize, panel toggles, etc.)
+      if (typeof ResizeObserver !== 'undefined' && fitAddon) {
+        var _wizRO = new ResizeObserver(function () { _doFit(); });
+        _wizRO.observe(container);
+      }
       // Replay full session buffer so late-mounting xterm shows all prior output.
       var buf = _getState('wiz_pty_buf');
       if (buf) {

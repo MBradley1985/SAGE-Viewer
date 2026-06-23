@@ -6,6 +6,135 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.1.2] — dev (unreleased)
+
+### Fixed
+
+#### Recording — playback smoothness (root-cause investigation, two-session fix)
+
+This section documents a chain of bugs that were introduced and resolved over two sessions.
+The full causal chain is recorded here so it is not repeated.
+
+**Stage 1 — original symptom:** Recording during snapshot playback was choppy because
+`_record_loop` captured the pre-rendered overlay JPEGs and duplicated each 3 fps frame to
+fill the 30 fps output.  Fix: dedicated VTK capture path reads directly from the render
+window via `_vtk_to_pil()`.
+
+**Stage 2 — double-play regression:** After the Stage 1 fix, recordings played through the
+snapshot sequence twice when `is_repeat` was enabled.  Root cause: `_record_loop` followed
+`state.snap_num`, which `_image_playback` loops indefinitely on repeat.  Fix: introduced
+`_pb_order` — a one-pass list built from the starting snapshot to the last snapshot — and
+`_pb_done` flag that stops capture after the list is exhausted.
+
+**Stage 3 — live-recording slowdown:** With a 30 fps recording active, moving the camera on
+a single snapshot (no playback) became sluggish.  Root cause: `_vtk_to_pil()` calls
+`rw.SetOffScreenRendering(1)` + `rw.Render()` every recording tick, blocking the asyncio
+event loop at 30 Hz and competing with interactive rendering.  Fix: added
+`_vtk_to_pil_passive()`, which reads the last completed framebuffer via
+`vtkWindowToImageFilter` with `ShouldRerenderOff()` / `ReadFrontBufferOff()` — no extra
+`Render()` call.  Live recording with no rotation now uses the passive path; rotation and
+snap changes still use `_vtk_to_pil()`.
+
+**Stage 4 — rotation double-step:** Both `_rotate_loop` (toolbar.py, 12 Hz) and
+`_record_loop` applied a camera rotation per tick.  Result: rotation rate doubled during
+recording.  Fix: `_rotate_loop` checks `state.recording_active` at each tick and skips both
+the rotation step and the `_push()` call when True.  The recording loop owns all camera
+movement while a recording is active; `_rotate_loop` resumes ownership when recording stops.
+
+**Stage 5 — playback smoothness regression (this session):** After Stage 2–4, playback
+recordings were choppy again at any FPS.  Root cause had two independent components:
+
+- *Pre-render phase interference:* `playback_active=True` is set by `_render_frames()` as
+  soon as the first frame is pre-rendered, which is well before `_image_playback()` starts.
+  Because `_record_loop` started its `_pb_order` pass the moment it saw
+  `playback_active=True`, `_pb_idx` advanced through 10–30 snaps during the pre-render
+  phase (several seconds at 30 fps).  When `_image_playback` finally started, recording
+  was already deep into the sequence and the camera angles were mismatched (pre-render
+  restores the camera to its starting position at the end; recording had already baked in
+  extra rotation from the pre-render window).
+
+- *PIL caching eliminated VTK temporal variation:* The Stage 3 optimisation cached the raw
+  PIL image for frames where neither snap nor rotation changed (up to 9 out of every 10
+  frames at 1× speed without rotation).  VTK's MSAA jitter produces subtly different renders
+  on successive `Render()` calls for the same scene; caching the PIL bypassed this and
+  produced runs of byte-identical frames that the human eye perceives as harder / choppier
+  than renders with natural inter-frame variation.
+
+  **Final fix:** Replaced `_pb_order` with overlay-driven `state.snap_num` tracking plus a
+  `prerender_busy` guard that holds capture until `_image_playback()` is actually running.
+  Removed all PIL caching in the playback path; every recording frame now calls
+  `_vtk_to_pil()` (force render).  One-pass detection uses end-snap rollover: when
+  `state.snap_num` reaches `_pb_end_snap` the `_pb_at_end` flag is set; when `snap_num`
+  subsequently changes away from the end snap (repeat wrap-around), `_pb_done` is set and
+  capture stops.  `is_repeat=False` (default) still terminates naturally when
+  `playback_active` goes False.
+
+**Key invariant for future work:** `playback_active=True` does NOT mean `_image_playback()`
+is running — it is also True during `_render_frames()` pre-render.  Always gate playback
+recording on `prerender_busy=False`.
+
+#### Recording — reset camera not showing all structure
+
+`on_reset()` called `scene.camera.focus_on_boxes()` then `_sync_fof_layer()`, which
+shows/hides FoF-link actors.  `scene.plotter.renderer.ResetCameraClippingRange()` was called
+before the visibility change, so near/far clipping planes were computed against the wrong
+actor set and some geometry was clipped out of view.  Fix: moved
+`ResetCameraClippingRange()` to after `_sync_fof_layer()`.
+
+#### Recording — galaxy/group info card absent from output frames
+
+The Galaxy Information and Group Information overlay cards were being composited during
+screenshots but not during recording.  Root cause: `_composite_overlays()` was accidentally
+dropped from `_save_frame()` during a `_record_loop` refactor.  Fix: re-added
+`_composite_overlays(raw).save(...)` as the final step of `_save_frame()` so every captured
+frame, regardless of recording mode, has the same overlay compositing as a screenshot.
+
+Note: highlight markers (Highlight Galaxy / Highlight Members) are baked into the
+pre-rendered frames via `_render_frames()` and are therefore always present in recordings.
+Info cards are composited separately from current `state` at capture time.
+
+#### Launch Mode terminal — persistent 1-row sliver (root-cause investigation)
+
+Three successive fixes were required before the sliver was eliminated.  The full history is
+recorded here to avoid re-treading the same ground.
+
+**Attempt 1 — height guard:** `_initWizTerm()` polled until `container.offsetWidth > 0` but
+did not check height.  In the VCard's `display:flex;flex-direction:column` layout, height
+resolves after width, so the poll could pass with `offsetHeight=0`.  `fitAddon.fit()` then
+called `getComputedStyle(container).height` → "0px" → 0 rows → 1-row sliver.
+Fix: added `container.offsetHeight < 50` to the poll condition.
+
+**Attempt 2 — requestAnimationFrame:** Even with the height guard passing (container had a
+real height), the sliver reappeared after server hot-restarts.  Root cause: `fitAddon.fit()`
+was called synchronously after `term.open()`, before xterm.js had completed its first
+browser paint cycle and measured character cell dimensions (`actualCellHeight` was 0).
+`fitAddon.proposeDimensions()` returns `undefined` when cell height is 0; `fit()` silently
+no-ops; the terminal keeps its default 1-row height.  Fix: moved the first `fit()` call into
+a `requestAnimationFrame` callback (after the initial paint) with 150 ms and 500 ms deferred
+re-fits as insurance.
+
+**Attempt 3 — CSS grid (final fix):** The sliver persisted through Attempt 2 because the
+root cause was not timing but layout: `display:flex;flex-direction:column` with `flex:1` on
+the terminal div does not always produce a pixel height readable by `getComputedStyle()` at
+the moment xterm.js needs it — the browser may report `height:auto` for flex children under
+certain conditions.  `fitAddon.proposeDimensions()` calls `parseInt(height)` on that value,
+which returns `NaN`, causing `fit()` to bail silently.
+
+  **Final fix:** Changed the VCard from `display:flex;flex-direction:column` to
+  `display:grid;grid-template-rows:1fr auto`.  The terminal div occupies the `1fr` row and
+  the action bar occupies the `auto` row.  CSS grid always resolves grid track sizes to
+  explicit pixel values before layout completes — `getComputedStyle(terminal).height` is
+  always a number, never `"auto"`.  `fitAddon.fit()` reliably reads the correct height
+  regardless of when it is called.  The `offsetHeight < 50` poll guard and
+  `requestAnimationFrame` deferral are retained as belt-and-suspenders.
+
+  **Rule for future layout changes in the Launch Mode card:** the terminal container
+  (`sage-wiz-pty`) must always sit in a CSS context that resolves its height to an explicit
+  pixel value — grid `1fr`, absolute with known `top`/`bottom`, or an explicit `height:`.
+  Do not use `flex:1;min-height:0` as the sole height source for an xterm.js container.
+
+---
+
 ## [1.0.9] — 2026-06-22
 
 ### Fixed

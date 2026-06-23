@@ -1709,6 +1709,41 @@ def build_navigation_panel(server, scene: Scene) -> None:
         ]
         return _PIL.fromarray(arr.astype(_np2.uint8), "RGB")
 
+    def _vtk_to_pil_passive(scale: int = 1):
+        """Read the last rendered framebuffer without forcing a re-render.
+
+        Used for live recording so the capture loop doesn't inject extra
+        Render() calls that would compete with interactive camera use.
+        Reads the back buffer (which holds the last completed render).
+        """
+        import vtk
+        from vtkmodules.util.numpy_support import vtk_to_numpy
+        import numpy as _np2
+        from PIL import Image as _PIL
+
+        rw = scene.plotter.ren_win
+        w2i = vtk.vtkWindowToImageFilter()
+        w2i.SetInput(rw)
+        w2i.SetInputBufferTypeToRGB()
+        w2i.ReadFrontBufferOff()
+        w2i.ShouldRerenderOff()
+        w2i.Update()
+        vimg = w2i.GetOutput()
+        w, h, _ = vimg.GetDimensions()
+        if w == 0 or h == 0:
+            return _vtk_to_pil(scale)
+        arr = vtk_to_numpy(vimg.GetPointData().GetScalars()).reshape(h, w, 3)[
+            ::-1
+        ]
+        img = _PIL.fromarray(arr.astype(_np2.uint8), "RGB")
+        if scale > 1:
+            try:
+                rs = _PIL.Resampling.LANCZOS
+            except AttributeError:
+                rs = _PIL.LANCZOS
+            img = img.resize((w * scale, h * scale), rs)
+        return img
+
     def _composite_overlays(pil_img):
         """Composite all visible HTML overlays: library cards, info panels, console pop-out."""
         lib_items = list(getattr(state, "library_items", []))
@@ -1998,87 +2033,187 @@ def build_navigation_panel(server, scene: Scene) -> None:
     _record_task: list = [None]  # asyncio.Task | None
 
     async def _record_loop():
-        """Capture frames for recording at the target FPS.
+        """Capture frames for recording.
 
-        Two modes depending on whether playback is active:
-        - Playback active: write a frame every 1/fps seconds. Decode the
-          playback_frame data URL only when it changes; reuse the cached PIL
-          image otherwise. This means slow playback (0.25x) produces many
-          duplicate frames between snapshots, giving the output video the same
-          apparent speed as the on-screen playback.
-        - Playback inactive: capture the VTK render window (off-screen mode)
-          at the target FPS.
+        PLAYBACK MODE
+        -------------
+        Reads state.playback_frame — the pre-rendered JPEG the overlay is
+        already showing — and writes frames_per_snap copies each time the
+        snap advances.  No VTK rendering, no scene.set_snapshot(), zero
+        asyncio blocking.  Speed and FPS settings produce exact frame counts:
+
+            frames_per_snap = round(movie_fps / (3.0 * play_speed))
+
+        The pre-rendered frames already have rotation baked in by
+        _render_frames(), so rotation is consistent with the overlay.
+
+        LIVE MODE  (no playback active)
+        --------------------------------
+        Unchanged: passive capture with no rotation, or force-render with
+        rotation.  This path is confirmed smooth and is not modified.
         """
-        import asyncio
-        import base64
-        import io as _io
-        from PIL import Image as _PIL
+        import asyncio, base64 as _b64, io as _io
+        import numpy as _np_rec
 
-        record_interval = 1.0 / max(1, int(_record_state["fps"]))
-        last_url: str | None = None
-        last_frame = (
-            None  # cached decoded PIL image — reused when URL unchanged
-        )
+        movie_fps = max(1, int(_record_state["fps"]))
+        record_interval = 1.0 / movie_fps
+
+        def _step_rotation(mode: str, dt: float) -> None:
+            parts = mode.split("_")
+            sign = 1.0 if parts[0] == "cw" else -1.0
+            dps = float(parts[1])
+            delta = sign * dps * dt
+            cam = scene.plotter.camera
+            focal = _np_rec.array(cam.focal_point, dtype=_np_rec.float64)
+            pos = _np_rec.array(cam.position, dtype=_np_rec.float64)
+            r = pos - focal
+            ang = _np_rec.deg2rad(delta)
+            c, s = _np_rec.cos(ang), _np_rec.sin(ang)
+            rm = _np_rec.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+            cam.position = tuple(focal + rm @ r)
+            cam.up = (0.0, 1.0, 0.0)
+
+        # Playback-recording state
+        _last_pb_snap: list[int | None] = [None]
+        _pb_end_snap: list[int | None] = [None]
+        _pb_at_end: list[bool] = [False]
+        _pb_done: bool = False
+
+        # ── Live-mode frame writer (VTK capture) ──────────────────────────
+        def _save_live_frame(force_render: bool = False) -> None:
+            sc = _record_state["scale"]
+            raw = _vtk_to_pil(scale=sc) if force_render else _vtk_to_pil_passive(scale=sc)
+            outpath = (
+                _record_state["dir"]
+                / f"frame_{_record_state['frames']:05d}.jpg"
+            )
+            _composite_overlays(raw).save(str(outpath), "JPEG", quality=95)
+            _record_state["frames"] += 1
+            state.recording_frames = _record_state["frames"]
+            state.flush()
+
+        # ── Playback-mode frame writer (pre-rendered JPEG) ─────────────────
+        def _save_pb_frames(data_url: str, n: int) -> None:
+            """Write ONE unique snap file and record it in snap_files.
+
+            Duplicates are generated later in _finalize_movie with crossfade
+            transitions between snaps — no identical-frame runs in the output.
+
+            Fast path (no overlays, no upscale): writes raw JPEG bytes.
+            Slow path: decode once, composite overlays, upscale if needed.
+            """
+            from PIL import Image as _PIL
+
+            sc = _record_state["scale"]
+            has_overlays = (
+                bool(getattr(state, "library_items", []))
+                or (
+                    bool(getattr(state, "galinfo_show", False))
+                    and str(getattr(state, "nav_active_tab", "")) == "target"
+                )
+                or (
+                    bool(getattr(state, "groupinfo_show", False))
+                    and str(getattr(state, "nav_active_tab", "")) == "environment"
+                )
+                or bool(getattr(state, "console_popout_show", False))
+            )
+
+            raw_bytes = _b64.b64decode(data_url.split(",", 1)[1])
+            snap_idx = len(_record_state["snap_files"])
+            snap_path = _record_state["dir"] / f"snap_{snap_idx:05d}.jpg"
+
+            if has_overlays or sc > 1:
+                img = _PIL.open(_io.BytesIO(raw_bytes)).convert("RGB")
+                if sc > 1:
+                    w, h = img.size
+                    try:
+                        _rs = _PIL.Resampling.LANCZOS
+                    except AttributeError:
+                        _rs = _PIL.LANCZOS
+                    img = img.resize((w * sc, h * sc), _rs)
+                _composite_overlays(img).save(str(snap_path), "JPEG", quality=95)
+            else:
+                snap_path.write_bytes(raw_bytes)
+
+            _record_state["snap_files"].append(
+                {"file": str(snap_path), "count": n}
+            )
+            _record_state["frames"] += n
+            state.recording_frames = _record_state["frames"]
+            state.flush()
 
         try:
             while _record_state["active"]:
                 t0 = asyncio.get_event_loop().time()
                 try:
                     pb_active = bool(getattr(state, "playback_active", False))
-                    pf = str(getattr(state, "playback_frame", "") or "")
+                    prerender = bool(getattr(state, "prerender_busy", False))
+                    rot_mode = str(getattr(state, "rotate_mode", "off"))
 
-                    if pb_active and pf.startswith("data:image"):
-                        # Decode only when the frame changes; duplicate otherwise.
-                        if pf != last_url:
-                            last_url = pf
-                            raw = base64.b64decode(pf.split(",", 1)[1])
-                            _img = _PIL.open(_io.BytesIO(raw)).convert("RGB")
-                            sc = _record_state.get("scale", 1)
-                            if sc > 1:
-                                try:
-                                    _rs = _PIL.Resampling.LANCZOS
-                                except AttributeError:
-                                    _rs = _PIL.LANCZOS
-                                _img = _img.resize(
-                                    (_img.width * sc, _img.height * sc), _rs
+                    if pb_active and not _pb_done:
+                        if prerender:
+                            # Pre-render in progress — wait; don't capture yet
+                            pass
+                        else:
+                            # ── Image-playback: read overlay frames ────────
+                            current_snap = int(getattr(state, "snap_num", 0))
+                            pb_frame = str(
+                                getattr(state, "playback_frame", "")
+                            )
+
+                            # Lazy-init end-snap for one-pass detection
+                            if _pb_end_snap[0] is None:
+                                snap_max = int(
+                                    getattr(state, "snap_max", 63)
                                 )
-                            last_frame = _img
-                        if last_frame is not None:
-                            outpath = (
-                                _record_state["dir"]
-                                / f"frame_{_record_state['frames']:05d}.jpg"
-                            )
-                            _composite_overlays(last_frame).save(
-                                str(outpath), "JPEG", quality=95
-                            )
-                            _record_state["frames"] += 1
-                            state.recording_frames = _record_state["frames"]
-                            state.flush()
+                                reverse = bool(
+                                    getattr(state, "is_reverse", False)
+                                )
+                                _pb_end_snap[0] = (
+                                    0 if reverse else snap_max
+                                )
+
+                            # On every snap change write frames_per_snap
+                            # copies of the overlay frame immediately.
+                            if (
+                                current_snap != _last_pb_snap[0]
+                                and pb_frame.startswith("data:")
+                            ):
+                                play_speed = float(
+                                    getattr(state, "play_speed", 1)
+                                )
+                                snap_rate = 3.0 * play_speed
+                                frames_per_snap = max(
+                                    1, round(movie_fps / snap_rate)
+                                )
+                                _save_pb_frames(pb_frame, frames_per_snap)
+                                _last_pb_snap[0] = current_snap
+
+                            # One-pass: stop when end snap rolls over (repeat)
+                            if current_snap == _pb_end_snap[0]:
+                                _pb_at_end[0] = True
+                            elif _pb_at_end[0]:
+                                _pb_done = True
 
                     elif not pb_active:
-                        # Live view — capture VTK then composite HTML overlays.
-                        last_url = None
-                        last_frame = None
-                        outpath = (
-                            _record_state["dir"]
-                            / f"frame_{_record_state['frames']:05d}.jpg"
-                        )
-                        frame = _vtk_to_pil(scale=_record_state["scale"])
-                        _composite_overlays(frame).save(
-                            str(outpath), "JPEG", quality=95
-                        )
-                        _record_state["frames"] += 1
-                        state.recording_frames = _record_state["frames"]
-                        state.flush()
+                        # ── Live view recording ────────────────────────────
+                        _last_pb_snap[0] = None
+                        _pb_end_snap[0] = None
+                        _pb_at_end[0] = False
+                        _pb_done = False
+
+                        rotating = rot_mode not in ("off", "undefined")
+                        if rotating:
+                            _step_rotation(rot_mode, record_interval)
+                            _save_live_frame(force_render=True)
+                        else:
+                            _save_live_frame(force_render=False)
 
                 except Exception as e:
                     state.last_movie = f"ERROR capturing frame: {e!s}"
                     state.flush()
                     break
 
-                # Sleep for whatever is left of the target interval.
-                # Always sleep at least 1 ms so the event loop can process
-                # button clicks even when capture takes longer than 1/fps.
                 elapsed = asyncio.get_event_loop().time() - t0
                 await asyncio.sleep(max(0.001, record_interval - elapsed))
         except asyncio.CancelledError:
@@ -2115,6 +2250,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 "scale": scale,
                 "movie_base": movie_base,
                 "session": sess,
+                # Playback recording: list of {"file": path, "count": n}
+                # entries — one per unique snap.  Populated by _save_pb_frames
+                # and consumed by _finalize_movie to generate crossfaded output.
+                "snap_files": [],
             }
         )
         state.recording_active = True
@@ -2135,6 +2274,77 @@ def build_navigation_panel(server, scene: Scene) -> None:
         except OSError:
             pass
 
+    def _expand_with_crossfade(frames_dir, snap_files: list) -> None:
+        """Expand snap_files into a crossfaded frame_*.jpg sequence.
+
+        For each snap transition, frames are split into a hold section and a
+        crossfade section that blends into the next snap:
+
+            hold_n  = count - blend_n    (identical copies of this snap)
+            blend_n = min(count // 2, 8) (crossfade into the next snap)
+
+        The last snap has no following snap so all its frames are holds.
+        Snap files are deleted after expansion.
+        """
+        from PIL import Image as _PIL
+        import pathlib
+
+        frames_dir = pathlib.Path(frames_dir)
+        if not snap_files:
+            return
+
+        imgs = []
+        for entry in snap_files:
+            try:
+                imgs.append(_PIL.open(entry["file"]).convert("RGB"))
+            except Exception:
+                imgs.append(None)
+
+        frame_idx = 0
+        n_snaps = len(snap_files)
+
+        for k, (img, entry) in enumerate(zip(imgs, snap_files)):
+            if img is None:
+                continue
+            count = entry["count"]
+            is_last = (k == n_snaps - 1)
+            next_img = imgs[k + 1] if not is_last else None
+
+            if is_last or next_img is None:
+                blend_n = 0
+            else:
+                blend_n = min(max(1, count // 2), 8)
+            hold_n = count - blend_n
+
+            for _ in range(hold_n):
+                img.save(
+                    str(frames_dir / f"frame_{frame_idx:05d}.jpg"),
+                    "JPEG",
+                    quality=95,
+                )
+                frame_idx += 1
+
+            for j in range(blend_n):
+                alpha = (j + 1) / (blend_n + 1)
+                _PIL.blend(img, next_img, alpha).save(
+                    str(frames_dir / f"frame_{frame_idx:05d}.jpg"),
+                    "JPEG",
+                    quality=95,
+                )
+                frame_idx += 1
+
+        # Close PIL images and delete the unique snap files
+        for img, entry in zip(imgs, snap_files):
+            try:
+                if img is not None:
+                    img.close()
+            except Exception:
+                pass
+            try:
+                pathlib.Path(entry["file"]).unlink()
+            except Exception:
+                pass
+
     def _finalize_movie(
         frames_dir,
         session_dir,
@@ -2142,6 +2352,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         fps: int,
         fmt: str,
         gif_loop: bool = True,
+        snap_files: list | None = None,
     ) -> str:
         """Convert PNG sequence in frames_dir → <session>/<movie_base>.<fmt>.
         For PNG sequence, renames the temp frames dir to <session>/<movie_base>/.
@@ -2151,6 +2362,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         frames_dir = pathlib.Path(frames_dir)
         session_dir = pathlib.Path(session_dir)
+
+        # Playback recordings: expand unique snap files into a crossfaded
+        # frame sequence before encoding.  Live recordings already have
+        # frame_*.jpg files and skip this step.
+        if snap_files:
+            _expand_with_crossfade(frames_dir, snap_files)
 
         if fmt == "png":
             target = session_dir / movie_base
@@ -2287,6 +2504,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 fps=snap["fps"],
                 fmt=snap["format"],
                 gif_loop=bool(state.movie_loop),
+                snap_files=snap.get("snap_files") or [],
             )
             state.last_movie = result
             state.flush()
@@ -2643,6 +2861,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
         scene.clear_focus()
         state.focus_active = False
         _sync_fof_layer()
+        # _sync_fof_layer may show/hide actors, changing scene bounds.
+        # Recompute clipping planes so all geometry is visible without
+        # the user having to zoom/move to trigger an automatic update.
+        scene.plotter.renderer.ResetCameraClippingRange()
         _push()
 
     @ctrl.set("center_camera")
