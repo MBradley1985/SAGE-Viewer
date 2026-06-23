@@ -315,7 +315,7 @@ def build_toolbar(server, scene: Scene) -> None:
                 img = _capture_frame()
                 buf = io.BytesIO()
                 Image.fromarray(img[..., :3]).save(
-                    buf, format="JPEG", quality=85
+                    buf, format="JPEG", quality=95
                 )
                 url = "data:image/jpeg;base64," + base64.b64encode(
                     buf.getvalue()
@@ -574,16 +574,19 @@ def build_toolbar(server, scene: Scene) -> None:
             sign, deg_per_sec = _parse_rotate(mode)
             if sign == 0:
                 break
-            delta = sign * deg_per_sec * interval
-            cam = scene.plotter.camera
-            focal = np.array(cam.focal_point, dtype=np.float64)
-            pos = np.array(cam.position, dtype=np.float64)
-            r = pos - focal
-            angle = np.deg2rad(delta)
-            c, s = np.cos(angle), np.sin(angle)
-            rm = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
-            cam.position = tuple(focal + rm @ r)
-            cam.up = (0.0, 1.0, 0.0)
+            # While recording, _record_loop steps rotation at the recording
+            # FPS — skip stepping here to avoid double-rotating the camera.
+            if not bool(getattr(state, "recording_active", False)):
+                delta = sign * deg_per_sec * interval
+                cam = scene.plotter.camera
+                focal = np.array(cam.focal_point, dtype=np.float64)
+                pos = np.array(cam.position, dtype=np.float64)
+                r = pos - focal
+                angle = np.deg2rad(delta)
+                c, s = np.cos(angle), np.sin(angle)
+                rm = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+                cam.position = tuple(focal + rm @ r)
+                cam.up = (0.0, 1.0, 0.0)
             _push()
             await asyncio.sleep(interval)
 
