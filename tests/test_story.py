@@ -39,6 +39,14 @@ def test_story_round_trip():
     assert Story.from_dict(st.to_dict()).to_dict() == st.to_dict()
 
 
+def test_autoplay_round_trip_and_default():
+    st = _sample_story()
+    assert st.autoplay is False  # default off
+    assert Story.from_dict({"title": "X", "autoplay": True, "scenes": []}).autoplay
+    st.autoplay = True
+    assert Story.from_dict(st.to_dict()).autoplay is True
+
+
 def test_required_snapshots_unions_everything():
     st = _sample_story()
     # requirements [63] + scene snaps {63, 50} + sweep range {60..63}

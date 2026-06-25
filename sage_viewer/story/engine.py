@@ -210,6 +210,12 @@ class StoryPlayer:
         try:
             await self._preload_sandbox(story)
             await self.apply_scene(0, transition=False)
+            # Story-level autoplay: begin playback immediately so a title
+            # scene's motion (e.g. a fly-through) runs without a Play click.
+            if getattr(story, "autoplay", False):
+                self._playing = True
+                self._push_hud()
+                await self._autoplay_from(0)
         except asyncio.CancelledError:
             pass
 
@@ -568,6 +574,8 @@ class StoryPlayer:
             await self._motion_orbit(sc, m)
         elif kind == "snapshot_sweep":
             await self._motion_snapshot_sweep(sc, m)
+        elif kind == "flythrough":
+            await self._motion_flythrough(sc, m)
         else:
             await self._dwell(sc.dwell_secs)
 
@@ -607,6 +615,27 @@ class StoryPlayer:
             center = self._resolve_point(f.get("center"))
             return center if center is not None else self._box()[1]
         return None
+
+    async def _motion_flythrough(self, sc, m) -> None:
+        """Run the existing cinematic fly-through as the scene's background.
+
+        Reuses the toolbar fly-through (approach → most-massive group → all
+        clusters → continuous box orbit) by flipping its reactive flag, so the
+        tour keeps "looking for groups" with no duplicated logic.  Holds while
+        playing; switches the fly-through off when the scene changes, the user
+        pauses, or Story Mode exits (including on task cancellation).
+        """
+        st = self.state
+        try:
+            if not getattr(st, "flythrough_active", False):
+                st.flythrough_active = True
+                st.flush()
+            while self._playing:
+                await asyncio.sleep(0.1)
+        finally:
+            if getattr(st, "flythrough_active", False):
+                st.flythrough_active = False
+                st.flush()
 
     async def _motion_snapshot_sweep(self, sc, m) -> None:
         scene = self._scene

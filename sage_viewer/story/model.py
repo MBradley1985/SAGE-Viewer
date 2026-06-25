@@ -128,6 +128,9 @@ class Story:
     description: str = ""
     theme: str = "dos_blue"
     requirements: dict[str, Any] = field(default_factory=dict)
+    # Start playback automatically on enter (e.g. a title scene that flies
+    # through the box until the presenter clicks Next).
+    autoplay: bool = False
     schema_version: int = SCHEMA_VERSION
     # Set by the loader; not serialised.
     source_path: str | None = field(default=None, compare=False)
@@ -179,6 +182,7 @@ class Story:
             "description": self.description,
             "theme": self.theme,
             "requirements": deepcopy(self.requirements),
+            "autoplay": self.autoplay,
             "scenes": [s.to_dict() for s in self.scenes],
         }
 
@@ -192,6 +196,7 @@ class Story:
             description=d.get("description", ""),
             theme=d.get("theme", "dos_blue"),
             requirements=deepcopy(d.get("requirements", {})),
+            autoplay=bool(d.get("autoplay", False)),
             schema_version=int(d.get("schema_version", SCHEMA_VERSION)),
             scenes=[Scene.from_dict(s) for s in d.get("scenes", [])],
             source_path=source_path,
