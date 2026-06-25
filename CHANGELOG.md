@@ -8,6 +8,40 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [1.2.0] — dev (unreleased)
 
+### Added
+
+#### Story Mode — guided, data-driven scene playback
+
+A new **Story Mode** button (next to Fly-through) opens a dropdown of *stories*
+loaded from JSON files in a `sage_stories/` folder. A story is an ordered set of
+*scenes* — each a fully captured viewpoint (camera + layer/filter/environment
+state + focus + optional object target + narration) — stepped through with
+Previous / Play / Pause / Next in a bottom HUD overlay.
+
+- **Non-destructive overlay.** The normal UI stays fully live; pausing hands
+  control back to the user, and exiting restores the pre-story camera, state,
+  and theme.
+- **Sandbox preload.** Entering a story warms the snapshot cache for every
+  snapshot the story references before the first scene renders.
+- **Motion.** Scenes can be `still`, `orbit` (spin around the focus/target), or
+  `snapshot_sweep` (animate through cosmic time).
+- **In-view text & equations.** Scenes carry `overlays` (titles, headings,
+  citations, free text, and LaTeX equations) rendered over the view. Equations
+  use **vendored KaTeX** (`static/katex/`, woff2-only — no network needed).
+- **Presentation chrome.** A Story Mode scene can hide the right navigation
+  panel for a full-bleed view via `chrome.hide_panel` (Story Mode only — there is
+  no general-use toggle).
+- **Models & multi-box.** Scenes can declare a `models` layout
+  (`primary` + `adjacent`), applied via the existing `switch_model` /
+  `toggle_adjacent` controllers; the pre-story layout is restored on exit.
+- **In-app authoring.** "Capture current scene…" appends the live view as a
+  scene to a named story file (recording camera, state, focus, chrome, and model
+  layout), so stories can be built from inside the viewer.
+- Applying a scene reuses the existing render pipeline (filter/layer change
+  handlers); camera moves reuse the new shared `scene/camera_motion.py` helpers,
+  which the Fly-through now also uses. Schema reference:
+  `docs/project/story_mode_design.md`.
+
 ### Changed
 
 #### Pop-outs (terminal + library) resize freely, with a fullscreen toggle

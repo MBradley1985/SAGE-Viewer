@@ -92,12 +92,77 @@ delta from the previous one).
     "highlight_group": true
   },
 
+  // ── In-view text / equations (over the render) ──────────────
+  "overlays": [
+    { "kind": "title", "text": "The SAGE26 Universe", "anchor": "top", "y": 8 },
+    { "kind": "citation", "text": "Croton et al. (2016)", "anchor": "bottom-right" },
+    { "kind": "equation", "latex": "\\dot{M}_* = \\alpha\\,M_{\\rm cold}/t_{\\rm dyn}",
+      "anchor": "center", "size": 2.0 }
+  ],
+
+  // ── UI chrome (presentation) ────────────────────────────────
+  "chrome": { "hide_panel": true },      // collapse the right navigation panel
+
+  // ── Model / multi-box layout (optional) ─────────────────────
+  "models": { "primary": "miniMillennium", "adjacent": ["microUchuu"] },
+
   // ── Playback ────────────────────────────────────────────────
   "transition": { "duration_secs": 6.0, "easing": "smoothstep" }, // fly INTO scene
   "dwell_secs": 8.0,                     // auto-advance delay in Play
   "motion": { "kind": "still" }          // see Motion below
 }
 ```
+
+## In-view text & equations
+
+Each scene may carry an ordered `overlays` list rendered as an HTML layer over
+the VTK view (`#sage-overlay-root`, `pointer-events:none` so it never blocks
+camera interaction). Overlay item fields:
+
+| Field | Meaning |
+|---|---|
+| `kind` | `title` · `heading` · `text` · `citation` · `equation` (sets size/weight/italic defaults) |
+| `text` | content for non-equation kinds |
+| `latex` | LaTeX source for `equation` kind; set `"inline": true` for inline math |
+| `anchor` | 9-grid: `top-left`…`center`…`bottom-right` |
+| `x`, `y` | percentage nudge from the anchor edges |
+| `size` | font size in rem (override) |
+| `color`, `weight`, `align`, `max_width` | style overrides |
+
+The overlay layer is rendered **entirely outside Vue**: the server ships the
+items as JSON (`story_overlays_json`) and `sage_viewer.js` builds the children of
+`#sage-overlay-root` itself. Vue owns the (empty) container element but never its
+children, so KaTeX's DOM writes cannot corrupt Vue's virtual DOM. Equations are
+typeset with **vendored KaTeX** (`static/katex/`, woff2-only, no network) via a
+direct `katex.render(latex, el, {displayMode})` call. The overlay layer and the
+playback HUD track the panel's right edge so text stays in the visible area when
+the panel is shown.
+
+## Chrome / panel visibility
+
+`scene.chrome.hide_panel` collapses the right navigation panel for a clean,
+full-bleed presentation view (bound to `state.panels_hidden` via `v-show` on the
+panel). This is a **Story Mode scene option only** — there is no general-use
+toggle button; in normal use the panel is always shown. The panel is a fixed
+300px flex child, so hiding it widens the VTK canvas to full width (the box
+re-centres for presentation). Exiting Story Mode restores its pre-story
+visibility.
+
+## Models & multi-box
+
+`scene.models` declares the model layout for a scene and is applied via the
+existing async controllers — `switch_model` (primary) and `toggle_adjacent`
+(side-by-side boxes):
+
+```jsonc
+"models": { "primary": "miniMillennium", "adjacent": ["microUchuu"] }
+```
+
+The engine no-ops when the layout already matches, switches the primary when it
+differs, and adds/removes adjacent boxes to match `adjacent`. Omitting `models`
+leaves the current layout untouched. On exit, the pre-story primary + adjacent
+layout is restored. Story-level `requirements.models` may list every model the
+story uses so they can be discovered/preloaded up front.
 
 ### Captured-state keys
 
@@ -138,6 +203,25 @@ filter_gal_sfr_dsk_z filter_gal_met_cg     filter_gal_met_sm    filter_gal_met_b
 filter_gal_met_hg    filter_gal_met_em     filter_gal_met_ics   filter_gal_met_cgm
 filter_gal_age       filter_gal_type       filter_gal_ffb       filter_gal_cgm
 ```
+
+## Portability (self-contained stories)
+
+So a story works on **whatever output is connected** (no hardcoded model names,
+snapshot counts, or box sizes), these fields accept symbolic values resolved at
+runtime against the active model:
+
+| Field | Symbolic values | Resolves to |
+|---|---|---|
+| `snap_num`, sweep `from`/`to` | `"first"`, `"last"`, `"40%"`, or an int | index in `[0, snap_count-1]` |
+| `camera` | `"box"` / `"reset"` (or an explicit `{position, focal_point, up}` dict) | box-framing from the model's box size |
+| `focus.center` | `"box"` (or a `[x,y,z]` list) | box centre |
+| `focus.radius` | `radius_frac` (fraction of box size) as an alternative | `frac × box_size` |
+
+The shipped **`example_tour.json` uses only these symbolic forms** and the
+currently-loaded model (no `models` block, no multi-box), so a fresh install
+plays it correctly regardless of which simulation is open. Model-specific stories
+(e.g. a personal MCR, or the dev `smoke_test.json`) may use absolute snapshots,
+explicit cameras, and named `models` since their environment is known.
 
 ## Targeting resolution (position + index hint)
 

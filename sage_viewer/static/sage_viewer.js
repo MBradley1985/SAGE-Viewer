@@ -618,4 +618,55 @@
     });
   })).observe(document.body, { childList: true, subtree: true });
 
+  // ─── Story Mode text / equation overlays ──────────────────────────
+  // Overlays are rendered ENTIRELY by this code, not by Vue: the server ships
+  // a JSON list in the hidden #sage-overlays-relay input, and we build the
+  // children of #sage-overlay-root ourselves. Vue owns the container element
+  // but never its children, so KaTeX's DOM writes can't corrupt Vue's vDOM.
+  (function () {
+    function makeItem(it) {
+      var d = document.createElement('div');
+      d.style.cssText = it.style || '';
+      if (it.latex != null && window.katex) {
+        try {
+          window.katex.render(it.latex, d, {
+            displayMode: !!it.display,
+            throwOnError: false,
+          });
+        } catch (e) {
+          d.textContent = it.latex;  // fall back to raw source
+        }
+      } else if (it.latex != null) {
+        d.textContent = it.latex;    // KaTeX not loaded yet
+      } else {
+        d.textContent = it.text || '';
+      }
+      return d;
+    }
+
+    function run() {
+      var relay = document.getElementById('sage-overlays-relay');
+      var root = document.getElementById('sage-overlay-root');
+      if (!relay || !root) { setTimeout(run, 200); return; }
+      var last = null;
+      function tick() {
+        var v = relay.value || '[]';
+        if (v !== last) {
+          var items = [];
+          try { items = JSON.parse(v); } catch (e) { items = []; }
+          // If equations are present but KaTeX hasn't loaded yet (scripts load
+          // asynchronously), retry next tick instead of caching raw LaTeX.
+          var needsKatex = items.some(function (it) { return it.latex != null; });
+          if (needsKatex && !window.katex) { setTimeout(tick, 100); return; }
+          last = v;
+          root.innerHTML = '';
+          items.forEach(function (it) { root.appendChild(makeItem(it)); });
+        }
+        setTimeout(tick, 150);
+      }
+      tick();
+    }
+    run();
+  })();
+
 })();
