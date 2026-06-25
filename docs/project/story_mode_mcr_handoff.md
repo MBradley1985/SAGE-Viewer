@@ -32,10 +32,17 @@ It is **intentionally NOT in the public release.** It lives only on the
 - **`main` / PyPI:** frozen at **1.2.1** (the live release). Do **not** touch.
   - ⚠️ `1.2.0` on PyPI was a botched build (tagged from the wrong commit) and was
     **yanked**. Never reuse `1.2.0`.
-- **Install:** a live **editable install** is active
-  (`pip install -e . --config-settings editable_mode=compat`), so the
-  `sage-viewer` console script runs the **source on the current branch**
-  (verified). It is not per-branch — it points at the repo source.
+- **Install (IMPORTANT — read this):** the build loop only works with an
+  **editable** install. If `pip show sage-viewer` does **not** list an "Editable
+  project location", you have a *regular* install and the `sage-viewer` console
+  script runs a **stale copy in site-packages** — repo `.py`/JS edits will NOT
+  show up until you reinstall (this bit the build hard, presenting as "my changes
+  aren't appearing / autoplay not working / overlay crash"). Fix it **once**:
+  `pip install -e . --config-settings editable_mode=compat`. Then the console
+  script loads the repo source via a `.pth`. **Do not run a plain `pip install .`
+  afterwards** — it reverts you to the stale-copy install. Verify (run from
+  OUTSIDE the repo): `python3 -c "import sage_viewer;print(sage_viewer.__file__)"`
+  → must print the **repo** path, not `site-packages`.
 - **Reload rules (important for the build loop):**
   - **Story content (`sage_stories/mcr.json`)** → edit, then **exit Story Mode and
     re-open it**. Changes load with **NO app restart** (`story_open` re-reads the
@@ -155,6 +162,10 @@ Full reference: **`docs/project/story_mode_design.md`**. Summary:
 - `{"kind":"orbit","dps":12,"degrees":360,"radius":40}` — spin around target/focus centre.
 - `{"kind":"snapshot_sweep","from":"40%","to":"last","fps":4}` — animate through cosmic
   time. In multi-box, advances **all** loaded boxes.
+- `{"kind":"flythrough"}` — cinematic tour that **keeps touring groups until Next**
+  (reset → approach box centre → biggest group → every cluster with focus → then cycle
+  groups forever). See §10. Optional tunables: `approach_secs`, `fly_secs`,
+  `group_radius`, `cluster_radius`, `group_dps`, `cluster_dps`.
 
 ### Overlays (in-view text & equations)
 Rendered over the VTK view by `sage_viewer.js` (outside Vue, so KaTeX can't corrupt
@@ -167,19 +178,28 @@ the vDOM). Equations use **vendored KaTeX** (offline, no network).
   { "kind": "text",     "text": "multi-line\nbody", "anchor": "left" },
   { "kind": "citation", "text": "Croton et al. (2016)", "anchor": "bottom-right" },
   { "kind": "equation", "latex": "\\dot{M}_* = \\alpha\\,M_{\\rm cold}/t_{\\rm dyn}",
-    "anchor": "center", "size": 2.0 }   // add "inline": true for inline math
+    "anchor": "center", "size": 2.0 },  // add "inline": true for inline math
+  { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left",
+    "x": 0, "y": 0, "width": 150 }      // logos/wordmarks — see §10
 ]
 ```
 - `anchor`: 9-grid — `top-left`,`top`,`top-right`,`left`,`center`,`right`,`bottom-left`,`bottom`,`bottom-right`.
-- `x`,`y`: percentage nudge from the anchor edges. Other overrides: `size` (rem),
-  `color`, `weight`, `align`, `max_width` (vw).
+- `x`,`y`: nudge from the anchor edges. **Numeric → percentage; string → CSS length**
+  (e.g. `"150px"`), so logos pin together at a fixed offset regardless of window width.
+- Other overrides: `size` (rem), `color`, `weight`, `align`, `max_width` (vw).
 - LaTeX strings are JSON, so backslashes are doubled (`\\dot`, `\\frac`).
+- `image` overlays: `src` is served from `sage_viewer/static/` at `/sage_static/<file>`
+  (NOT the data Library); use **PNG/JPG/SVG, not PDF**; `width` is px (number) or any CSS
+  length; `opacity` optional. Bundled: `SAGElogo.jpg`, `CAS_logo.png`.
 
 ## 5. The MCR file
 
 - **Location:** `sage_stories/mcr.json` (tracked on `story-mode` only — a branch
   `.gitignore` exception `!sage_stories/*.json` makes it version-controlled).
-- **Current state:** a 1-scene scaffold (title card). Build it out from here.
+- **Current state:** **Slide 1 (title) is built** (see §10) — a right-aligned
+  title column (Mid-Candidature Review / Michael Bradley / Supervisors block),
+  SAGE + CAS logos pinned bottom-left, story-level `autoplay`, and a `flythrough`
+  motion as the moving background. Build the remaining scenes from here.
 - **Running it:** launch `sage-viewer` from the **repo root**, open Story Mode →
   "Mid-Candidature Review".
 
@@ -224,9 +244,67 @@ git push origin story-mode
 - **Never tag `story-mode` with `v*`** (auto-publishes to PyPI).
 - Captured screenshots/recordings reflect the current view; Story Mode overlays are
   HTML over the canvas and are **not** baked into VTK screenshots.
+- **Panel toggle reshapes the VTK view.** The right panel is a fixed 300px flex
+  child toggled with `v-show` (`display:none`), so showing/hiding it (e.g. when
+  pause re-shows it) snaps the canvas width and the remote view re-frames
+  (apparent zoom/shift). **Left as-is by author's choice** — a smooth-slide or
+  overlay fix would touch out-of-scope general layout (`app.py` panel /
+  `VtkRemoteView`).
 
 ## 9. Eventual end-state (after the MCR)
 Per the author: stash the MCR content and send only the **framework** to `main`/PyPI
 later. Because the framework (`sage_viewer/...`) and MCR content (`sage_stories/`) are
 cleanly separated, that's a code-only promotion — the MCR JSON never needs to leave
 `story-mode`.
+
+> ⚠️ The bundled `CAS_logo.png` (and any personal logo) under `sage_viewer/static/`
+> is MCR content, not framework — exclude it (and the `image`/`flythrough`/`autoplay`
+> docs examples if undesired) when promoting the framework to `main`/PyPI.
+
+## 10. Framework features added during the MCR build (session log)
+
+All on `story-mode`, in-scope per §3. Framework `.py`/JS changes need a
+**`sage-viewer` restart** (with the **editable** install from §2 — otherwise they
+won't show up); `mcr.json` reloads on re-open. Tests: `python3 -m pytest -q`.
+
+### Story-level `autoplay`
+Top-level boolean in the story JSON (sibling of `scenes`). `true` → entering the
+story starts playback immediately (no Play click), so a title scene's motion runs
+on open. `Story.autoplay` (`model.py`), applied in `engine._enter_async`.
+
+### Motion kind: `flythrough`
+`{"kind":"flythrough"}` — cinematic tour that **keeps touring groups until Next**:
+reset camera → approach box centre → orbit the most-massive group → visit every
+cluster most→least (with a focus ring) → then cycle the groups forever. Group =
+halo Mvir 10^12.5–10^14; cluster = ≥10^14. Drives the camera with the shared
+`scene/camera_motion.py` helpers (the same ones the toolbar fly-through uses), so
+**`toolbar.py` is not edited**. Optional tunables on the motion object (defaults):
+`approach_secs` 8, `fly_secs` 7, `group_radius` 15, `cluster_radius` 30,
+`group_dps` 10, `cluster_dps` 8. (`engine._motion_flythrough` /
+`_flythrough_targets`.)
+
+### Overlay kind: `image` (logos / wordmarks)
+`{ "kind":"image", "src":"/sage_static/<file>", "anchor":"bottom-left", "x":0,
+"y":0, "width":150 }`. `src` is served from `sage_viewer/static/` at
+`/sage_static/<file>` (**not** the data Library); use **PNG/JPG/SVG, not PDF**.
+`width` is px (number) or any CSS length; `opacity` optional. Rendered as an
+`<img>` by `sage_viewer.js`; normalised in `engine._normalize_overlay`. Bundled
+assets: `SAGElogo.jpg`, `CAS_logo.png`.
+
+### Overlay `x`/`y` accept pixel offsets
+For **all** overlay kinds, `x`/`y` are a **percentage when numeric, a CSS length
+when a string** (e.g. `"150px"`), so logos pin together at a fixed offset
+regardless of window width. (`engine._overlay_position_style`.)
+
+### Pause = hand back full control
+Pause now **freezes motion AND re-shows the right panel** (`panels_hidden=False`),
+even if the scene set `chrome.hide_panel`. **Play after pause resumes in place** —
+it does not re-stage the scene, so the fly-through does **not** restart: it skips
+its reset/approach intro (tracked per scene in `_ft_done`) and continues touring,
+and the panel re-hides per the scene's chrome. (`engine.play`/`pause`/`_resume`,
+`apply_scene`.)
+
+### Compact HUD
+The playback HUD (progress + scene title + caption + transport) is now a small
+card **pinned lower-right** (was bottom-centre, full-width), panel-aware.
+(`ui/story_mode.py`.)
