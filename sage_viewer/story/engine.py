@@ -43,23 +43,31 @@ async def _maybe_await(result):
     return result
 
 
-def _overlay_position_style(anchor: str, x: float, y: float) -> str:
-    """CSS positioning for a 9-grid anchor plus percentage nudge."""
+def _overlay_position_style(anchor: str, x, y) -> str:
+    """CSS positioning for a 9-grid anchor plus an offset.
+
+    ``x``/``y`` are percentages when numeric, or pass-through CSS lengths when
+    given as strings (e.g. ``"150px"``) — handy for pinning logos to a fixed
+    pixel offset regardless of window width.
+    """
+    def _len(v):
+        return v if isinstance(v, str) else f"{float(v)}%"
+
     parts: list[str] = ["position:absolute;"]
     transforms: list[str] = []
     # Vertical.
     if anchor.startswith("top"):
-        parts.append(f"top:{y}%;")
+        parts.append(f"top:{_len(y)};")
     elif anchor.startswith("bottom"):
-        parts.append(f"bottom:{y}%;")
+        parts.append(f"bottom:{_len(y)};")
     else:  # vertical centre
         parts.append("top:50%;")
         transforms.append("translateY(-50%)")
     # Horizontal.
     if anchor.endswith("left"):
-        parts.append(f"left:{x}%;")
+        parts.append(f"left:{_len(x)};")
     elif anchor.endswith("right"):
-        parts.append(f"right:{x}%;")
+        parts.append(f"right:{_len(x)};")
     else:  # horizontal centre
         parts.append("left:50%;")
         transforms.append("translateX(-50%)")
@@ -77,8 +85,9 @@ def _normalize_overlay(item: dict) -> dict:
     """
     kind = item.get("kind", "text")
     anchor = item.get("anchor", "top-left")
-    x = float(item.get("x", 6.0))
-    y = float(item.get("y", 6.0))
+    # Numeric → percentage; string → pass-through CSS length (e.g. "150px").
+    x = item.get("x", 6.0)
+    y = item.get("y", 6.0)
 
     # Image overlays (e.g. logos) carry a src + sizing, not text/font props.
     if kind == "image":
@@ -154,8 +163,12 @@ class StoryPlayer:
         self._story: Story | None = None
         self._index = 0
         self._playing = False
+        self._paused = False  # True after pause() → next play() resumes in place
         self._task: asyncio.Task | None = None
         self._saved: dict | None = None  # user state stashed on enter
+        # Scene indices whose fly-through intro (reset → approach → clusters)
+        # has already played, so a pause/resume doesn't restart the tour.
+        self._ft_done: set[int] = set()
 
     # ---- small helpers --------------------------------------------------
 
@@ -255,14 +268,36 @@ class StoryPlayer:
     def play(self) -> None:
         if self._story is None:
             return
-        self._playing = True
-        self._push_hud()
-        self._start(self._go(self._index, play=True))
+        if self._paused:
+            # Resume in place: continue the current scene's motion WITHOUT
+            # re-staging it (so a fly-through doesn't restart from the top),
+            # and re-hide the panel per the scene's chrome.
+            self._paused = False
+            self._playing = True
+            self._apply_chrome(self._story.scenes[self._index])
+            self.state.flush()
+            self._push_hud()
+            self._start(self._resume())
+        else:
+            self._playing = True
+            self._push_hud()
+            self._start(self._go(self._index, play=True))
+
+    async def _resume(self) -> None:
+        try:
+            await self._autoplay_from(self._index)
+        except asyncio.CancelledError:
+            pass
 
     def pause(self) -> None:
+        # Stop auto-advance, freeze motion, and hand full control back: show
+        # the right panel again (even if the scene hid it for presentation).
         self._playing = False
+        self._paused = True
         if self._task is not None and not self._task.done():
             self._task.cancel()
+        self.state.panels_hidden = False
+        self.state.flush()
         self._push_hud()
 
     def goto(self, i: int) -> None:
@@ -300,6 +335,10 @@ class StoryPlayer:
         scene = self._scene
         sc = self._story.scenes[i]
         self._index = i
+        # Freshly staging a scene clears any paused/resume state and replays
+        # this scene's fly-through intro on the next motion run.
+        self._paused = False
+        self._ft_done.discard(i)
         self._push_hud()
 
         # Model / multi-box layout first — it changes the active data.
@@ -680,42 +719,50 @@ class StoryPlayer:
             )
 
         groups, clusters = self._flythrough_targets()
+        # The intro (reset → approach → biggest group → clusters) plays only
+        # the first time this scene runs; a pause/resume skips straight to the
+        # group-touring loop so the tour isn't restarted from the top.
+        first_run = self._index not in self._ft_done
+        self._ft_done.add(self._index)
         try:
-            # Reset camera, then approach the box centre.
-            cam.position = (cx, cy, bs * 2.2)
-            cam.focal_point = (cx, cy, cz)
-            cam.up = _UP
-            self._push()
-            await asyncio.sleep(1.0 / fps)
-            if not await smooth_move(
-                cam, np.array([cx, cy, bs * 2.2]), np.array([cx, cy, cz]),
-                np.array([cx, cy, cz]), np.array([cx, cy, cz - 0.5]),
-                approach_secs, fps, is_active=active, push=self._push,
-            ):
-                return
-
-            # Biggest group.
-            if groups:
-                if not await fly_to(groups[0], g_radius, fly_secs):
-                    return
-                if not await spin(groups[0], g_radius, g_dps):
-                    return
-
-            # Every cluster, most → least massive, with focus on each.
-            for cpos in clusters:
-                if not await fly_to(cpos, c_radius, fly_secs):
-                    return
-                scene.set_focus_sphere(tuple(float(v) for v in cpos), c_radius)
-                st.focus_active = True
-                st.flush()
+            if first_run:
+                # Reset camera, then approach the box centre.
+                cam.position = (cx, cy, bs * 2.2)
+                cam.focal_point = (cx, cy, cz)
+                cam.up = _UP
                 self._push()
                 await asyncio.sleep(1.0 / fps)
-                ok = active() and await spin(cpos, c_radius, c_dps)
-                scene.clear_focus()
-                st.focus_active = False
-                st.flush()
-                if not ok:
+                if not await smooth_move(
+                    cam, np.array([cx, cy, bs * 2.2]), np.array([cx, cy, cz]),
+                    np.array([cx, cy, cz]), np.array([cx, cy, cz - 0.5]),
+                    approach_secs, fps, is_active=active, push=self._push,
+                ):
                     return
+
+                # Biggest group.
+                if groups:
+                    if not await fly_to(groups[0], g_radius, fly_secs):
+                        return
+                    if not await spin(groups[0], g_radius, g_dps):
+                        return
+
+                # Every cluster, most → least massive, with focus on each.
+                for cpos in clusters:
+                    if not await fly_to(cpos, c_radius, fly_secs):
+                        return
+                    scene.set_focus_sphere(
+                        tuple(float(v) for v in cpos), c_radius
+                    )
+                    st.focus_active = True
+                    st.flush()
+                    self._push()
+                    await asyncio.sleep(1.0 / fps)
+                    ok = active() and await spin(cpos, c_radius, c_dps)
+                    scene.clear_focus()
+                    st.focus_active = False
+                    st.flush()
+                    if not ok:
+                        return
 
             # Then keep touring groups (cycling) until Next.
             if not groups:

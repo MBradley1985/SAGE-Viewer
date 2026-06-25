@@ -134,6 +134,14 @@ def test_normalize_overlay_image():
     css = _normalize_overlay({"kind": "image", "src": "x", "width": "12vw"})
     assert "width:12vw" in css["style"]
 
+    # x/y pass through as pixel offsets so logos pin together regardless of
+    # window width (rather than drifting as percentages).
+    px = _normalize_overlay(
+        {"kind": "image", "src": "x", "anchor": "bottom-left",
+         "x": "150px", "y": 0}
+    )
+    assert "left:150px" in px["style"] and "bottom:0.0%" in px["style"]
+
 
 def test_resolve_snap_symbolic():
     from sage_viewer.story.engine import resolve_snap
