@@ -6,7 +6,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.2.0] — dev (unreleased)
+## [1.2.1] — 2026-06-25
+
+> **Note:** the `1.2.0` artifact on PyPI was built from the wrong commit (the
+> release tag pointed at a pre-release merge) and is missing the changes below.
+> `1.2.1` is the first complete 1.2.x release. The `1.2.0` PyPI release has been
+> yanked.
+
+The following changes were intended for 1.2.0 and ship in 1.2.1:
 
 ### Added
 
@@ -86,6 +93,25 @@ you switch to, and the settings apply to that model:
   state so a later Side-by-Side activation restores the same view.
 
 ### Fixed
+
+#### Console commands — environment / type filters now do what they say
+
+- **"show only clusters" (or any single class) now turns every other class off**,
+  including pairs. Previously the "show only …" handler never touched the pairs
+  flag, so pairs stayed visible.
+- **"pair(s)" is its own class.** The parser mapped pairs into the isolated
+  bucket, so "show only pairs" actually showed isolated. It now drives
+  `env_show_pairs` correctly.
+- **"show only centrals" / "show centrals" work.** A greedy "show only …" regex
+  swallowed centrals/satellites (→ "unknown environment class"), and plain
+  "show centrals" wasn't matched at all despite being documented. Both are fixed.
+
+#### Terminal pop-out re-fits when resized
+
+Resizing (or maximising) the console terminal pop-out grew the card but left the
+xterm at its original size, so the terminal filled only part of the window. The
+pop-out now attaches a `ResizeObserver` that calls the xterm `FitAddon` on every
+resize (mirroring the wizard terminal), so the terminal always fills the card.
 
 #### Recording — playback smoothness (root-cause investigation, two-session fix)
 

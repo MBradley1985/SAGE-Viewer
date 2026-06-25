@@ -394,6 +394,15 @@
         return;
       }
       _xtermsOut[sid] = t;
+      // Re-fit the terminal whenever the pop-out card is resized (drag-resize,
+      // fullscreen toggle, etc.) so the xterm always fills the window instead
+      // of leaving an empty region.
+      function _fit() { if (t.fit) { try { t.fit.fit(); } catch (e) {} } }
+      requestAnimationFrame(function () { _fit(); setTimeout(_fit, 200); });
+      if (typeof ResizeObserver !== 'undefined' && t.fit) {
+        t.ro = new ResizeObserver(function () { _fit(); });
+        t.ro.observe(container);
+      }
     }
 
     // PTY output listener — fires synchronously on every server state push so

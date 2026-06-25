@@ -110,15 +110,18 @@ def _h_reset_filters(_m, ctx) -> str:
     return "Filters reset."
 
 
+# Canonical environment classes — each maps to a state flag env_show_<class>.
+_ENV_CLASSES = ("field", "isolated", "group", "cluster", "pairs")
+
+
 def _h_show_only_env(m, ctx) -> str:
-    """`show only groups` / `show only clusters` / ..."""
+    """`show only groups` / `show only clusters` / ... — restrict to the named
+    classes and turn every other class off (including pairs)."""
     classes = _parse_env_classes(m.group("kinds"))
     if not classes:
         return f"Unknown environment class in: {m.group('kinds')!r}"
-    ctx.state.env_show_field = "field" in classes
-    ctx.state.env_show_isolated = "isolated" in classes
-    ctx.state.env_show_group = "group" in classes
-    ctx.state.env_show_cluster = "cluster" in classes
+    for c in _ENV_CLASSES:
+        setattr(ctx.state, f"env_show_{c}", c in classes)
     return f"Showing: {', '.join(sorted(classes))}"
 
 
@@ -414,13 +417,18 @@ def _parse_env_classes(text: str) -> set:
     if "cluster" in text:
         out.add("cluster")
     if "pair" in text:
-        out.add("isolated")  # pairs map to isolated bucket
+        out.add("pairs")
     return out
 
 
 # ---------------------------------------------------------------------------
 # Command table — order matters
 # ---------------------------------------------------------------------------
+
+# Environment-class words, as a reusable regex fragment.  Used so "show only X"
+# only matches real env classes and doesn't shadow e.g. "show only centrals".
+_ENV_KIND = r"(?:field|isolated|groups?|clusters?|pairs?)"
+_ENV_LIST = rf"{_ENV_KIND}(?:\s*,?\s*(?:and\s+)?{_ENV_KIND})*"
 
 _COMMANDS: list[tuple[re.Pattern, Handler]] = [
     (re.compile(r"^(help|\?|commands)$"), _h_help),
@@ -430,19 +438,9 @@ _COMMANDS: list[tuple[re.Pattern, Handler]] = [
     # Filter / visibility
     (re.compile(r"^(show all|show everything|reset filters)$"), _h_show_all),
     (re.compile(r"^hide everything$"), _h_hide_everything),
-    (re.compile(r"^show only (?P<kinds>.+)$"), _h_show_only_env),
-    (
-        re.compile(
-            r"^show (?P<kinds>(?:field|isolated|group|groups|cluster|clusters|pair|pairs)(?:\s*,?\s*(?:and\s+)?(?:field|isolated|group|groups|cluster|clusters|pair|pairs))*)$"
-        ),
-        _h_show_env_add,
-    ),
-    (
-        re.compile(
-            r"^hide (?P<kinds>(?:field|isolated|group|groups|cluster|clusters|pair|pairs)(?:\s*,?\s*(?:and\s+)?(?:field|isolated|group|groups|cluster|clusters|pair|pairs))*)$"
-        ),
-        _h_hide_env,
-    ),
+    (re.compile(rf"^show only (?P<kinds>{_ENV_LIST})$"), _h_show_only_env),
+    (re.compile(rf"^show (?P<kinds>{_ENV_LIST})$"), _h_show_env_add),
+    (re.compile(rf"^hide (?P<kinds>{_ENV_LIST})$"), _h_hide_env),
     (
         re.compile(
             r"^(?P<verb>show|hide) (?P<layer>haloe?s?|galax(?:y|ies))$"
@@ -450,7 +448,7 @@ _COMMANDS: list[tuple[re.Pattern, Handler]] = [
         _h_layer_visibility,
     ),
     (
-        re.compile(r"^(?:show only |only )?(?P<type>centrals?|satellites?)$"),
+        re.compile(r"^(?:show only |show |only )?(?P<type>centrals?|satellites?)$"),
         _h_type_filter,
     ),
     # Navigation
