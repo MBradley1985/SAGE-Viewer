@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from trame.widgets import html, vuetify3 as v3
 
-from sage_viewer.story import discover_stories
+from sage_viewer.story import discover_stories, load_story
 from sage_viewer.story.engine import StoryPlayer
 
 # Theme-neutral HUD styling so the overlay reads on any palette.
@@ -68,9 +68,17 @@ def init_story_mode(server, scene) -> StoryPlayer:
     @ctrl.set("story_open")
     def _story_open(index=0):
         try:
-            story = _discovered[int(index)]
+            cached = _discovered[int(index)]
         except (IndexError, ValueError, TypeError):
             return
+        # Re-read the JSON from disk on every open so edits take effect by just
+        # exiting Story Mode and re-selecting it — no app restart needed.
+        story = cached
+        if getattr(cached, "source_path", None):
+            try:
+                story = load_story(cached.source_path)
+            except (OSError, ValueError, KeyError):
+                story = cached
         player.enter(story)
 
     @ctrl.set("story_exit")

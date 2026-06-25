@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "title": "Mid-Candidature Review",
+  "author": "Michael Bradley",
+  "description": "PhD Mid-Candidature Review presentation, built with Story Mode on the story-mode branch. Scenes below are a starting scaffold — replace/extend them.",
+  "theme": "dos_blue",
+  "requirements": {},
+  "scenes": [
+    {
+      "id": "title",
+      "title": "Title",
+      "caption": "",
+      "snap_num": "last",
+      "camera": "box",
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": true,
+        "halo_opacity": 0.12,
+        "galaxy_color_mode": "structure"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "overlays": [
+        { "kind": "title", "text": "Mid-Candidature Review", "anchor": "top", "y": 10 },
+        { "kind": "heading", "text": "Michael Bradley", "anchor": "top", "y": 22, "color": "#06b6d4" }
+      ],
+      "transition": { "duration_secs": 4.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0,
+      "motion": { "kind": "still" }
+    }
+  ]
+}
