@@ -6,7 +6,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.2.0] — 2026-06-25
+## [1.2.1] — 2026-06-25
+
+> **Note:** the `1.2.0` artifact on PyPI was built from the wrong commit (the
+> release tag pointed at a pre-release merge) and is missing the changes below.
+> `1.2.1` is the first complete 1.2.x release. The `1.2.0` PyPI release has been
+> yanked.
+
+The following changes were intended for 1.2.0 and ship in 1.2.1:
 
 ### Changed
 
