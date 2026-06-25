@@ -53,6 +53,18 @@ you switch to, and the settings apply to that model:
 
 ### Fixed
 
+#### Console commands — environment / type filters now do what they say
+
+- **"show only clusters" (or any single class) now turns every other class off**,
+  including pairs. Previously the "show only …" handler never touched the pairs
+  flag, so pairs stayed visible.
+- **"pair(s)" is its own class.** The parser mapped pairs into the isolated
+  bucket, so "show only pairs" actually showed isolated. It now drives
+  `env_show_pairs` correctly.
+- **"show only centrals" / "show centrals" work.** A greedy "show only …" regex
+  swallowed centrals/satellites (→ "unknown environment class"), and plain
+  "show centrals" wasn't matched at all despite being documented. Both are fixed.
+
 #### Terminal pop-out re-fits when resized
 
 Resizing (or maximising) the console terminal pop-out grew the card but left the
