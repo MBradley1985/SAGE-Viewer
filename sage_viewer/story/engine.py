@@ -17,6 +17,7 @@ import numpy as np
 
 from sage_viewer.scene.camera_motion import (
     orbit_around,
+    orbit_start_position,
     smooth_move,
 )
 from sage_viewer.story.keys import STORY_STATE_KEYS
@@ -616,25 +617,125 @@ class StoryPlayer:
             return center if center is not None else self._box()[1]
         return None
 
-    async def _motion_flythrough(self, sc, m) -> None:
-        """Run the existing cinematic fly-through as the scene's background.
+    def _flythrough_targets(self):
+        """(groups, clusters) world positions for the current snapshot.
 
-        Reuses the toolbar fly-through (approach → most-massive group → all
-        clusters → continuous box orbit) by flipping its reactive flag, so the
-        tour keeps "looking for groups" with no duplicated logic.  Holds while
-        playing; switches the fly-through off when the scene changes, the user
-        pauses, or Story Mode exits (including on task cancellation).
+        Groups (10^12.5 ≤ Mvir < 10^14) and clusters (Mvir ≥ 10^14), each
+        sorted most-massive first — the same thresholds the toolbar
+        fly-through uses.
         """
+        scene = self._scene
+        halos, _gal = scene.active_model.loader.get(scene.current_snap)
+        if getattr(halos, "count", 0) <= 0:
+            return [], []
+        masses = np.asarray(halos.masses, dtype=float)
+        log_m = np.log10(np.maximum(masses, 1.0))
+        h_pos = np.asarray(halos.positions, dtype=float) + np.asarray(
+            scene.active_model.offset, dtype=float
+        )
+        g_idx = np.where((log_m >= 12.5) & (log_m < 14.0))[0]
+        g_idx = g_idx[np.argsort(masses[g_idx])[::-1]]
+        c_idx = np.where(log_m >= 14.0)[0]
+        c_idx = c_idx[np.argsort(masses[c_idx])[::-1]]
+        return [h_pos[i] for i in g_idx], [h_pos[i] for i in c_idx]
+
+    async def _motion_flythrough(self, sc, m) -> None:
+        """Cinematic fly-through that keeps touring groups until Next.
+
+        Reset → approach the box centre → visit the most-massive group →
+        visit every cluster (most→least, with focus) → then keep hopping
+        between groups (cycling the sorted list) until the presenter clicks
+        Next.  Drives the camera with the shared ``camera_motion`` helpers
+        (the same ones the toolbar uses) so the loop can keep visiting groups
+        instead of settling into a box orbit.  Honours ``self._playing``.
+        """
+        scene = self._scene
         st = self.state
+        cam = scene.plotter.camera
+        bs, centre = self._box()
+        cx, cy, cz = (float(centre[0]), float(centre[1]), float(centre[2]))
+        active = lambda: self._playing  # noqa: E731
+
+        fps = _FPS
+        approach_secs = float(m.get("approach_secs", 8.0))
+        fly_secs = float(m.get("fly_secs", 7.0))
+        g_radius = float(m.get("group_radius", 15.0))
+        c_radius = float(m.get("cluster_radius", 30.0))
+        g_dps = float(m.get("group_dps", 10.0))
+        c_dps = float(m.get("cluster_dps", 8.0))
+
+        async def fly_to(target, radius, secs):
+            t3 = np.asarray(target, dtype=float)
+            dest = orbit_start_position(cam, t3, radius)
+            return await smooth_move(
+                cam, np.asarray(cam.position, dtype=float),
+                np.asarray(cam.focal_point, dtype=float), dest, t3,
+                secs, fps, is_active=active, push=self._push,
+            )
+
+        async def spin(target, radius, dps):
+            return await orbit_around(
+                cam, np.asarray(target, dtype=float), radius, 360.0, dps,
+                fps, is_active=active, push=self._push,
+            )
+
+        groups, clusters = self._flythrough_targets()
         try:
-            if not getattr(st, "flythrough_active", False):
-                st.flythrough_active = True
+            # Reset camera, then approach the box centre.
+            cam.position = (cx, cy, bs * 2.2)
+            cam.focal_point = (cx, cy, cz)
+            cam.up = _UP
+            self._push()
+            await asyncio.sleep(1.0 / fps)
+            if not await smooth_move(
+                cam, np.array([cx, cy, bs * 2.2]), np.array([cx, cy, cz]),
+                np.array([cx, cy, cz]), np.array([cx, cy, cz - 0.5]),
+                approach_secs, fps, is_active=active, push=self._push,
+            ):
+                return
+
+            # Biggest group.
+            if groups:
+                if not await fly_to(groups[0], g_radius, fly_secs):
+                    return
+                if not await spin(groups[0], g_radius, g_dps):
+                    return
+
+            # Every cluster, most → least massive, with focus on each.
+            for cpos in clusters:
+                if not await fly_to(cpos, c_radius, fly_secs):
+                    return
+                scene.set_focus_sphere(tuple(float(v) for v in cpos), c_radius)
+                st.focus_active = True
                 st.flush()
-            while self._playing:
-                await asyncio.sleep(0.1)
+                self._push()
+                await asyncio.sleep(1.0 / fps)
+                ok = active() and await spin(cpos, c_radius, c_dps)
+                scene.clear_focus()
+                st.focus_active = False
+                st.flush()
+                if not ok:
+                    return
+
+            # Then keep touring groups (cycling) until Next.
+            if not groups:
+                while active():  # no groups → gentle box orbit fallback
+                    if not await spin(centre, bs * 1.7, 8.0):
+                        return
+                return
+            i = 0
+            while active():
+                g = groups[i % len(groups)]
+                if not await fly_to(g, g_radius, fly_secs):
+                    return
+                if not await spin(g, g_radius, g_dps):
+                    return
+                i += 1
         finally:
-            if getattr(st, "flythrough_active", False):
-                st.flythrough_active = False
+            # Never leave a focus mask behind when the scene changes/pauses.
+            if getattr(st, "focus_active", False):
+                scene.clear_focus()
+                st.focus_active = False
                 st.flush()
 
     async def _motion_snapshot_sweep(self, sc, m) -> None:
