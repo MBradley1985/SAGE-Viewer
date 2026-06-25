@@ -5,6 +5,7 @@
   "description": "PhD Mid-Candidature Review presentation, built with Story Mode on the story-mode branch.",
   "theme": "dos_blue",
   "requirements": {},
+  "autoplay": true,
   "scenes": [
     {
       "id": "title",
@@ -18,17 +19,17 @@
         "halo_opacity": 0.12,
         "galaxy_color_mode": "structure"
       },
-      "focus": { "kind": "sphere", "center": "box", "radius_frac": 2.5 },
+      "focus": { "kind": "none" },
       "chrome": { "hide_panel": true },
       "overlays": [
-        { "kind": "title", "text": "Mid-Candidature Review", "anchor": "top", "y": 36, "align": "right", "size": 3.4 },
-        { "kind": "heading", "text": "Michael Bradley", "anchor": "top", "y": 49, "align": "right", "color": "#ffffff" },
-        { "kind": "text", "text": "Supervisors:\nDarren\nRobert\nMichelle", "anchor": "top", "y": 56, "align": "right" },
+        { "kind": "title", "text": "Mid-Candidature Review", "anchor": "top-right", "x": 5, "y": 42, "align": "right", "size": 3.4 },
+        { "kind": "heading", "text": "Michael Bradley", "anchor": "top-right", "x": 5, "y": 55, "align": "right", "color": "#ffffff" },
+        { "kind": "text", "text": "Supervisors:\nDarren\nRobert\nMichelle", "anchor": "top-right", "x": 5, "y": 62, "align": "right" },
         { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 3, "y": 5, "width": 150 }
       ],
-      "transition": { "duration_secs": 4.0, "easing": "smoothstep" },
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0,
-      "motion": { "kind": "orbit", "dps": 6, "degrees": 100000 }
+      "motion": { "kind": "flythrough" }
     }
   ]
 }
