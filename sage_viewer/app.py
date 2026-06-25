@@ -154,11 +154,30 @@ def create_app(
     _sage_static_dir = _os_static.path.join(
         _os_static.path.dirname(__file__), "static"
     )
+
+    # Cache-bust the served JS/CSS with each file's mtime so browsers
+    # pick up edits on restart instead of replaying a stale cached copy
+    # (which silently breaks client-side features like the pop-out
+    # fullscreen toggle until a manual hard refresh).
+    def _bust(rel):
+        try:
+            mtime = int(
+                _os_static.path.getmtime(
+                    _os_static.path.join(
+                        _sage_static_dir,
+                        _os_static.path.basename(rel),
+                    )
+                )
+            )
+        except OSError:
+            return rel
+        return f"{rel}?v={mtime}"
+
     server.enable_module(
         {
             "serve": {"sage_static": _sage_static_dir},
-            "scripts": ["sage_static/sage_viewer.js"],
-            "styles": ["sage_static/sage_theme.css"],
+            "scripts": [_bust("sage_static/sage_viewer.js")],
+            "styles": [_bust("sage_static/sage_theme.css")],
         }
     )
 
@@ -400,6 +419,17 @@ def create_app(
     async def on_switch_model(name: str):
         import asyncio
 
+        # Capture the outgoing model's full UI state (filters, structure,
+        # colormaps, opacity, visibility, snapshot) so it carries over to
+        # the model we switch to.  Redshift — not the raw snap index — is
+        # what we preserve, so models with different snapshot lists land on
+        # the matching cosmic time rather than the matching slider position.
+        carried = save_profile(server.state)
+        old_table = scene.primary.snap_table
+        cur_snap = int(carried.get("snap_num") or 0)
+        cur_snap = max(0, min(cur_snap, old_table.count - 1))
+        carried_z = old_table.snap_to_z(cur_snap)
+
         server.state.model_loading = True
         server.state.flush()
         await asyncio.sleep(
@@ -416,14 +446,26 @@ def create_app(
             scene.primary.loader.preload_all()
         finally:
             server.state.model_loading = False
-            # Force-sync slider and snap chip to z=0 of the new model so the
-            # UI always reflects the new model, even when snap_num hasn't
-            # changed numerically (e.g. both models share the same snap count).
-            z0 = scene.primary.snap_count - 1
-            server.state.snap_max = z0
-            server.state.snap_num = z0
+            # Map the carried-over redshift onto the new model's snapshot
+            # list (closest match), clamped to its valid range.
+            new_max = scene.primary.snap_count - 1
+            target_snap = scene.primary.snap_table.z_to_snap(carried_z)
+            target_snap = max(0, min(target_snap, new_max))
+            # Re-apply the carried settings to the new primary, with the
+            # snapshot keys adjusted to the new model's range / matched z.
+            carried["snap_num"] = target_snap
+            carried["snap_max"] = new_max
+            load_profile(server.state, carried)
+            # dirty() forces the @state.change handlers to fire even when a
+            # value is numerically unchanged, so every setting is re-applied
+            # to the now-active (new primary) model's layers and filters.
+            server.state.dirty(*BOX_PROFILE_KEYS)
+            # Keep this model's stored profile in sync so a later
+            # side-by-side activation restores the same carried-over state.
+            _profiles[name] = save_profile(server.state)
             server.state.snap_label = scene.snap_label
             _refresh_models_state()
+            server.state.flush()
 
     @server.controller.set("toggle_overlay")
     async def on_toggle_overlay(name: str):
@@ -1106,8 +1148,8 @@ def create_app(
                         classes="sage-popout",
                         style=(
                             "position:absolute;left:24px;bottom:24px;"
-                            "width:560px;max-width:60%;"
-                            "height:360px;max-height:55%;"
+                            "width:560px;min-width:240px;"
+                            "height:360px;min-height:160px;"
                             "background:rgba(13,13,26,0.92);"
                             "border:1px solid #06b6d4;"
                             "box-shadow:0 0 18px rgba(6,182,212,0.30);"
@@ -1139,6 +1181,13 @@ def create_app(
                                 ),
                             )
                             v3.VSpacer()
+                            v3.VBtn(
+                                icon="mdi-fullscreen",
+                                size="x-small",
+                                variant="text",
+                                color="#9ca3af",
+                                classes="sage-popout-max-btn",
+                            )
                             v3.VBtn(
                                 icon="mdi-close",
                                 size="x-small",
@@ -1354,8 +1403,10 @@ def create_app(
                             "`position:absolute;"
                             "top:${item.top_px}px;"
                             "right:${item.right_px}px;"
-                            "min-width:320px;max-width:540px;"
-                            "resize:both;overflow:auto;"
+                            "width:480px;min-width:240px;"
+                            "height:380px;min-height:200px;"
+                            "display:flex;flex-direction:column;"
+                            "resize:both;overflow:hidden;"
                             "background:rgba(17,24,39,0.92);"
                             "backdrop-filter:blur(6px);"
                             "border:1px solid #374151;"
@@ -1370,6 +1421,7 @@ def create_app(
                                 "display:flex;align-items:center;"
                                 "font-size:0.85rem;letter-spacing:0.06em;"
                                 "padding:10px 12px 6px;cursor:move;"
+                                "flex-shrink:0;"
                             ),
                         ):
                             v3.VIcon(
@@ -1381,6 +1433,12 @@ def create_app(
                             html.Span("{{ item.name }}")
                             v3.VSpacer()
                             v3.VBtn(
+                                icon="mdi-fullscreen",
+                                size="x-small",
+                                variant="text",
+                                classes="sage-popout-max-btn",
+                            )
+                            v3.VBtn(
                                 icon="mdi-close",
                                 size="x-small",
                                 variant="text",
@@ -1390,11 +1448,21 @@ def create_app(
                                 ),
                             )
                         v3.VDivider()
-                        with v3.VCardText(style="padding:8px 12px;"):
+                        with v3.VCardText(
+                            style=(
+                                "padding:8px 12px;flex:1 1 0;min-height:0;"
+                                "overflow:auto;display:flex;"
+                                "align-items:center;justify-content:center;"
+                            ),
+                        ):
                             html.Img(
                                 src=("item.data_url",),
                                 v_if=("item.kind === 'image'",),
-                                style="max-width:100%;max-height:60vh;display:block;",
+                                style=(
+                                    "max-width:100%;max-height:100%;"
+                                    "width:auto;height:auto;"
+                                    "object-fit:contain;display:block;"
+                                ),
                             )
                             html.Video(
                                 src=("item.data_url",),
@@ -1403,7 +1471,11 @@ def create_app(
                                 autoplay=True,
                                 muted=True,
                                 loop=True,
-                                style="max-width:100%;max-height:60vh;display:block;",
+                                style=(
+                                    "max-width:100%;max-height:100%;"
+                                    "width:auto;height:auto;"
+                                    "object-fit:contain;display:block;"
+                                ),
                             )
 
                     # Loading overlay shown while a model loads

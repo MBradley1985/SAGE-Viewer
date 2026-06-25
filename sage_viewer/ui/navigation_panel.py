@@ -1895,14 +1895,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
         import platform
 
         W, H = pil_img.size
-        pan_w = min(300, max(240, int(W * 0.22)))
         row_h = 18
         title_h = 30
         pad = 8
-        n_rows = max(1, len(items))
-        pan_h = title_h + pad // 2 + n_rows * row_h + pad
-        pan_x = W - 24 - pan_w
-        pan_y = 32
+        gap = 16  # minimum gap between the label and value columns
         font_sz = 11
         try:
             if platform.system() == "Darwin":
@@ -1923,6 +1919,29 @@ def build_navigation_panel(server, scene: Scene) -> None:
         except Exception:
             _lf = ImageFont.load_default()
             _vf = _lf
+        # Size the panel to its content so nothing collides or gets clipped
+        # in recordings (the label is left-aligned, the value right-aligned,
+        # so a fixed width let long rows overlap). Width = widest
+        # label+gap+value row, capped to the frame; height grows with rows.
+        _meas = ImageDraw.Draw(_PIL.new("RGB", (1, 1)))
+
+        def _text_w(text, font):
+            try:
+                b = _meas.textbbox((0, 0), text, font=font)
+                return b[2] - b[0]
+            except (AttributeError, TypeError):
+                return int(len(text) * font_sz * 0.6)
+
+        content_w = _text_w("i  " + title, _lf)
+        for row in items:
+            lw = _text_w(str(row.get("label", "")), _lf)
+            vw = _text_w(str(row.get("value", "")), _vf)
+            content_w = max(content_w, lw + gap + vw)
+        pan_w = int(min(W - 48, max(260, content_w + pad * 2)))
+        n_rows = max(1, len(items))
+        pan_h = title_h + pad // 2 + n_rows * row_h + pad
+        pan_x = W - 24 - pan_w
+        pan_y = 32
         overlay = _PIL.new("RGBA", (pan_w, pan_h), (17, 24, 39, 216))
         draw = ImageDraw.Draw(overlay)
         draw.rectangle(
@@ -2367,7 +2386,10 @@ def build_navigation_panel(server, scene: Scene) -> None:
         # frame sequence before encoding.  Live recordings already have
         # frame_*.jpg files and skip this step.
         if snap_files:
-            _expand_with_crossfade(frames_dir, snap_files)
+            try:
+                _expand_with_crossfade(frames_dir, snap_files)
+            except Exception as exc:
+                return f"ERROR (crossfade): {exc!s}"
 
         if fmt == "png":
             target = session_dir / movie_base
@@ -2497,15 +2519,18 @@ def build_navigation_panel(server, scene: Scene) -> None:
         snap = dict(_record_state)  # copy current state before thread starts
 
         def _do_finalize():
-            result = _finalize_movie(
-                frames_dir=snap["dir"],
-                session_dir=snap["session"],
-                movie_base=snap["movie_base"],
-                fps=snap["fps"],
-                fmt=snap["format"],
-                gif_loop=bool(state.movie_loop),
-                snap_files=snap.get("snap_files") or [],
-            )
+            try:
+                result = _finalize_movie(
+                    frames_dir=snap["dir"],
+                    session_dir=snap["session"],
+                    movie_base=snap["movie_base"],
+                    fps=snap["fps"],
+                    fmt=snap["format"],
+                    gif_loop=bool(state.movie_loop),
+                    snap_files=snap.get("snap_files") or [],
+                )
+            except Exception as exc:
+                result = f"ERROR (finalize): {exc!s}"
             state.last_movie = result
             state.flush()
 
@@ -2820,7 +2845,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
     @ctrl.set("clear_draw_sphere")
     def on_clear_draw_sphere():
-        """Cancel an in-progress sphere draw without committing it."""
+        """Cancel any active Draw Sphere widget, clear the zoom indicator, and undo focus."""
         if bool(state.draw_sphere_active):
             try:
                 scene.plotter.clear_sphere_widgets()
@@ -2829,12 +2854,16 @@ def build_navigation_panel(server, scene: Scene) -> None:
             _draw_sphere_widget[0] = None
             _remove_sphere_actor()
             state.draw_sphere_active = False
-            state.flush()
-            _push()
+        scene.camera._clear_indicator()
+        scene.clear_focus()
+        state.focus_active = False
+        state.flush()
+        _sync_fof_layer()
+        _push()
 
     @ctrl.set("clear_draw_box")
     def on_clear_draw_box():
-        """Cancel an in-progress box draw without committing it."""
+        """Cancel any active Draw Box widget, clear the zoom indicator, and undo focus."""
         if bool(state.draw_box_active):
             try:
                 scene.plotter.clear_box_widgets()
@@ -2843,12 +2872,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
             _detach_box_cam_observer()
             _draw_box_widget[0] = None
             state.draw_box_active = False
-            state.flush()
-            _push()
+        scene.camera._clear_indicator()
+        scene.clear_focus()
+        state.focus_active = False
+        state.flush()
+        _sync_fof_layer()
+        _push()
 
     @ctrl.set("reset_camera")
     def on_reset():
         _clear_draw_widgets()
+        scene.camera._clear_indicator()
         regions = [(0.0, 0.0, 0.0, scene.primary.box_size)]
         for name in scene._adjacent_order:
             m = scene._models.get(name)
@@ -4147,8 +4181,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         density="compact",
                         prepend_icon="mdi-close-circle-outline",
                         click=ctrl.clear_draw_sphere,
-                        title="Cancel the active Draw Sphere widget",
-                        v_show=("draw_sphere_active",),
+                        title="Clear sphere widget, zoom indicator and focus region",
+                        v_show=("draw_sphere_active || focus_active",),
                     )
 
             # Box
@@ -4216,8 +4250,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         density="compact",
                         prepend_icon="mdi-close-circle-outline",
                         click=ctrl.clear_draw_box,
-                        title="Cancel the active Draw Box widget",
-                        v_show=("draw_box_active",),
+                        title="Clear box widget, zoom indicator and focus region",
+                        v_show=("draw_box_active || focus_active",),
                     )
 
             # ── CONSOLE tab — multi-session REPL ────────────────────

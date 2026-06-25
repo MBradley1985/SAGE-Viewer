@@ -6,7 +6,50 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.1.2] — dev (unreleased)
+## [1.2.0] — dev (unreleased)
+
+### Changed
+
+#### Pop-outs (terminal + library) resize freely, with a fullscreen toggle
+
+The floating pop-out cards (console / terminal pop-out and library media items) could only
+be shrunk, and growth was capped by `max-width` / `max-height` limits — the terminal hit a
+~60% width wall and library cards couldn't widen past 540px or grow their media past `60vh`.
+
+- **Removed the size caps.** Both card types are now `resize:both` with only small
+  `min-width` / `min-height` floors, so they can be dragged to any size up to the viewport.
+- **Library cards are flex columns** whose media (`<img>` / `<video>`) scales with
+  `object-fit:contain` to fill the resized card, vertically as well as horizontally.
+- **New fullscreen button** (`mdi-fullscreen`, beside the close button on each pop-out)
+  toggles a `sage-popout-max` class that pins the card to fill the VTK render area; the glyph
+  flips to `mdi-fullscreen-exit` and clicking again restores the previous size / position.
+  Handled client-side in `sage_viewer.js` with the CSS in `sage_theme.css`.
+- **Galaxy / Group info panels stay fixed-size but no longer squish in recordings.** The
+  recording compositor (`_draw_info_panel`) drew labels left-aligned and values right-aligned
+  at a fixed width, so long rows collided. It now measures each row and sizes the card to the
+  widest `label + gap + value`, capped to the frame, so every field stays legible.
+- **Static assets are cache-busted** (`?v=<mtime>` on `sage_viewer.js` / `sage_theme.css`)
+  so client-side changes take effect on server restart instead of replaying a stale cached
+  copy — this is why the fullscreen toggle initially appeared to do nothing.
+
+#### Switching models now carries over the current view settings
+
+Previously, switching the primary model (Models menu) reset the new model to its defaults:
+snapshot jumped to z=0 and all filters, structure / colour modes, colormaps, opacities and
+layer visibility reverted to factory values.  Now the full UI state transfers to the model
+you switch to, and the settings apply to that model:
+
+- **Filters, structure, colour modes, colormaps, opacities, layer visibility** are captured
+  from the outgoing model and re-applied to the new one via the existing per-box profile
+  machinery (`save_profile` / `load_profile`), with `state.dirty(*BOX_PROFILE_KEYS)` forcing
+  every change handler to re-run against the new primary's layers.
+- **Redshift (not raw snapshot index) is preserved.**  The outgoing model's current redshift
+  is mapped onto the new model's snapshot list via `SnapshotTable.z_to_snap()` (closest
+  match, clamped to range).  Models that share a snapshot list land on the identical snap;
+  models with different lists (e.g. miniMillennium 64 snaps ↔ microUchuu 50 snaps) land on
+  the snapshot closest in cosmic time rather than the same slider position.
+- The new model's stored side-by-side profile (`_profiles[name]`) is updated to the carried
+  state so a later Side-by-Side activation restores the same view.
 
 ### Fixed
 
@@ -132,6 +175,59 @@ which returns `NaN`, causing `fit()` to bail silently.
   (`sage-wiz-pty`) must always sit in a CSS context that resolves its height to an explicit
   pixel value — grid `1fr`, absolute with known `top`/`bottom`, or an explicit `height:`.
   Do not use `flex:1;min-height:0` as the sole height source for an xterm.js container.
+
+#### Recording — finalization silently abandoned after stop
+
+Stopping a recording produced a frames folder full of images but no output file (GIF / MOV /
+PNG sequence).  Root cause: the finalization daemon thread (`_do_finalize`) had no top-level
+exception handler.  Any error inside `_finalize_movie` — including the completely unguarded
+`_expand_with_crossfade` call that expands playback snap files into the crossfaded frame
+sequence — would kill the thread silently, leaving `state.last_movie` stuck at `"Encoding…"`
+and the frames folder on disk with no assembled output.
+
+Fix: wrapped the `_finalize_movie` call in `_do_finalize` with a `try/except` so any
+failure is reported in the Record tab's "Last:" label.  Also wrapped the
+`_expand_with_crossfade` call inside `_finalize_movie` with its own `try/except` so errors
+from that stage surface as a readable error string rather than an uncaught exception.
+
+#### Coords / Box tabs — Clear button now clears indicator and undoes focus
+
+The **Clear** button in the Coords and Box tabs previously only appeared while a Draw Sphere
+or Draw Box widget was actively being placed, and only removed the interactive handles — it
+did not clear the grey wireframe indicator left by the Zoom operation, and did not undo the
+focus region.
+
+Fix:
+- `on_clear_draw_sphere` / `on_clear_draw_box` now also call
+  `scene.camera._clear_indicator()`, `scene.clear_focus()`, `state.focus_active = False`,
+  and `_sync_fof_layer()`, fully reversing a Zoom + Focus action in one click.
+- The Clear button visibility condition changed from `draw_sphere_active` /
+  `draw_box_active` to `draw_sphere_active || focus_active` (and equivalent for box), so the
+  button appears as soon as a zoom is committed — not only during active drawing.
+
+#### Coords / Box — Reset Camera left zoom indicator wireframe on screen
+
+Pressing **Reset Camera** after zooming to a sphere or box region left the grey wireframe
+indicator actor on screen.  Root cause: `on_reset` called `_clear_draw_widgets()` (which
+removes the interactive cyan draw handles) but never called
+`scene.camera._clear_indicator()`, which is the separate actor placed by `zoom_to_radius()`
+/ `zoom_to_box()`.  Fix: one `scene.camera._clear_indicator()` call added to `on_reset`
+immediately after `_clear_draw_widgets()`.
+
+#### Library — GIF animations started mid-way instead of from frame 0
+
+Opening a GIF in the Library viewer showed the animation already several frames in rather
+than starting from the beginning.  Root cause: the browser starts decoding and playing a GIF
+as soon as the `<img>` src attribute is set, but the Vue render cycle and DOM compositing
+(backdrop-filter, elevation shadow) mean the card is not visible to the user until 1–2
+animation frames later.  For a 10 fps GIF, one frame is 100 ms — already past the start.
+
+Fix: added a `MutationObserver` in `sage_viewer.js` that watches for new `<img>` elements
+inside `.sage-popout` cards.  When a GIF `<img>` is detected, the observer waits two
+`requestAnimationFrame` callbacks (allowing the card to be painted), then synchronously
+resets `img.src = ''` followed by `img.src = originalSrc` in the same JavaScript event.
+Both assignments are synchronous so no blank frame is visible; the GIF animation restarts
+from frame 0 exactly when the card becomes visible to the user.
 
 ---
 

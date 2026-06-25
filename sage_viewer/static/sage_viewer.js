@@ -97,6 +97,26 @@
     document.addEventListener('mouseup',   up);
   });
 
+  // ─── Pop-out maximise / restore ───────────────────────────────────
+  // Click on a `.sage-popout-max-btn` toggles the `sage-popout-max`
+  // class on the nearest `.sage-popout`, which (via sage_theme.css)
+  // pins the card to fill the VTK render area. The button glyph flips
+  // between the fullscreen / fullscreen-exit icons to match.
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('.sage-popout-max-btn');
+    if (!btn) return;
+    var card = btn.closest('.sage-popout');
+    if (!card) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var maxed = card.classList.toggle('sage-popout-max');
+    var icon = btn.querySelector('.mdi');
+    if (icon) {
+      icon.classList.toggle('mdi-fullscreen', !maxed);
+      icon.classList.toggle('mdi-fullscreen-exit', maxed);
+    }
+  }, true);  // capture phase — beat Vuetify's own click handling
+
   // ─── Enter-to-click ───────────────────────────────────────────────
   // Any <input> / <textarea> whose ancestor declares
   // `data-enter-click="<button-id>"` will, on Enter, trigger a click
@@ -569,5 +589,33 @@
     window.__sageXterms    = _xterms;
     window.__sageXtermsOut = _xtermsOut;
   })();
+
+  // ─── GIF animation restart ────────────────────────────────────────────
+  // The browser starts playing a GIF as soon as the <img> src is set, but
+  // the card may not be visible yet (Vue render cycle + compositing delay).
+  // When a new GIF <img> appears inside a .sage-popout card, wait two
+  // animation frames (card is now painted) then reset the src so the
+  // animation restarts from frame 0. Both assignments are synchronous so
+  // no blank frame is visible between them.
+  (new MutationObserver(function (mutations) {
+    mutations.forEach(function (m) {
+      m.addedNodes.forEach(function (node) {
+        if (node.nodeType !== 1) return;
+        var imgs = node.tagName === 'IMG' ? [node] : node.querySelectorAll('img');
+        imgs.forEach(function (img) {
+          if (!img.src || img.src.indexOf('data:image/gif') !== 0) return;
+          // Only reset if this img is inside a library pop-out card.
+          if (!img.closest || !img.closest('.sage-popout')) return;
+          var src = img.src;
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              img.src = '';
+              img.src = src;
+            });
+          });
+        });
+      });
+    });
+  })).observe(document.body, { childList: true, subtree: true });
 
 })();
