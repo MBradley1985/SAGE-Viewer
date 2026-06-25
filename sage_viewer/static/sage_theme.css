@@ -21,3 +21,21 @@ body,
     background-color: #000000 !important;
     box-shadow: none !important;
 }
+
+/* Maximised pop-out (terminal / library card) — fills the VTK render
+   area. Toggled by sage_viewer.js when the fullscreen button is hit.
+   !important overrides the inline left/top/width/height the card
+   carries from its initial placement and any user drag/resize. */
+.sage-popout.sage-popout-max {
+    inset: 0 !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    resize: none !important;
+    border-radius: 0 !important;
+}
