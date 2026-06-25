@@ -634,6 +634,13 @@
   // but never its children, so KaTeX's DOM writes can't corrupt Vue's vDOM.
   (function () {
     function makeItem(it) {
+      // Image overlays (logos etc.) carry a src instead of text/latex.
+      if (it.src != null) {
+        var img = document.createElement('img');
+        img.src = it.src;
+        img.style.cssText = it.style || '';
+        return img;
+      }
       var d = document.createElement('div');
       d.style.cssText = it.style || '';
       if (it.latex != null && window.katex) {

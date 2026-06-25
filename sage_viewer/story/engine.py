@@ -75,6 +75,24 @@ def _normalize_overlay(item: dict) -> dict:
     Other items carry plain ``text``.
     """
     kind = item.get("kind", "text")
+    anchor = item.get("anchor", "top-left")
+    x = float(item.get("x", 6.0))
+    y = float(item.get("y", 6.0))
+
+    # Image overlays (e.g. logos) carry a src + sizing, not text/font props.
+    if kind == "image":
+        w = item.get("width", 140)
+        width_css = w if isinstance(w, str) else f"{float(w):g}px"
+        style = (
+            _overlay_position_style(anchor, x, y)
+            + f"width:{width_css};height:auto;"
+            + f"opacity:{float(item.get('opacity', 1.0))};"
+            + "pointer-events:none;"
+            + "filter:drop-shadow(0 2px 8px rgba(0,0,0,0.8));"
+        )
+        return {"id": str(item.get("id", "")), "style": style,
+                "src": item.get("src", "")}
+
     base = _OVERLAY_DEFAULTS.get(kind, _OVERLAY_DEFAULTS["text"])
 
     size = float(item.get("size", base["size"]))
@@ -82,9 +100,6 @@ def _normalize_overlay(item: dict) -> dict:
     weight = int(item.get("weight", base["weight"]))
     italic = bool(item.get("italic", base["italic"]))
     align = item.get("align", "left")
-    anchor = item.get("anchor", "top-left")
-    x = float(item.get("x", 6.0))
-    y = float(item.get("y", 6.0))
 
     style = (
         _overlay_position_style(anchor, x, y)

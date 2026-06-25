@@ -190,22 +190,22 @@ def build_story_overlays(server) -> None:
 
 
 def build_story_hud(server) -> None:
-    """Bottom-centre playback overlay, shown while a story is active."""
+    """Compact playback overlay pinned to the lower-right, shown while active."""
     ctrl = server.controller
     with html.Div(
         v_show=("story_active",),
-        # Centre within the visible area (right edge tracks the panel).
+        # Compact card in the lower-right corner (right edge tracks the panel).
         style=(
-            "'position:absolute;bottom:18px;left:0;z-index:50;"
-            "width:min(720px,90vw);margin-left:auto;margin-right:auto;"
-            "border-radius:6px;padding:12px 16px;"
+            "'position:absolute;bottom:18px;z-index:50;"
+            "width:min(320px,90vw);"
+            "border-radius:6px;padding:8px 12px;"
             + _HUD_BG
-            + "right:' + (panels_hidden ? '0px' : '300px')",
+            + "right:' + (panels_hidden ? '16px' : '316px')",
         ),
     ):
         # Header: progress + scene title.
         with html.Div(
-            style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"
+            style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"
         ):
             v3.VChip(
                 "{{ story_scene_index }} / {{ story_scene_count }}",
@@ -215,25 +215,21 @@ def build_story_hud(server) -> None:
             )
             html.Span(
                 "{{ story_scene_title }}",
-                style="font-weight:700;font-size:1.05rem;color:#fff;",
-            )
-            v3.VSpacer()
-            html.Span(
-                "{{ story_title }}",
-                style="font-size:0.8rem;color:#94a3b8;",
+                style="font-weight:700;font-size:0.92rem;color:#fff;"
+                "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;",
             )
         # Caption.
         html.Div(
             "{{ story_scene_caption }}",
             v_show=("story_scene_caption",),
             style=(
-                "white-space:pre-wrap;font-size:0.95rem;line-height:1.4;"
-                "color:#cbd5e1;margin-bottom:10px;max-height:30vh;overflow:auto;"
+                "white-space:pre-wrap;font-size:0.82rem;line-height:1.35;"
+                "color:#cbd5e1;margin-bottom:8px;max-height:24vh;overflow:auto;"
             ),
         )
         # Transport row.
         with html.Div(
-            style="display:flex;align-items:center;justify-content:center;gap:6px;"
+            style="display:flex;align-items:center;justify-content:center;gap:4px;"
         ):
             v3.VBtn(
                 icon="mdi-skip-previous",

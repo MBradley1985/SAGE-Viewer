@@ -110,6 +110,23 @@ def test_normalize_overlay_equation_and_citation():
     assert "bottom:" in cite["style"] and "right:" in cite["style"]
 
 
+def test_normalize_overlay_image():
+    from sage_viewer.story.engine import _normalize_overlay
+
+    img = _normalize_overlay(
+        {"kind": "image", "src": "/sage_static/SAGElogo.jpg",
+         "anchor": "bottom-left", "width": 160}
+    )
+    assert img["src"] == "/sage_static/SAGElogo.jpg"
+    assert "text" not in img and "latex" not in img  # image carries no text
+    assert "width:160px" in img["style"]
+    assert "bottom:" in img["style"] and "left:" in img["style"]
+
+    # width passes through as a CSS string when given as one.
+    css = _normalize_overlay({"kind": "image", "src": "x", "width": "12vw"})
+    assert "width:12vw" in css["style"]
+
+
 def test_resolve_snap_symbolic():
     from sage_viewer.story.engine import resolve_snap
 
