@@ -53,6 +53,13 @@ you switch to, and the settings apply to that model:
 
 ### Fixed
 
+#### Terminal pop-out re-fits when resized
+
+Resizing (or maximising) the console terminal pop-out grew the card but left the
+xterm at its original size, so the terminal filled only part of the window. The
+pop-out now attaches a `ResizeObserver` that calls the xterm `FitAddon` on every
+resize (mirroring the wizard terminal), so the terminal always fills the card.
+
 #### Recording — playback smoothness (root-cause investigation, two-session fix)
 
 This section documents a chain of bugs that were introduced and resolved over two sessions.
