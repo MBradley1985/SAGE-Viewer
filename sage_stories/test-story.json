@@ -1,0 +1,472 @@
+{
+  "schema_version": 1,
+  "title": "Test story",
+  "author": "",
+  "description": "",
+  "theme": "dos_blue",
+  "requirements": {
+    "model": "millennium",
+    "snapshots": [
+      63
+    ]
+  },
+  "scenes": [
+    {
+      "id": "scene-1",
+      "title": "Scene 1",
+      "caption": "Testing a few things",
+      "snap_num": 63,
+      "camera": {
+        "position": [
+          31.25,
+          31.25,
+          417.79478871748597
+        ],
+        "focal_point": [
+          31.25,
+          31.25,
+          31.25
+        ],
+        "up": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": true,
+        "halo_opacity": 0.12,
+        "halo_color_mode": "mvir",
+        "halo_colormap": "viridis",
+        "galaxy_colormap": "plasma",
+        "galaxy_color_mode": "structure",
+        "galaxy_opacity": 1.0,
+        "fof_links_on": false,
+        "filter_halo_mvir": [
+          10.0,
+          15.0
+        ],
+        "filter_halo_rvir": [
+          0.0,
+          3.0
+        ],
+        "filter_halo_vvir": [
+          0.0,
+          1000.0
+        ],
+        "filter_halo_len": [
+          0,
+          10000
+        ],
+        "filter_halo_vmax": [
+          0.0,
+          1000.0
+        ],
+        "filter_halo_conc": [
+          0.0,
+          50.0
+        ],
+        "filter_halo_spin": [
+          0.0,
+          0.2
+        ],
+        "filter_gal_smass": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_sfr": [
+          -6.0,
+          5.0
+        ],
+        "filter_gal_ssfr": [
+          -14.0,
+          0.0
+        ],
+        "filter_gal_coldgas": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_bulge": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_bt": [
+          0.0,
+          1.0
+        ],
+        "filter_gal_bhmass": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_ics": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_h2": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_cgmgas": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_hotgas": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_h1gas": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_ejected": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_outflow": [
+          -6.0,
+          5.0
+        ],
+        "filter_gal_massload": [
+          -3.0,
+          5.0
+        ],
+        "filter_gal_cooling": [
+          -7.0,
+          7.0
+        ],
+        "filter_gal_heating": [
+          -7.0,
+          7.0
+        ],
+        "filter_gal_diskrad": [
+          -4.0,
+          1.0
+        ],
+        "filter_gal_bulgerad": [
+          -4.0,
+          1.0
+        ],
+        "filter_gal_mb_mass": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_mb_rad": [
+          -4.0,
+          1.0
+        ],
+        "filter_gal_ib_mass": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_ib_rad": [
+          -4.0,
+          1.0
+        ],
+        "filter_gal_sfr_bulge": [
+          -6.0,
+          5.0
+        ],
+        "filter_gal_sfr_disk": [
+          -6.0,
+          5.0
+        ],
+        "filter_gal_sfr_blg_z": [
+          -6.0,
+          1.0
+        ],
+        "filter_gal_sfr_dsk_z": [
+          -6.0,
+          1.0
+        ],
+        "filter_gal_met_cg": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_met_sm": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_met_bm": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_met_hg": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_met_em": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_met_ics": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_met_cgm": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_age": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_type": "both",
+        "filter_gal_ffb": "any",
+        "filter_gal_cgm": "any",
+        "env_show_cluster": true,
+        "env_show_field": true,
+        "env_show_group": true,
+        "env_show_isolated": true,
+        "env_show_pairs": true
+      },
+      "focus": {
+        "kind": "none"
+      },
+      "transition": {
+        "duration_secs": 4.0,
+        "easing": "smoothstep"
+      },
+      "dwell_secs": 6.0,
+      "motion": {
+        "kind": "still"
+      },
+      "chrome": {
+        "hide_panel": true
+      },
+      "models": {
+        "primary": "millennium"
+      }
+    },
+    {
+      "id": "scene-2",
+      "title": "Scene 2",
+      "caption": "",
+      "snap_num": 63,
+      "camera": {
+        "position": [
+          71.875,
+          31.25,
+          275.625
+        ],
+        "focal_point": [
+          71.875,
+          31.25,
+          31.25
+        ],
+        "up": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": true,
+        "halo_opacity": 0.12,
+        "halo_color_mode": "mvir",
+        "halo_colormap": "viridis",
+        "galaxy_colormap": "plasma",
+        "galaxy_color_mode": "structure",
+        "galaxy_opacity": 1.0,
+        "fof_links_on": false,
+        "filter_halo_mvir": [
+          10.0,
+          15.0
+        ],
+        "filter_halo_rvir": [
+          0.0,
+          3.0
+        ],
+        "filter_halo_vvir": [
+          0.0,
+          1000.0
+        ],
+        "filter_halo_len": [
+          0,
+          10000
+        ],
+        "filter_halo_vmax": [
+          0.0,
+          1000.0
+        ],
+        "filter_halo_conc": [
+          0.0,
+          50.0
+        ],
+        "filter_halo_spin": [
+          0.0,
+          0.2
+        ],
+        "filter_gal_smass": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_sfr": [
+          -6.0,
+          5.0
+        ],
+        "filter_gal_ssfr": [
+          -14.0,
+          0.0
+        ],
+        "filter_gal_coldgas": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_bulge": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_bt": [
+          0.0,
+          1.0
+        ],
+        "filter_gal_bhmass": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_ics": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_h2": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_cgmgas": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_hotgas": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_h1gas": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_ejected": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_outflow": [
+          -6.0,
+          5.0
+        ],
+        "filter_gal_massload": [
+          -3.0,
+          5.0
+        ],
+        "filter_gal_cooling": [
+          -7.0,
+          7.0
+        ],
+        "filter_gal_heating": [
+          -7.0,
+          7.0
+        ],
+        "filter_gal_diskrad": [
+          -4.0,
+          1.0
+        ],
+        "filter_gal_bulgerad": [
+          -4.0,
+          1.0
+        ],
+        "filter_gal_mb_mass": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_mb_rad": [
+          -4.0,
+          1.0
+        ],
+        "filter_gal_ib_mass": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_ib_rad": [
+          -4.0,
+          1.0
+        ],
+        "filter_gal_sfr_bulge": [
+          -6.0,
+          5.0
+        ],
+        "filter_gal_sfr_disk": [
+          -6.0,
+          5.0
+        ],
+        "filter_gal_sfr_blg_z": [
+          -6.0,
+          1.0
+        ],
+        "filter_gal_sfr_dsk_z": [
+          -6.0,
+          1.0
+        ],
+        "filter_gal_met_cg": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_met_sm": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_met_bm": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_met_hg": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_met_em": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_met_ics": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_met_cgm": [
+          -2.0,
+          12.0
+        ],
+        "filter_gal_age": [
+          0.0,
+          14.0
+        ],
+        "filter_gal_type": "both",
+        "filter_gal_ffb": "any",
+        "filter_gal_cgm": "any",
+        "env_show_cluster": true,
+        "env_show_field": true,
+        "env_show_group": true,
+        "env_show_isolated": true,
+        "env_show_pairs": true
+      },
+      "focus": {
+        "kind": "none"
+      },
+      "transition": {
+        "duration_secs": 4.0,
+        "easing": "smoothstep"
+      },
+      "dwell_secs": 6.0,
+      "motion": {
+        "kind": "still"
+      },
+      "chrome": {
+        "hide_panel": true
+      },
+      "models": {
+        "primary": "millennium",
+        "adjacent": [
+          "millennium_vanilla"
+        ]
+      }
+    }
+  ]
+}
