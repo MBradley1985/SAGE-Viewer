@@ -314,9 +314,52 @@ take-control/pause/play never interfere with it. Driven by the
 shared `scene/camera_motion.py` helpers (the same ones the toolbar fly-through
 uses), so **`toolbar.py` is not edited**. Optional tunables (defaults):
 `approach_secs` 8, `fly_secs` 7, `group_radius` 15, `cluster_radius` 30,
-`group_dps` 10, `cluster_dps` 8. (`engine._motion_flythrough` /
+`group_dps` 10, `cluster_dps` 8, `spin_degrees` 180 (orbit arc per target).
+(`engine._motion_flythrough` /
 `_flythrough_targets`.) Lives in the engine, so it applies to **every** flythrough
-scene (title slide, `galaxies-vanilla`/`galaxies-millennium`, `cosmic-noon-flythrough`).
+scene (title slide, `galaxies-vanilla`, `cosmic-noon-flythrough`).
+
+**Style:** `{"kind":"flythrough","style":"normal"}` runs the **normal-mode (toolbar)
+fly-through** instead of the story tour — approach → most-massive group → all clusters
+(focus+spin) → return → **continuous gentle box orbit forever**. Calm; used as the
+**scene-selector background** (`scene-menu`, millennium box behind the grid).
+(`engine._motion_flythrough_normal`, mirrors `toolbar._flythrough_loop`; `toolbar.py`
+untouched.) Default `style:"story"` is the cluster/group tour described above.
+
+**Target kind:** `{"kind":"flythrough","targets":"ffb"}` tours **FFB-regime galaxies**
+(`ffb_regime != 0`, most-massive stellar mass first) instead of halo groups/clusters —
+same fly-in → focus → rotate → next cycle. Tunables `galaxy_radius` (6) / `galaxy_dps`
+(14). Default `targets:"halos"` is the groups/clusters tour.
+(`engine._ffb_galaxy_targets`; used by `cosmic-dawn-flythrough` at z=10.)
+
+**Snapshot rewind pre-step (pre-rendered, played back smoothly):**
+`{"kind":"flythrough","rewind_to":"z=1.5","rewind_fps":30}` — on a fresh start the box
+is staged at the scene's `snap_num` (e.g. `"z=0"`), then evolved to `rewind_to` before
+the tour. To get **smooth, high-res playback** that isn't capped by live remote-render
+throughput, each snapshot in the range is rendered **once off-screen** into a cached JPEG
+(quality 100), then the sequence is **played back at `rewind_fps`** through the existing
+playback overlay (`playback_active`/`playback_frame`).
+
+- **Rendered up front, during loading:** `_enter_async` hides the panel, preloads
+  ("Loading galaxies…"), then calls `_prerender_motions` to pre-render **every**
+  pre-renderable motion **before** the Title slide opens (shows a "Pre-rendering
+  z-evolution…" chip) — so reaching those scenes plays back instantly with no mid-show
+  pause, and nothing churns on the title (`show_overlay=False`, off-screen capture,
+  `playback_active` cleared before `apply_scene(0)`). It renders at the **in-show window
+  size** (panel hidden up front), and the rewind live hand-off renders the final snapshot
+  with the same box camera **before** dropping the overlay, so recording→live is
+  **seamless** (same camera, snapshot, size, quality).
+- Frames cached per (scene, model, range) in `_rewind_cache` (cleared on Exit). A cache
+  miss falls back to rendering behind the overlay on first visit. A pause mid-rewind
+  drops the overlay.
+- Targets are computed **after** the rewind (so they match the final snapshot).
+  `rewind_fps` default 4. Playback **displays at ≤30 fps** (above that the per-frame
+  state stream coalesces and you get a flash from first→last frame), and any higher
+  `rewind_fps` is honoured as a **frame-skip speed**: `display = min(fps, 30)`,
+  `step = round(fps/display)`. So 30 → 30 fps × 1 (1×), 60 → 30 fps × 2 (2×), 120 →
+  30 fps × 4. Used by `cosmic-noon-flythrough` z=0→z=1.5 @ 30 (1×) and
+  `cosmic-dawn-flythrough` z=0→z=10 @ 60 (2×).
+  (`engine._ensure_rewind_frames` / `_flythrough_rewind` / `_prerender_rewinds`.)
 
 ### Overlay kind: `image` (logos / wordmarks)
 `{ "kind":"image", "src":"/sage_static/<file>", "anchor":"bottom-left", "x":0,
@@ -371,6 +414,17 @@ fires, so the scene holds until the user steps on. A pause/resume continues the
 sweep **in place** — the per-scene frame index `_sweep_k` is checkpointed before
 each frame await — instead of restarting from the first snapshot.
 (`engine._motion_snapshot_sweep`.)
+
+### Motion `snapshot_sweep` → `prerender`
+`{"kind":"snapshot_sweep", … ,"prerender":true}` plays the sweep from **cached,
+pre-rendered frames** (smooth, decoupled from live remote-render rate) instead of
+live. Frames (one per snapshot in `[from, to]`) are rendered up front during the
+load by `_prerender_motions` (same path/cache as the fly-through rewind); playback
+loops them through the playback overlay at ≤30 fps display, honouring higher `fps`
+as a frame-skip speed. **Single box only** — a pre-rendered image can't step
+adjacent boxes independently, so it falls back to the live sweep when side-by-side
+boxes are shown. Used by `sims-sweep` (slide 3). (`engine._sweep_playback` /
+`_sweep_order` / `_capture_snapshot_sequence`.)
 
 ### Overlay kind: `scene_menu` (clickable scene selector + thumbnails)
 `{ "kind":"scene_menu", "title":"Jump to a scene", "cols":4, "max_width":88,

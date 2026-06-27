@@ -296,8 +296,8 @@ Cross-time object tracking is therefore out of scope for the MVP.
 |---|---|---|
 | `still` | — | hold the captured pose for `dwell_secs` |
 | `orbit` | `radius`, `dps`, `degrees`, `axis?` | spin around the `target` / `focus` centre — reuses the fly-through `_orbit_around` helper |
-| `snapshot_sweep` | `from`, `to`, `fps?`, `loop?` | step `snap_num` across cosmic time while holding/orbiting the camera — reuses the preloaded cache |
-| `flythrough` | `approach_secs?`, `fly_secs?`, `group_radius?`, `cluster_radius?`, `group_dps?`, `cluster_dps?` | reset camera → fly into box centre → tour clusters→groups (fly in → focus → orbit → next) until Next; no settling box orbit. Full sequence replays each time the scene is staged (scene/model switch, re-entry); only pause→play continues in place |
+| `snapshot_sweep` | `from`, `to`, `fps?`, `loop?`, `prerender?` | step `snap_num` across cosmic time while holding/orbiting the camera — reuses the preloaded cache. `prerender:true` plays cached pre-rendered frames (smooth, ≤30 fps display + frame-skip speed; single box only) |
+| `flythrough` | `style?` (`"story"`/`"normal"`), `approach_secs?`, `fly_secs?`, `group_radius?`, `cluster_radius?`, `group_dps?`, `cluster_dps?`, `spin_degrees?` (default 180), `targets?` (`"halos"`/`"ffb"`), `galaxy_radius?`, `galaxy_dps?`, `rewind_to?`, `rewind_fps?` | **`style:"story"` (default):** reset camera → fly into box centre → tour targets (fly in → focus → orbit `spin_degrees` → unfocus → next) until Next; no settling box orbit. `targets:"halos"` = clusters→groups; `targets:"ffb"` = FFB galaxies. `rewind_to` first steps the box's snapshot from `snap_num` to that redshift before touring. **`style:"normal"`:** the normal-mode (toolbar) fly-through — approach → group → clusters (focus+spin) → return → continuous gentle box orbit forever (calm background, e.g. the scene selector). Full sequence replays each staging; pause→play continues in place |
 
 `snapshot_sweep` is the headline capability for the MCR (e.g. "watch this halo
 assemble from z = 6 to z = 0"). Every snapshot in `[from, to]` must be declared

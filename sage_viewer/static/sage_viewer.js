@@ -76,6 +76,10 @@
   document.addEventListener('mousedown', function (e) {
     var handle = e.target.closest && e.target.closest('.sage-popout-handle');
     if (!handle) return;
+    // Don't start a drag when the press lands on a button in the title bar
+    // (the ✕ close / maximize). Otherwise re-anchoring the card on mousedown
+    // resizes it and swallows the first click, so closing took two clicks.
+    if (e.target.closest('button, .v-btn')) return;
     var card = handle.closest('.sage-popout');
     if (!card) return;
     e.preventDefault();

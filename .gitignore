@@ -71,6 +71,7 @@ sage_library/
 !docs/images/*.jpeg
 !docs/images/*.gif
 !sage_viewer/static/*.jpg
+!sage_viewer/static/*.jpeg
 !sage_viewer/static/*.png
 # Bundled Story Mode example stories (package data — must be committed)
 !sage_viewer/examples/*.json

@@ -70,11 +70,13 @@
       "focus": { "kind": "none" },
       "chrome": { "hide_panel": true },
       "overlays": [
-        { "kind": "heading", "text": "Simulations", "anchor": "top", "y": 6, "align": "center", "size": 3.0 }
+        { "kind": "heading", "text": "Simulations", "anchor": "top", "y": 6, "align": "center", "size": 3.0 },
+        { "kind": "image", "src": "/sage_static/Uchuu.jpeg", "anchor": "left", "x": "24px", "width": 420 },
+        { "kind": "image", "src": "/sage_static/Millennium.jpg", "anchor": "right", "x": "24px", "width": 420 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0,
-      "motion": { "kind": "snapshot_sweep", "from": "first", "to": "last", "fps": 4.5, "loop": true }
+      "motion": { "kind": "snapshot_sweep", "from": "first", "to": "last", "fps": 4.5, "loop": true, "prerender": true }
     },
     {
       "id": "sims-tng-video",
@@ -93,6 +95,8 @@
       "overlays": [
         { "kind": "heading", "text": "Simulations", "anchor": "top", "y": 6, "align": "center", "size": 3.0 },
         { "kind": "video", "src": "/sage_static/tng50_single_galaxy_formation_g1_1080p_clean_gas_stars.mp4", "anchor": "center", "x": 0, "y": 4, "width": "55vw", "loop": true, "autoplay": true, "muted": true, "controls": true },
+        { "kind": "image", "src": "/sage_static/fire-logo.png", "anchor": "left", "x": "24px", "width": 340 },
+        { "kind": "image", "src": "/sage_static/TNG.jpeg", "anchor": "right", "x": "24px", "width": 380 },
         { "kind": "citation", "text": "TNG50 (IllustrisTNG)", "anchor": "bottom-right", "x": 3, "y": 3 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
@@ -114,7 +118,10 @@
       "focus": { "kind": "none" },
       "chrome": { "hide_panel": true },
       "overlays": [
-        { "kind": "heading", "text": "Semi Analytic Galaxy Evolution (SAGE)", "anchor": "top", "y": 6, "align": "center", "size": 3.0 }
+        { "kind": "heading", "text": "Semi-Analytic Models (SAMs)", "anchor": "top", "y": 6, "align": "center", "size": 3.0 },
+        { "kind": "image", "src": "/sage_static/SHARK-logo.jpeg", "anchor": "right", "x": "24px", "width": 340 },
+        { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "top-left", "x": 4, "y": 8, "width": 280 },
+        { "kind": "image", "src": "/sage_static/LogoLight.png", "anchor": "top-left", "x": 4, "y": 58, "width": 280 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0,
@@ -183,7 +190,7 @@
       "id": "cosmic-noon-flythrough",
       "title": "",
       "caption": "",
-      "snap_num": "z=1.5",
+      "snap_num": "z=0",
       "camera": "box",
       "models": { "primary": "millennium", "adjacent": [] },
       "state": {
@@ -196,7 +203,7 @@
       "overlays": [],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0,
-      "motion": { "kind": "flythrough" }
+      "motion": { "kind": "flythrough", "rewind_to": "z=1.5", "rewind_fps": 30.0 }
     },
     {
       "id": "card-cosmic-dawn",
@@ -219,24 +226,44 @@
       "dwell_secs": 6.0
     },
     {
+      "id": "cosmic-dawn-flythrough",
+      "title": "",
+      "caption": "",
+      "snap_num": "z=0",
+      "camera": "box",
+      "models": { "primary": "millennium", "adjacent": [] },
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": true,
+        "galaxy_color_mode": "structure"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "overlays": [],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0,
+      "motion": { "kind": "flythrough", "targets": "ffb", "rewind_to": "z=10", "rewind_fps": 60.0 }
+    },
+    {
       "id": "scene-menu",
       "title": "",
       "caption": "",
       "snap_num": "last",
       "camera": "box",
-      "models": { "adjacent": [] },
+      "models": { "primary": "millennium", "adjacent": [] },
       "state": {
-        "halos_visible": false,
-        "galaxies_visible": false
+        "halos_visible": true,
+        "galaxies_visible": true,
+        "galaxy_color_mode": "structure"
       },
       "focus": { "kind": "none" },
       "chrome": { "hide_panel": true },
-      "hold": true,
       "overlays": [
         { "kind": "scene_menu", "title": "Jump to a scene", "anchor": "center", "cols": 4, "max_width": 88 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
-      "dwell_secs": 6.0
+      "dwell_secs": 6.0,
+      "motion": { "kind": "flythrough", "style": "normal" }
     }
   ]
 }

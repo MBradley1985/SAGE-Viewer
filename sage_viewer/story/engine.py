@@ -226,6 +226,11 @@ class StoryPlayer:
         # Per-scene snapshot_sweep frame index, so a pause/resume continues the
         # evolution in place instead of restarting from the first snapshot.
         self._sweep_k: dict[int, int] = {}
+        # Cache of pre-rendered snapshot frame sequences (JPEG data-URLs), keyed
+        # by (scene id, model, snapshot order), so a fly-through rewind or a
+        # snapshot_sweep plays back smoothly off cached images and re-visits are
+        # instant. Cleared on exit.
+        self._frame_cache: dict = {}
 
     # ---- small helpers --------------------------------------------------
 
@@ -293,7 +298,19 @@ class StoryPlayer:
 
     async def _enter_async(self, story: Story) -> None:
         try:
+            # Hide the panel for the whole show up front, so the rewind
+            # pre-render captures at the same window size the show uses (the
+            # seamless hand-off depends on matching size).
+            self.state.panels_hidden = True
+            self.state.flush()
             await self._preload_sandbox(story)
+            # Pre-render every pre-renderable motion (fly-through rewinds + any
+            # snapshot_sweep flagged prerender) DURING loading — before the title
+            # opens — so reaching those scenes plays back instantly and
+            # seamlessly, and nothing churns on the title.
+            await self._prerender_motions(story)
+            self.state.playback_active = False  # no overlay when the title opens
+            # The MCR opens at the Title slide.
             await self.apply_scene(0, transition=False)
             # Story-level autoplay: begin playback immediately so a title
             # scene's motion (e.g. a fly-through) runs without a Play click.
@@ -311,6 +328,9 @@ class StoryPlayer:
         self.state.story_active = False
         self.state.story_playing = False
         self.state.story_overlays_json = "[]"
+        # Drop any pre-rendered playback overlay + free the cached frames.
+        self.state.playback_active = False
+        self._frame_cache.clear()
         self.state.flush()
         # Restore the per-box labels that were suppressed on enter.
         if hasattr(self._scene, "set_labels_enabled"):
@@ -382,6 +402,8 @@ class StoryPlayer:
         if self._task is not None and not self._task.done():
             self._task.cancel()
         self.state.panels_hidden = False
+        # Drop the rewind playback overlay if a pause lands mid-rewind.
+        self.state.playback_active = False
         self.state.flush()
         self._push_hud()
 
@@ -440,6 +462,8 @@ class StoryPlayer:
         sc = self._story.scenes[i]
         self._index = i
         self._paused = False
+        # Drop any leftover pre-rendered playback overlay from the prior scene.
+        self.state.playback_active = False
         self._sweep_k.pop(i, None)  # fresh staging → sweep starts from the top
         # Fresh staging restarts the fly-through from the top (reset → centre →
         # clusters → groups); pause/resume keeps these so Play continues in
@@ -833,7 +857,15 @@ class StoryPlayer:
         try:
             from PIL import Image
 
-            arr = self._capture_image()
+            # Capture off-screen — the on-screen/back buffer reads back black on
+            # the remote-view setup (same reason the rewind pre-render does this).
+            rw = self._scene.plotter.ren_win
+            prev_off = rw.GetOffScreenRendering()
+            rw.SetOffScreenRendering(1)
+            try:
+                arr = self._capture_image()
+            finally:
+                rw.SetOffScreenRendering(prev_off)
             if arr is None:
                 return False
             img = Image.fromarray(arr[:, :, :3], "RGB")
@@ -1014,31 +1046,235 @@ class StoryPlayer:
         c_idx = c_idx[np.argsort(masses[c_idx])[::-1]]
         return [h_pos[i] for i in g_idx], [h_pos[i] for i in c_idx]
 
-    async def _motion_flythrough(self, sc, m) -> None:
-        """Cinematic fly-through — the full sequence every time it is staged.
+    def _ffb_galaxy_targets(self):
+        """World positions of FFB-regime galaxies (``ffb_regime != 0``) for the
+        current snapshot, most-massive (stellar mass) first."""
+        scene = self._scene
+        _halos, gals = scene.active_model.loader.get(scene.current_snap)
+        flag = getattr(gals, "ffb_regime", None)
+        pos = getattr(gals, "positions", None)
+        if flag is None or pos is None:
+            return []
+        ffb = np.asarray(flag) != 0
+        if not np.any(ffb):
+            return []
+        idx = np.where(ffb)[0]
+        sm = np.asarray(gals.stellar_mass, dtype=float)[idx]
+        idx = idx[np.argsort(sm)[::-1]]
+        world = np.asarray(pos, dtype=float) + np.asarray(
+            scene.active_model.offset, dtype=float
+        )
+        return [world[i] for i in idx]
 
-        On a **fresh** start (every time a fly-through scene is staged via
-        next/prev/goto/enter, including a model switch): reset the camera, fly
-        into the box centre, then — repeated until Next — one uniform cycle per
-        target (clusters first, then groups, most-massive first): fly **in**
-        (search) → raise a **focus** ring → **orbit** it (rotate) → drop the
-        ring and go to the **next**. There is no settling box orbit at the end.
+    async def _capture_snapshot_sequence(self, sc, lead, order, *, show_overlay):
+        """Render an ordered list of snapshots to a cached JPEG sequence.
 
-        Only a **pause/resume** is exempt: Play after Pause re-enters here for
-        the same scene WITHOUT re-staging, so ``_ft_done`` / ``_ft_idx`` are
-        intact and the tour simply continues in place (the intro is skipped) —
-        so taking control then resuming never interferes with the fly-through.
-        Driven by the shared ``camera_motion`` helpers (the same ones the
-        toolbar uses). Honours ``self._playing``.
+        One frame per entry in ``order`` (snapshot indices), rendered ONCE
+        off-screen at the live render-window size (so cached frames match the
+        in-show view — seamless). Cached per (scene, model, order); a cache hit
+        returns at once. Returns the frame list, or ``None`` if cancelled
+        mid-render. Requires the scene's model + camera staged by the caller and
+        ``self._playing`` True (so ``_warm_sweep`` runs). ``show_overlay`` raises
+        the playback overlay over the live view while rendering.
+        """
+        import base64
+        import io as _io
+
+        from PIL import Image
+
+        scene = self._scene
+        st = self.state
+        key = (sc.id, lead.name, tuple(order))
+        if key in self._frame_cache:
+            return self._frame_cache[key]
+        if not order:
+            self._frame_cache[key] = []
+            return []
+
+        await self._warm_sweep([(lead, min(order), max(order))])
+        frames: list[str] = []
+        rw = scene.plotter.ren_win
+        prev_off = rw.GetOffScreenRendering()
+        rw.SetOffScreenRendering(1)  # read-back needs the off-screen FBO
+        try:
+            for k, s in enumerate(order):
+                if not self._playing:
+                    return None  # cancelled mid-render
+                scene.set_snapshot(int(s))
+                arr = self._capture_image()
+                if arr is None:
+                    continue
+                buf = _io.BytesIO()
+                # Full quality so the hand-off to the live (quality-100) view is
+                # imperceptible.
+                Image.fromarray(arr[:, :, :3], "RGB").save(
+                    buf, "JPEG", quality=100
+                )
+                frames.append(
+                    "data:image/jpeg;base64,"
+                    + base64.b64encode(buf.getvalue()).decode("ascii")
+                )
+                if show_overlay and k == 0:  # cover the live view ASAP
+                    st.playback_frame = frames[0]
+                    st.playback_active = True
+                st.preload_status = (
+                    f"Pre-rendering z-evolution…  {k + 1}/{len(order)}"
+                )
+                st.flush()
+                await asyncio.sleep(0)
+        finally:
+            rw.SetOffScreenRendering(prev_off)
+            st.preload_status = ""
+        self._frame_cache[key] = frames
+        return frames
+
+    async def _ensure_rewind_frames(self, sc, rewind_to, *, show_overlay):
+        """Render the rewind range to a cached JPEG sequence (one per snapshot).
+
+        Returns ``(frames, start, end)`` — ``frames`` is ``None`` if cancelled.
+        Delegates the capture/cache to ``_capture_snapshot_sequence``.
+        """
+        scene = self._scene
+        if scene.active_box_name != scene.primary_name:
+            scene.set_active_box(scene.primary_name)
+        lead = scene.primary
+        start = scene.current_snap
+        end = resolve_snap(rewind_to, lead.snap_count, lead.snap_table)
+        if end == start:
+            return [], start, end
+        step = -1 if end < start else 1
+        order = list(range(start, end + step, step))
+        frames = await self._capture_snapshot_sequence(
+            sc, lead, order, show_overlay=show_overlay
+        )
+        return frames, start, end
+
+    async def _flythrough_rewind(self, sc, rewind_to, fps: float) -> None:
+        """Play the (pre-rendered, cached) snapshot rewind back at ``fps``.
+
+        A fly-through pre-step: the scene is staged at ``snap_num`` (e.g. z=0);
+        this plays the cached image sequence up to ``rewind_to`` (e.g. z=1.5)
+        through the playback overlay — smooth and high-res, decoupled from live
+        remote-render throughput. Frames are normally pre-rendered up front (see
+        ``_prerender_motions``); a cache miss renders them here behind the
+        overlay. The hand-off back to live is seamless: the live view is set to
+        the final snapshot (same box camera) and rendered BEFORE the overlay is
+        dropped, so it matches the last shown frame exactly.
+        """
+        st = self.state
+        scene = self._scene
+        frames, start, end = await self._ensure_rewind_frames(
+            sc, rewind_to, show_overlay=True
+        )
+        if frames is None:  # cancelled during render
+            st.playback_active = False
+            st.flush()
+            return
+        if start == end or not frames:
+            st.playback_active = False
+            st.flush()
+            return
+
+        # Ensure the overlay is up (cache-hit path skips the render above).
+        st.playback_frame = frames[0]
+        st.playback_active = True
+        st.flush()
+
+        # Playback pass — flip the cached frames. The per-frame state stream
+        # can only push so fast; above ~30 fps the client coalesces updates and
+        # you see a "flash" from the first frame to the last. So cap the DISPLAY
+        # rate at 30 fps and honour any higher rewind_fps as a frame-skip
+        # "speed" (e.g. 60 → 30 fps × step 2 = 2× speed, still smooth).
+        display_fps = min(float(fps), 30.0)
+        speed = max(1, int(round(float(fps) / display_fps)))
+        interval = 1.0 / display_fps
+        i = 0
+        n = len(frames)
+        while i < n:
+            if not self._playing:
+                break
+            st.playback_frame = frames[i]
+            st.flush()
+            await asyncio.sleep(interval)
+            i += speed
+
+        # Seamless hand-off: render the LIVE view at the final snapshot (same box
+        # camera as the recording) BEFORE dropping the overlay.
+        scene.set_snapshot(int(end))
+        self._render_push()
+        st.playback_active = False
+        st.flush()
+
+    async def _prerender_motions(self, story) -> None:
+        """Pre-render every pre-renderable motion up front (during load), so
+        reaching those scenes plays back instantly and seamlessly.
+
+        Covers fly-through **rewinds** (``rewind_to``) and **snapshot_sweep**
+        scenes flagged ``"prerender": true``. Stages each scene's
+        model/snapshot/state/camera and fills the frame cache off-screen at the
+        in-show render-window size. Called during the load (after the panel is
+        hidden, before the opening scene is applied); the caller applies the
+        opening scene afterwards.
+        """
+        jobs = []
+        for sc in story.scenes:
+            m = sc.motion or {}
+            kind = m.get("kind")
+            if kind == "flythrough" and m.get("rewind_to") is not None:
+                jobs.append(("rewind", sc))
+            elif kind == "snapshot_sweep" and m.get("prerender"):
+                jobs.append(("sweep", sc))
+        if not jobs:
+            return
+        # Let the render window settle to the (already-set) panel-hidden size.
+        await asyncio.sleep(0.3)
+        was_playing = self._playing
+        self._playing = True  # so _warm_sweep + capture run during the load
+        try:
+            for kind, sc in jobs:
+                await self._apply_models(sc)
+                self._apply_snapshot(sc)
+                self._apply_flat_state(sc)
+                self._propagate_layer_visibility(sc)
+                cam = self._scene.plotter.camera
+                pos1, foc1, up1 = self._resolve_camera(sc)
+                cam.position = tuple(pos1)
+                cam.focal_point = tuple(foc1)
+                cam.up = tuple(up1)
+                if kind == "rewind":
+                    await self._ensure_rewind_frames(
+                        sc, sc.motion.get("rewind_to"), show_overlay=False
+                    )
+                else:  # sweep
+                    lead = self._scene.primary
+                    await self._capture_snapshot_sequence(
+                        sc, lead, self._sweep_order(sc, lead),
+                        show_overlay=False,
+                    )
+        finally:
+            self._playing = was_playing
+
+    async def _motion_flythrough_normal(self, sc, m) -> None:
+        """Normal-mode (toolbar) fly-through, for use as a calm background.
+
+        Mirrors ``toolbar._flythrough_loop``: reset → approach the box centre →
+        most-massive group (spin) → every cluster (focus + spin) → return to a
+        box-orbit standoff → **continuous gentle box orbit forever** (until
+        Next). The intro plays only on a fresh staging; a pause/resume continues
+        the box orbit from the current camera. Uses the shared ``camera_motion``
+        helpers (so ``toolbar.py`` is untouched). Honours ``self._playing``.
         """
         scene = self._scene
         st = self.state
         cam = scene.plotter.camera
         active = lambda: self._playing  # noqa: E731
-
         fps = _FPS
-        approach_secs = float(m.get("approach_secs", 8.0))
-        fly_secs = float(m.get("fly_secs", 7.0))
+        interval = 1.0 / fps
+        bs, centre = self._box()
+        cx, cy, cz = float(centre[0]), float(centre[1]), float(centre[2])
+        orbit_r = bs * 1.7
+        approach_secs = float(m.get("approach_secs", 10.0))
+        box_dps = float(m.get("box_dps", 8.0))
         g_radius = float(m.get("group_radius", 15.0))
         c_radius = float(m.get("cluster_radius", 30.0))
         g_dps = float(m.get("group_dps", 10.0))
@@ -1059,6 +1295,149 @@ class StoryPlayer:
                 fps, is_active=active, push=self._push,
             )
 
+        idx = self._index
+        fresh = idx not in self._ft_done
+        self._ft_done.add(idx)
+        groups, clusters = self._flythrough_targets()
+        try:
+            if fresh:
+                # Reset → approach the box centre (focal just past centre so the
+                # final frame isn't a degenerate camera).
+                cam.position = (cx, cy, bs * 2.2)
+                cam.focal_point = (cx, cy, cz)
+                cam.up = _UP
+                self._render_push()
+                await asyncio.sleep(interval)
+                if not await smooth_move(
+                    cam, np.array([cx, cy, bs * 2.2]), np.array([cx, cy, cz]),
+                    np.array([cx, cy, cz]), np.array([cx, cy, cz - 0.5]),
+                    approach_secs, fps, is_active=active, push=self._push,
+                ):
+                    return
+                # Most-massive group.
+                if groups:
+                    if not await fly_to(groups[0], g_radius, 8.0):
+                        return
+                    if not await spin(groups[0], g_radius, g_dps):
+                        return
+                # Every cluster, most → least massive, with focus.
+                for cpos in clusters:
+                    if not await fly_to(cpos, c_radius, 10.0):
+                        return
+                    scene.set_focus_sphere(
+                        tuple(float(v) for v in cpos), c_radius
+                    )
+                    st.focus_active = True
+                    st.flush()
+                    self._render_push()
+                    await asyncio.sleep(interval)
+                    ok = active() and await spin(cpos, c_radius, c_dps)
+                    scene.clear_focus()
+                    st.focus_active = False
+                    st.flush()
+                    self._render_push()
+                    if not ok:
+                        return
+                # Return to a box-orbit standoff (shortest fly-back).
+                diff = np.asarray(cam.position, dtype=float) - np.array(
+                    [cx, cy, cz]
+                )
+                diff[1] = 0.0
+                theta = (
+                    float(np.arctan2(diff[0], diff[2]))
+                    if np.linalg.norm(diff) > 1e-6 else 0.0
+                )
+                rtn = np.array([
+                    cx + orbit_r * np.sin(theta), cy,
+                    cz + orbit_r * np.cos(theta),
+                ])
+                if not await smooth_move(
+                    cam, np.asarray(cam.position, dtype=float),
+                    np.asarray(cam.focal_point, dtype=float), rtn,
+                    np.array([cx, cy, cz]), 10.0, fps,
+                    is_active=active, push=self._push,
+                ):
+                    return
+
+            # Continuous gentle box orbit forever (resume continues from here).
+            diff = np.asarray(cam.position, dtype=float) - np.array([cx, cy, cz])
+            diff[1] = 0.0
+            theta = (
+                float(np.arctan2(diff[0], diff[2]))
+                if np.linalg.norm(diff) > 1e-6 else 0.0
+            )
+            deg_step = np.deg2rad(box_dps * interval)
+            while active():
+                theta += deg_step
+                cam.position = (
+                    cx + orbit_r * np.sin(theta), cy,
+                    cz + orbit_r * np.cos(theta),
+                )
+                cam.focal_point = (cx, cy, cz)
+                cam.up = _UP
+                self._push()
+                await asyncio.sleep(interval)
+        finally:
+            if getattr(st, "focus_active", False):
+                scene.clear_focus()
+                st.focus_active = False
+                st.flush()
+
+    async def _motion_flythrough(self, sc, m) -> None:
+        """Cinematic fly-through — the full sequence every time it is staged.
+
+        On a **fresh** start (every time a fly-through scene is staged via
+        next/prev/goto/enter, including a model switch): reset the camera, fly
+        into the box centre, then — repeated until Next — one uniform cycle per
+        target (clusters first, then groups, most-massive first): fly **in**
+        (search) → raise a **focus** ring → **orbit** it (rotate) → drop the
+        ring and go to the **next**. There is no settling box orbit at the end.
+
+        Only a **pause/resume** is exempt: Play after Pause re-enters here for
+        the same scene WITHOUT re-staging, so ``_ft_done`` / ``_ft_idx`` are
+        intact and the tour simply continues in place (the intro is skipped) —
+        so taking control then resuming never interferes with the fly-through.
+        Driven by the shared ``camera_motion`` helpers (the same ones the
+        toolbar uses). Honours ``self._playing``.
+        """
+        # The normal-mode (toolbar) fly-through settles into a gentle box orbit
+        # — used e.g. as the scene-selector background. Dispatch to it.
+        if str(m.get("style", "")).lower() == "normal":
+            await self._motion_flythrough_normal(sc, m)
+            return
+
+        scene = self._scene
+        st = self.state
+        cam = scene.plotter.camera
+        active = lambda: self._playing  # noqa: E731
+
+        fps = _FPS
+        approach_secs = float(m.get("approach_secs", 8.0))
+        fly_secs = float(m.get("fly_secs", 7.0))
+        g_radius = float(m.get("group_radius", 15.0))
+        c_radius = float(m.get("cluster_radius", 30.0))
+        g_dps = float(m.get("group_dps", 10.0))
+        c_dps = float(m.get("cluster_dps", 8.0))
+        gal_radius = float(m.get("galaxy_radius", 6.0))
+        gal_dps = float(m.get("galaxy_dps", 14.0))
+        spin_degrees = float(m.get("spin_degrees", 180.0))  # orbit per target
+        target_kind = str(m.get("targets", "halos")).lower()
+
+        async def fly_to(target, radius, secs):
+            t3 = np.asarray(target, dtype=float)
+            dest = orbit_start_position(cam, t3, radius)
+            return await smooth_move(
+                cam, np.asarray(cam.position, dtype=float),
+                np.asarray(cam.focal_point, dtype=float), dest, t3,
+                secs, fps, is_active=active, push=self._push,
+            )
+
+        async def spin(target, radius, dps):
+            return await orbit_around(
+                cam, np.asarray(target, dtype=float), radius, spin_degrees, dps,
+                fps, is_active=active, push=self._push,
+            )
+
         # Fresh staging (not a pause/resume) → play the centre-approach intro
         # and restart the cursor. apply_scene clears _ft_done/_ft_idx for the
         # scene on every fresh staging, so this replays the full sequence each
@@ -1067,16 +1446,19 @@ class StoryPlayer:
         fresh = idx not in self._ft_done
         self._ft_done.add(idx)
 
-        groups, clusters = self._flythrough_targets()
-        # Tour clusters first (most massive), then groups — each visited with
-        # the identical search → focus → rotate → next cycle.
-        targets = (
-            [(c, c_radius, c_dps) for c in clusters]
-            + [(g, g_radius, g_dps) for g in groups]
-        )
         try:
             if fresh:
                 self._ft_idx[idx] = 0
+                # Optional snapshot rewind first: the scene is staged at snap_num
+                # (e.g. z=0), then stepped to rewind_to (e.g. z=1.5) before the
+                # tour, so the box "rewinds" into the tour epoch.
+                rewind_to = m.get("rewind_to")
+                if rewind_to is not None:
+                    await self._flythrough_rewind(
+                        sc, rewind_to, float(m.get("rewind_fps", 4.0))
+                    )
+                    if not active():
+                        return
                 # Into the box: reset to a pulled-back view, then approach centre.
                 bs, centre = self._box()
                 cx, cy, cz = float(centre[0]), float(centre[1]), float(centre[2])
@@ -1091,6 +1473,21 @@ class StoryPlayer:
                     approach_secs, fps, is_active=active, push=self._push,
                 ):
                     return
+
+            # Build the target list AFTER any rewind, so it reflects the current
+            # snapshot. Default = halo clusters first (most massive), then groups;
+            # targets:"ffb" tours FFB-regime galaxies (most massive first). Each
+            # target is visited with the identical search → focus → rotate → next.
+            if target_kind in ("ffb", "ffb_galaxies", "galaxies"):
+                targets = [
+                    (p, gal_radius, gal_dps) for p in self._ffb_galaxy_targets()
+                ]
+            else:
+                groups, clusters = self._flythrough_targets()
+                targets = (
+                    [(c, c_radius, c_dps) for c in clusters]
+                    + [(g, g_radius, g_dps) for g in groups]
+                )
 
             if not targets:
                 # Empty box: hold the staged view until Next (no box orbit).
@@ -1128,6 +1525,69 @@ class StoryPlayer:
                 st.focus_active = False
                 st.flush()
 
+    def _sweep_order(self, sc, lead) -> list[int]:
+        """Ordered snapshot indices for a sweep scene's [from, to] range."""
+        m = sc.motion or {}
+        lo = resolve_snap(
+            m.get("from", sc.snap_num), lead.snap_count, lead.snap_table
+        )
+        hi = resolve_snap(
+            m.get("to", sc.snap_num), lead.snap_count, lead.snap_table
+        )
+        step = 1 if hi >= lo else -1
+        return list(range(lo, hi + step, step))
+
+    async def _sweep_playback(self, sc, lead, fps: float, loop: bool) -> None:
+        """Play a pre-rendered snapshot_sweep back through the playback overlay.
+
+        Frames (one per snapshot in [from, to]) are normally pre-rendered up
+        front; a cache miss renders them here behind the overlay. Plays at a
+        display rate capped to 30 fps, honouring higher ``fps`` as a frame-skip
+        speed (same as the rewind). Loops until Next/Pause when ``loop`` (those
+        cancel the task; `pause`/`apply_scene` drop the overlay). A pause/resume
+        continues in place via ``_sweep_k``.
+        """
+        st = self.state
+        scene = self._scene
+        order = self._sweep_order(sc, lead)
+        frames = await self._capture_snapshot_sequence(
+            sc, lead, order, show_overlay=True
+        )
+        if not frames:  # None (cancelled) or empty
+            st.playback_active = False
+            st.flush()
+            return
+        n = len(frames)
+        display_fps = min(float(fps), 30.0)
+        speed = max(1, int(round(float(fps) / display_fps)))
+        interval = 1.0 / display_fps
+        i = self._sweep_k.get(self._index, 0)
+        if i >= n:
+            i = 0
+        st.playback_frame = frames[i]
+        st.playback_active = True
+        st.flush()
+        while self._playing:
+            while i < n:
+                if not self._playing:
+                    break
+                self._sweep_k[self._index] = i
+                st.playback_frame = frames[i]
+                st.flush()
+                await asyncio.sleep(interval)
+                i += speed
+            i = 0
+            self._sweep_k[self._index] = 0
+            if not loop:
+                break
+        # loop=False ends naturally → land the live view on the final snapshot
+        # and drop the overlay (loop=True is ended by Next/Pause, which drop it).
+        if not loop and self._playing:
+            scene.set_snapshot(int(order[-1]))
+            self._render_push()
+            st.playback_active = False
+            st.flush()
+
     async def _motion_snapshot_sweep(self, sc, m) -> None:
         scene = self._scene
         # Lead the sweep with the PRIMARY box so it always steps one snapshot
@@ -1136,6 +1596,14 @@ class StoryPlayer:
         if scene.active_box_name != scene.primary_name:
             scene.set_active_box(scene.primary_name)
         lead = scene.primary
+        # Pre-rendered path: play cached frames back smoothly. Single box only —
+        # a pre-rendered image can't independently step adjacent boxes, so fall
+        # back to the live sweep when side-by-side boxes are shown.
+        if m.get("prerender") and len(self._displayed_models()) <= 1:
+            await self._sweep_playback(
+                sc, lead, float(m.get("fps", 4.0)), bool(m.get("loop", False))
+            )
+            return
         from_spec = m.get("from", sc.snap_num)
         to_spec = m.get("to", sc.snap_num)
         lo = resolve_snap(from_spec, lead.snap_count, lead.snap_table)
