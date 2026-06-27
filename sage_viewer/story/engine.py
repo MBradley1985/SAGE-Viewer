@@ -462,8 +462,11 @@ class StoryPlayer:
         sc = self._story.scenes[i]
         self._index = i
         self._paused = False
-        # Drop any leftover pre-rendered playback overlay from the prior scene.
-        self.state.playback_active = False
+        # Do NOT drop playback_active here — keep any pre-rendered overlay
+        # visible while we stage the new scene (model switch, snapshot, camera).
+        # Dropping it at the TOP leaves the stale live VTK view exposed until
+        # _render_push() fires, causing a visible flash. We drop it at the
+        # BOTTOM, after the new scene is fully rendered (see end of this method).
         self._sweep_k.pop(i, None)  # fresh staging → sweep starts from the top
         # Fresh staging restarts the fly-through from the top (reset → centre →
         # clusters → groups); pause/resume keeps these so Play continues in
@@ -517,6 +520,16 @@ class StoryPlayer:
         # Render the fully-staged scene ONCE before pushing, so the client gets
         # the new frame in one shot instead of flickering through the old view.
         self._render_push()
+        # Now drop any pre-rendered playback overlay from the previous scene.
+        # Doing it HERE (after _render_push) rather than at the top of this
+        # method means the overlay stays visible while we staged — no flash of a
+        # stale live view. A one-iteration yield lets the view_update image
+        # arrive at the client before the state flush drops the overlay, avoiding
+        # a race where the overlay drops before the new frame is painted.
+        if getattr(self.state, "playback_active", False):
+            await asyncio.sleep(0)
+        self.state.playback_active = False
+        self.state.flush()
         # Lazily capture a thumbnail for the scene selector the first time a
         # scene is shown, so the menu grid fills in as the talk is navigated
         # (best-effort; the menu scene itself is skipped).
@@ -1125,6 +1138,10 @@ class StoryPlayer:
         finally:
             rw.SetOffScreenRendering(prev_off)
             st.preload_status = ""
+        if not frames:
+            # All captures returned None — don't cache so a retry is possible
+            # (e.g. if the render window wasn't settled during load).
+            return None
         self._frame_cache[key] = frames
         return frames
 
@@ -1199,9 +1216,12 @@ class StoryPlayer:
             i += speed
 
         # Seamless hand-off: render the LIVE view at the final snapshot (same box
-        # camera as the recording) BEFORE dropping the overlay.
+        # camera as the recording) BEFORE dropping the overlay. A one-iteration
+        # yield lets the view_update image reach the client before the state
+        # flush clears the overlay, preventing a race-condition flash.
         scene.set_snapshot(int(end))
         self._render_push()
+        await asyncio.sleep(0)
         st.playback_active = False
         st.flush()
 
@@ -1585,6 +1605,7 @@ class StoryPlayer:
         if not loop and self._playing:
             scene.set_snapshot(int(order[-1]))
             self._render_push()
+            await asyncio.sleep(0)
             st.playback_active = False
             st.flush()
 
