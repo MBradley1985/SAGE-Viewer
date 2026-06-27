@@ -386,7 +386,7 @@ class GalaxyLayer:
 
         Always rendered (all galaxies):
           • blue cold-gas envelope sized by ColdGas
-          • green CGM (Regime == 0) or red HotGas (Regime == 1) outer envelope
+          • blue-green CGM (Regime == 0) or red HotGas (Regime == 1) outer envelope
 
         Only when a focus region is active:
           • cyan disk layer  (StellarMass − BulgeMass), user-configurable colour
@@ -423,9 +423,9 @@ class GalaxyLayer:
         outer_scalar = _logn(outer_mass, 7.0, 11.5)
 
         # ---- (1) Outer envelope ---------------------------------------
-        # CGM galaxies → green, Hot atmosphere → red.
+        # CGM galaxies → blue-green, Hot atmosphere → red.
         # Sized by outer mass, very low opacity.
-        for mask, cmap in [(cgm_mask, "Greens"), (hot_mask, "Reds")]:
+        for mask, cmap in [(cgm_mask, "YlGn"), (hot_mask, "Reds")]:
             if not np.any(mask):
                 continue
             cloud = pv.PolyData(pos[mask])
