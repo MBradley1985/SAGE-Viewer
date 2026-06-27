@@ -28,7 +28,8 @@
         { "kind": "heading", "text": "Michael Bradley", "anchor": "top-right", "x": 5, "y": 62, "align": "right", "color": "#ffffff" },
         { "kind": "text", "text": "Supervisors:\nDarren Croton\nRobert Mostoghiu Paun\nMichelle Cluver", "anchor": "top-right", "x": 5, "y": 66, "align": "right" },
         { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 },
-        { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "200px", "y": 0, "width": 290 }
+        { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "210px", "y": 0, "width": 290 },
+        { "kind": "image", "src": "/sage_static/CDM.webp", "anchor": "bottom-left", "x": "510px", "y": 0, "width": 269 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0,
@@ -56,7 +57,7 @@
     },
     {
       "id": "sims-sweep",
-      "title": "Simulations",
+      "title": "DM simulations",
       "caption": "Structure assembling from high-z to z=0",
       "snap_num": "first",
       "camera": { "frame": "box", "zoom": 1.4 },
@@ -80,7 +81,7 @@
     },
     {
       "id": "sims-tng-video",
-      "title": "Simulations",
+      "title": "Hydrodynamical simulations",
       "caption": "A TNG50 zoom of a single galaxy forming",
       "snap_num": "last",
       "camera": "box",
@@ -104,7 +105,7 @@
     },
     {
       "id": "sims-add-galaxies",
-      "title": "Simulations",
+      "title": "SAMs",
       "caption": "Pause, switch on galaxies, then resume",
       "snap_num": "first",
       "camera": { "frame": "box", "zoom": 1.4 },
@@ -188,7 +189,7 @@
     },
     {
       "id": "cosmic-noon-flythrough",
-      "title": "",
+      "title": "Cosmic Noon",
       "caption": "",
       "snap_num": "z=0",
       "camera": "box",
@@ -227,7 +228,7 @@
     },
     {
       "id": "cosmic-dawn-flythrough",
-      "title": "",
+      "title": "Cosmic Dawn",
       "caption": "",
       "snap_num": "z=0",
       "camera": "box",
@@ -246,11 +247,11 @@
     },
     {
       "id": "timeline",
-      "title": "Remaining PhD Timeline",
+      "title": "Timeline",
       "caption": "",
       "snap_num": "last",
       "camera": "box",
-      "models": { "primary": "millennium_vanilla", "adjacent": [] },
+      "models": { "primary": "millennium", "adjacent": [] },
       "state": {
         "halos_visible": true,
         "galaxies_visible": true,
@@ -260,7 +261,7 @@
       "chrome": { "hide_panel": true },
       "hold": true,
       "overlays": [
-        { "kind": "heading", "text": "Research Timeline", "anchor": "top", "y": 18, "align": "center", "size": 2.2 },
+        { "kind": "heading", "text": "Remaining PhD Timeline", "anchor": "top", "y": 18, "align": "center", "size": 2.2 },
         {
           "kind": "text",
           "text": "14 Jul 2026   —   Mid-Candidature Review  ◀ today\n\nAug 2026   —   300 Collaboration Annual Meeting\n\nOct 2026   —   SAGE26 Papers I (model) & II (FFBs) submitted\n\nNov 2026   —   CDM ECR / Annual Workshop / Conference\n\nJan 2027   —   SAGE26 Paper III (ICS) submitted, or with Papers I & II\n\nFeb 2027   —   Paper IV — High-z MQGs  (Karl, Darren, Harry, Amrita & Jayde)\n\nMar 2027   —   Thesis writing\n\nMay / Jun 2027   —   Draft thesis review\n\nSep 2027   —   Thesis submission",
@@ -277,7 +278,7 @@
       "caption": "",
       "snap_num": "last",
       "camera": "box",
-      "models": { "primary": "millennium_vanilla", "adjacent": [] },
+      "models": { "primary": "millennium", "adjacent": [] },
       "state": {
         "halos_visible": true,
         "galaxies_visible": true,
@@ -287,14 +288,27 @@
       "chrome": { "hide_panel": true },
       "hold": true,
       "overlays": [
-        { "kind": "heading", "text": "Summary", "anchor": "top", "y": 7, "align": "center", "size": 2.8 },
+        { "kind": "heading", "text": "Summary", "anchor": "top", "y": 5, "align": "center", "size": 2.5 },
+        { "kind": "heading", "text": "Key Findings", "anchor": "top", "y": 14, "align": "center", "size": 1.2 },
         {
           "kind": "text",
-          "text": "•  [Key finding placeholder 1]\n\n•  [Key finding placeholder 2]\n\n•  [Key finding placeholder 3]\n\n•  Next steps: [placeholder]",
-          "anchor": "top", "y": 22, "align": "center", "size": 1.3
+          "text": "•  Implementing a distinct CGM reservoir with dedicated inflow physics results in a more detailed galaxy structure, more analogous to observations.\n\n•  Ensuring star formation is fuelled from H₂ rather than total cold gas results in a physically precise stellar growth mechanism through time.\n\n•  A FIRE-inspired supernova feedback model produces more realistic mass loading values and regulates galaxy growth through time.\n\n•  FFBs reproduce galaxies seen by JWST and provide theoretical reasoning for how these galaxies evolved.\n\n•  Many other fixes, changes and bug-hunts under the hood of SAGE26.",
+          "anchor": "top", "y": 20, "align": "center", "size": 0.88, "max_width": 70
         },
-        { "kind": "citation", "text": "[ QR code — link TBD ]", "anchor": "bottom-left",  "x": 5, "y": 8 },
-        { "kind": "citation", "text": "[ QR code — link TBD ]", "anchor": "bottom-right", "x": 5, "y": 8 }
+        { "kind": "heading", "text": "Next Steps", "anchor": "top", "y": 45, "align": "center", "size": 1.2 },
+        {
+          "kind": "text",
+          "text": "•  SAGE26 Paper I: Modelling the baryon cycle from cosmic dawn to the present day\n\n•  SAGE26 Paper II: Modelling JWST massive galaxies with Feedback-Free Bursts\n\n•  SAGE26 Paper III: Intracluster Stars and the Brightest Cluster Galaxy\n\n•  Paper IV: High Redshift Massive Quiescent Galaxies analogous to Erigeneia",
+          "anchor": "top", "y": 51, "align": "center", "size": 0.9, "max_width": 70
+        },
+        {
+          "kind": "citation",
+          "text": "SAGE-PSO: github.com/MBradley1985/SAGE-PSO\nSAGE26: github.com/MBradley1985/SAGE26\nSAGE-Viewer: github.com/MBradley1985/SAGE-Viewer\nsage-home: github.com/sage-home",
+          "anchor": "bottom-right", "x": 20, "y": 1, "align": "right"
+        },
+        { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 },
+        { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "210px", "y": 0, "width": 290 },
+        { "kind": "image", "src": "/sage_static/CDM.webp", "anchor": "bottom-left", "x": "510px", "y": 0, "width": 269 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0,
