@@ -1439,7 +1439,10 @@ def create_app(
                             "backdrop-filter:blur(6px);"
                             "border:1px solid #374151;"
                             "color:#e2e8f0;"
-                            "z-index:5;`",
+                            # In Story Mode, lift library cards above the story
+                            # overlay layer (z40) + HUD (z50) so opened items sit
+                            # on top of the scene; normal-use layering unchanged.
+                            "z-index:${story_active ? 60 : 5};`",
                         ),
                         elevation=8,
                     ):

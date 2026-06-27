@@ -72,8 +72,10 @@ delta from the previous one).
   "snap_num": 63,
   "theme": "dos_blue",                  // optional; omit = inherit story theme
 
-  // ── Camera (literal pose) ───────────────────────────────────
+  // ── Camera ──────────────────────────────────────────────────
   "camera": { "position": [..], "focal_point": [..], "up": [0, 1, 0] },
+  // …or "box" / "reset" to frame all loaded boxes, or a box-framing dict
+  // with a pull-back factor: { "frame": "box", "zoom": 1.4 }  (zoom>1 = further back)
 
   // ── Full captured state ─────────────────────────────────────
   "layers":  { /* all LAYER_KEYS + cbar keys */ },
@@ -109,6 +111,8 @@ delta from the previous one).
   // ── Playback ────────────────────────────────────────────────
   "transition": { "duration_secs": 6.0, "easing": "smoothstep" }, // fly INTO scene
   "dwell_secs": 8.0,                     // auto-advance delay in Play
+  "hold": false,                         // true = park here in Play after motion
+                                         //   (no auto-advance; Next still steps on)
   "motion": { "kind": "still" }          // see Motion below
 }
 ```
@@ -121,13 +125,58 @@ camera interaction). Overlay item fields:
 
 | Field | Meaning |
 |---|---|
-| `kind` | `title` · `heading` · `text` · `citation` · `equation` (sets size/weight/italic defaults) |
+| `kind` | `title` · `heading` · `text` · `citation` · `equation` (text kinds — set size/weight/italic defaults) · `image` · `video` · `scene_menu` (clickable scene grid — see below) |
 | `text` | content for non-equation kinds |
 | `latex` | LaTeX source for `equation` kind; set `"inline": true` for inline math |
+| `src` | for `image` / `video`: file served from `sage_viewer/static/` at `/sage_static/<file>` (NOT the data Library) |
+| `width` | for `image` / `video`: px (number) or any CSS length (e.g. `"55vw"`) |
+| `opacity` | for `image` / `video`: 0–1 (default 1.0) |
+| `loop`, `autoplay`, `muted` | `video` only — playback flags (each default `true`) |
+| `controls` | `video` only — show native transport (default `false`); when `true` the video accepts clicks (otherwise it's click-through) |
 | `anchor` | 9-grid: `top-left`…`center`…`bottom-right` |
-| `x`, `y` | percentage nudge from the anchor edges |
+| `x`, `y` | nudge from the anchor edges — **percentage when numeric, a CSS length when a string** (e.g. `"150px"`) |
 | `size` | font size in rem (override) |
 | `color`, `weight`, `align`, `max_width` | style overrides |
+
+`image` overlays carry only `src` + sizing (`width`, `opacity`). `video` overlays add
+the playback flags above; use **MP4/WebM** (and **PNG/JPG/SVG, not PDF** for images).
+Both are normalised in `engine._normalize_overlay` and emitted by `sage_viewer.js`.
+
+### Scene-selector grid (`scene_menu`)
+
+`{ "kind": "scene_menu" }` expands at apply-time into a **clickable grid of the
+story's scenes** — a "jump to a scene" slide. Each cell shows a captured
+thumbnail (or a numbered placeholder) and, on click, flies to that scene.
+
+```jsonc
+{ "kind": "scene_menu", "title": "Jump to a scene", "anchor": "center",
+  "cols": 4, "max_width": 88, "include_cards": false }
+```
+
+| Field | Meaning |
+|---|---|
+| `cols` | grid columns (default 4) |
+| `title` | optional heading above the grid |
+| `include_cards` | include `card-*` divider scenes (default `false`) |
+| `anchor`, `x`, `y`, `max_width` | placement of the grid container |
+
+Mechanics: the menu scene is itself a scene (usually the last, with
+`"hold": true`). `engine._build_scene_menu` lists every other scene as a cell
+`{index, n, label, thumb}`; `sage_viewer.js` renders the grid and a cell click
+writes the target index to a hidden relay input (`#sage-story-goto-relay`,
+`v_model="story_goto_relay"`) whose server `@state.change` handler calls
+`player.goto(index)` — the same external-JS→server relay path the PTY uses.
+
+**Thumbnails** are an authoring one-off: Story Mode menu → **"Capture
+thumbnails"** (`ctrl.story_capture_thumbs` → `player.capture_thumbnails()`)
+steps through every scene, screenshots the render window via
+`vtkWindowToImageFilter` (the remote plotter is never `.show()`n, so pyvista's
+`screenshot()` can't run), downscales, and writes
+`static/story_thumbs/<story>__<scene_id>.png` (served at
+`/sage_static/story_thumbs/…`). A cell with no captured thumbnail falls back to
+a numbered placeholder, so the selector works before any capture. Thumbnails are
+**MCR content, not framework** — exclude them when promoting to `main`/PyPI
+(same as `CAS_logo.png`).
 
 The overlay layer is rendered **entirely outside Vue**: the server ships the
 items as JSON (`story_overlays_json`) and `sage_viewer.js` builds the children of
@@ -212,8 +261,8 @@ runtime against the active model:
 
 | Field | Symbolic values | Resolves to |
 |---|---|---|
-| `snap_num`, sweep `from`/`to` | `"first"`, `"last"`, `"40%"`, or an int | index in `[0, snap_count-1]` |
-| `camera` | `"box"` / `"reset"` (or an explicit `{position, focal_point, up}` dict) | box-framing from the model's box size |
+| `snap_num`, sweep `from`/`to` | `"first"`, `"last"`, `"40%"`, `"z=1.5"`, or an int | index in `[0, snap_count-1]` (a `"z=…"` spec → closest snapshot to that redshift via the box's redshift table, so it carries over on a model switch) |
+| `camera` | `"box"` / `"reset"`, `{ "frame": "box", "zoom": 1.4 }`, or an explicit `{position, focal_point, up}` dict | box-framing from the model's box size (`zoom` > 1 pulls the camera further back) |
 | `focus.center` | `"box"` (or a `[x,y,z]` list) | box centre |
 | `focus.radius` | `radius_frac` (fraction of box size) as an alternative | `frac × box_size` |
 
@@ -247,18 +296,25 @@ Cross-time object tracking is therefore out of scope for the MVP.
 |---|---|---|
 | `still` | — | hold the captured pose for `dwell_secs` |
 | `orbit` | `radius`, `dps`, `degrees`, `axis?` | spin around the `target` / `focus` centre — reuses the fly-through `_orbit_around` helper |
-| `snapshot_sweep` | `from`, `to`, `fps?` | step `snap_num` across cosmic time while holding/orbiting the camera — reuses the preloaded cache |
+| `snapshot_sweep` | `from`, `to`, `fps?`, `loop?` | step `snap_num` across cosmic time while holding/orbiting the camera — reuses the preloaded cache |
+| `flythrough` | `approach_secs?`, `fly_secs?`, `group_radius?`, `cluster_radius?`, `group_dps?`, `cluster_dps?` | reset camera → fly into box centre → tour clusters→groups (fly in → focus → orbit → next) until Next; no settling box orbit. Full sequence replays each time the scene is staged (scene/model switch, re-entry); only pause→play continues in place |
 
 `snapshot_sweep` is the headline capability for the MCR (e.g. "watch this halo
 assemble from z = 6 to z = 0"). Every snapshot in `[from, to]` must be declared
-in the story's `requirements.snapshots`.
+in the story's `requirements.snapshots`. `fps` defaults to 4.0. `loop` (default
+`false`) replays the sweep until Next/Pause — auto-advance never fires, so the
+scene holds until the user steps on. A pause/resume continues the sweep **in
+place** (the per-scene frame index is checkpointed) rather than restarting from
+the first frame.
 
 ## Playback semantics
 
 - **Next / Previous** — `_smooth_move` the camera to the target scene's pose,
   apply its full state (filters/layers/env), reconstruct focus, set theme.
 - **Play** — auto-advance: run each scene's `motion`, wait `dwell_secs`,
-  transition to the next.
+  transition to the next. A scene with `"hold": true` parks after its motion
+  (no auto-advance) until the user presses Next — useful for title cards, videos,
+  and looping sweeps.
 - **Pause** — stop auto-advance, hand full normal control to the user. The HUD
   remains; nothing is locked.
 - **Resume (Play after Pause)** — smoothly fly back to the *current* scene's

@@ -112,10 +112,11 @@ Full reference: **`docs/project/story_mode_design.md`**. Summary:
   "id": "intro",
   "title": "Shown in the HUD",
   "caption": "HUD caption text",
-  "snap_num": "last",            // int, "first", "last", or "40%"  (per-model)
+  "snap_num": "last",            // int, "first", "last", "40%", or "z=1.5"  (per-model)
   "theme": "dos_blue",           // optional per-scene theme
 
   "camera": "box",               // "box"/"reset" (frame all loaded boxes) OR
+                                 // {"frame":"box","zoom":1.4} (box-frame, pull back) OR
                                  // {"position":[x,y,z],"focal_point":[x,y,z],"up":[0,1,0]}
 
   "state": {                     // any STORY_STATE_KEYS (layers/filters/env)
@@ -143,15 +144,16 @@ Full reference: **`docs/project/story_mode_design.md`**. Summary:
 
   "transition": { "duration_secs": 5.0, "easing": "smoothstep" }, // fly INTO scene
   "dwell_secs": 6.0,                                              // hold time in Play
-  "motion": { "kind": "still" }                                  // still | orbit | snapshot_sweep
+  "hold": false,                 // true → park here in Play after motion (Next steps on)
+  "motion": { "kind": "still" }                                  // still | orbit | snapshot_sweep | flythrough
 }
 ```
 
 ### Symbolic values (portable; resolved at runtime per model)
 | Field | Accepts |
 |---|---|
-| `snap_num`, sweep `from`/`to` | int · `"first"` · `"last"` · `"40%"` |
-| `camera` | `"box"` / `"reset"` (frames all loaded boxes) · explicit dict |
+| `snap_num`, sweep `from`/`to` | int · `"first"` · `"last"` · `"40%"` · `"z=1.5"` (closest snapshot to that redshift, per box — carries over on a model switch) |
+| `camera` | `"box"` / `"reset"` (frames all loaded boxes) · `{"frame":"box","zoom":N}` (pull back) · explicit dict |
 | `focus.center` | `"box"` (box centre) · `[x,y,z]` |
 | `focus` radius | `radius` (absolute) · `radius_frac` (× box size) |
 | `models.primary` | `"current"` (launched) · `"other"`/`"auto"` (another available) · explicit name |
@@ -160,12 +162,17 @@ Full reference: **`docs/project/story_mode_design.md`**. Summary:
 ### Motion kinds
 - `{"kind":"still"}` — hold for `dwell_secs`.
 - `{"kind":"orbit","dps":12,"degrees":360,"radius":40}` — spin around target/focus centre.
-- `{"kind":"snapshot_sweep","from":"40%","to":"last","fps":4}` — animate through cosmic
-  time. In multi-box, advances **all** loaded boxes.
-- `{"kind":"flythrough"}` — cinematic tour that **keeps touring groups until Next**
-  (reset → approach box centre → biggest group → every cluster with focus → then cycle
-  groups forever). See §10. Optional tunables: `approach_secs`, `fly_secs`,
-  `group_radius`, `cluster_radius`, `group_dps`, `cluster_dps`.
+- `{"kind":"snapshot_sweep","from":"40%","to":"last","fps":4,"loop":false}` — animate
+  through cosmic time. In multi-box, advances **all** loaded boxes. `fps` default 4.0.
+  `loop:true` replays until Next/Pause (auto-advance never fires, so the scene holds);
+  a pause/resume continues the sweep **in place** rather than restarting.
+- `{"kind":"flythrough"}` — fly **into the box centre** (intro), then keep hopping
+  structures until Next: per target (clusters then groups) fly in (search) → focus ring →
+  orbit (rotate) → next. **No settling box orbit** at the end. The **full sequence
+  replays every time a flythrough scene is staged** (switching scenes/models/re-entry);
+  only pause→play continues in place. See §10. Optional
+  tunables: `approach_secs`, `fly_secs`, `group_radius`, `cluster_radius`, `group_dps`,
+  `cluster_dps`.
 
 ### Overlays (in-view text & equations)
 Rendered over the VTK view by `sage_viewer.js` (outside Vue, so KaTeX can't corrupt
@@ -180,7 +187,12 @@ the vDOM). Equations use **vendored KaTeX** (offline, no network).
   { "kind": "equation", "latex": "\\dot{M}_* = \\alpha\\,M_{\\rm cold}/t_{\\rm dyn}",
     "anchor": "center", "size": 2.0 },  // add "inline": true for inline math
   { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left",
-    "x": 0, "y": 0, "width": 150 }      // logos/wordmarks — see §10
+    "x": 0, "y": 0, "width": 150 },     // logos/wordmarks — see §10
+  { "kind": "video", "src": "/sage_static/clip.mp4", "anchor": "center",
+    "width": "55vw", "loop": true, "autoplay": true, "muted": true,
+    "controls": false },                // movies — see §10
+  { "kind": "scene_menu", "title": "Jump to a scene", "anchor": "center",
+    "cols": 4, "max_width": 88 }         // clickable scene grid — see §10
 ]
 ```
 - `anchor`: 9-grid — `top-left`,`top`,`top-right`,`left`,`center`,`right`,`bottom-left`,`bottom`,`bottom-right`.
@@ -191,6 +203,18 @@ the vDOM). Equations use **vendored KaTeX** (offline, no network).
 - `image` overlays: `src` is served from `sage_viewer/static/` at `/sage_static/<file>`
   (NOT the data Library); use **PNG/JPG/SVG, not PDF**; `width` is px (number) or any CSS
   length; `opacity` optional. Bundled: `SAGElogo.jpg`, `CAS_logo.png`.
+- `video` overlays: same `src`/`width`/`opacity` as `image`, served from `/sage_static/`;
+  use **MP4/WebM**. Playback flags `loop`/`autoplay`/`muted` default `true`; `controls`
+  defaults `false` (set `true` to show the native transport — the video then accepts
+  clicks instead of being click-through). Pair with scene `"hold": true` so playback
+  isn't cut off by auto-advance.
+- `scene_menu` overlay: a **clickable grid of the story's scenes** (a "jump to a scene"
+  slide). Fields `cols` (default 4), `title`, `include_cards` (default `false`, i.e.
+  skips `card-*` dividers), plus `anchor`/`x`/`y`/`max_width`. Put it on its own scene
+  with `"hold": true` (usually last). Clicking a cell flies to that scene. Cells show
+  captured thumbnails; un-captured cells show a numbered placeholder. **Capture
+  thumbnails** from the Story Mode dropdown (steps through every scene and screenshots
+  it into `static/story_thumbs/`). See §10.
 
 ## 5. The MCR file
 
@@ -272,16 +296,27 @@ Top-level boolean in the story JSON (sibling of `scenes`). `true` → entering t
 story starts playback immediately (no Play click), so a title scene's motion runs
 on open. `Story.autoplay` (`model.py`), applied in `engine._enter_async`.
 
-### Motion kind: `flythrough`
-`{"kind":"flythrough"}` — cinematic tour that **keeps touring groups until Next**:
-reset camera → approach box centre → orbit the most-massive group → visit every
-cluster most→least (with a focus ring) → then cycle the groups forever. Group =
-halo Mvir 10^12.5–10^14; cluster = ≥10^14. Drives the camera with the shared
-`scene/camera_motion.py` helpers (the same ones the toolbar fly-through uses), so
-**`toolbar.py` is not edited**. Optional tunables on the motion object (defaults):
+### Motion kind: `flythrough` (centre intro → tour → carry-over)
+`{"kind":"flythrough"}` — on a **fresh** start fly **into the box centre** (the
+intro), then keep hopping structures until Next. Per target (clusters first,
+Mvir ≥ 10^14; then groups, 10^12.5–10^14; most-massive first): **fly in** (search)
+→ raise a **focus** ring → **orbit** it (rotate) → drop the ring and go to the
+**next**. **No settling box orbit** at the end (an empty box just holds the staged
+view).
+
+The **full sequence runs every time a flythrough scene is staged** (next / prev /
+goto / enter, including a model switch): `apply_scene` clears the scene's
+`_ft_done` / `_ft_idx`, so the intro + clusters→groups tour replays from the top.
+The one exception is **pause → play**, which re-enters for the same scene WITHOUT
+re-staging, so those are intact and the tour simply **continues in place** (intro
+skipped). So switching scenes/models always gives the centre-first sequence, and
+take-control/pause/play never interfere with it. Driven by the
+shared `scene/camera_motion.py` helpers (the same ones the toolbar fly-through
+uses), so **`toolbar.py` is not edited**. Optional tunables (defaults):
 `approach_secs` 8, `fly_secs` 7, `group_radius` 15, `cluster_radius` 30,
 `group_dps` 10, `cluster_dps` 8. (`engine._motion_flythrough` /
-`_flythrough_targets`.)
+`_flythrough_targets`.) Lives in the engine, so it applies to **every** flythrough
+scene (title slide, `galaxies-vanilla`/`galaxies-millennium`, `cosmic-noon-flythrough`).
 
 ### Overlay kind: `image` (logos / wordmarks)
 `{ "kind":"image", "src":"/sage_static/<file>", "anchor":"bottom-left", "x":0,
@@ -308,3 +343,64 @@ and the panel re-hides per the scene's chrome. (`engine.play`/`pause`/`_resume`,
 The playback HUD (progress + scene title + caption + transport) is now a small
 card **pinned lower-right** (was bottom-centre, full-width), panel-aware.
 (`ui/story_mode.py`.)
+
+### Scene `hold`
+Top-level scene boolean (default `false`). In Play, a `hold` scene runs its
+motion then **parks** — no auto-advance off `dwell_secs` — until **Next** steps
+on. For title cards, videos, and looping sweeps. (`Scene.hold` in `model.py`,
+the park loop in `engine._autoplay_from`.)
+
+### Camera `{"frame":"box","zoom":N}`
+A box-framing camera with a pull-back factor: same all-boxes framing as `"box"`,
+but `zoom` > 1 pulls the camera further back (smaller box on screen, e.g. to
+clear a heading). Default `zoom` 1.0. (`engine._resolve_camera` /
+`_frame_boxes`.)
+
+### Overlay kind: `video` (movies)
+`{ "kind":"video", "src":"/sage_static/<file>", "width":"55vw", "loop":true,
+"autoplay":true, "muted":true, "controls":false }`. Like `image` (same
+`src`/`width`/`opacity`, served from `/sage_static/`), plus playback flags —
+`loop`/`autoplay`/`muted` default `true`, `controls` default `false`. With
+`controls:true` the `<video>` accepts pointer events (native transport /
+fullscreen); otherwise it's click-through. Use MP4/WebM. Rendered as a `<video>`
+by `sage_viewer.js`; normalised in `engine._normalize_overlay`.
+
+### Motion `snapshot_sweep` → `loop`
+`loop` (default `false`) replays the sweep until Next/Pause; auto-advance never
+fires, so the scene holds until the user steps on. A pause/resume continues the
+sweep **in place** — the per-scene frame index `_sweep_k` is checkpointed before
+each frame await — instead of restarting from the first snapshot.
+(`engine._motion_snapshot_sweep`.)
+
+### Overlay kind: `scene_menu` (clickable scene selector + thumbnails)
+`{ "kind":"scene_menu", "title":"Jump to a scene", "cols":4, "max_width":88,
+"include_cards":false }` expands into a **grid of the story's scenes**; clicking a
+cell flies to that scene. Built across the in-scope Story Mode files only:
+- **`engine._build_scene_menu`** (called from `_apply_overlays`) lists every other
+  scene as a cell `{index, n, label, thumb}`, skipping the menu scene itself and —
+  unless `include_cards` — the `card-*` dividers.
+- **`sage_viewer.js`** renders the grid; a cell click writes `"<index>:<seq>"` to a
+  hidden relay `#sage-story-goto-relay` (`v_model="story_goto_relay"`).
+- **`ui/story_mode.py`** holds the relay input + a `@state.change("story_goto_relay")`
+  handler that calls `player.goto(index)` (same external-JS→server path as the PTY).
+
+**Thumbnails** are captured two ways, both writing
+`static/story_thumbs/<story>__<scene_id>.png` (served at `/sage_static/story_thumbs/…`):
+- **Lazy (automatic):** `engine._maybe_capture_thumb`, called at the end of
+  `apply_scene`, screenshots a scene the first time it is shown — so the grid fills in
+  as the talk is navigated, no manual step. Skips the menu scene + already-captured ones.
+- **Bulk:** Story Mode dropdown → "Capture thumbnails" (`ctrl.story_capture_thumbs` →
+  `engine.capture_thumbnails`) walks every scene to (re)capture the whole set at once.
+
+Both use `engine._save_thumb` → `_capture_image` (`vtkWindowToImageFilter`; pyvista's
+`screenshot()` can't run — the remote plotter is never `.show()`n; technique mirrored
+from `toolbar._capture_frame`, **not** edited), downscaled to 360px. A cell with no
+thumbnail shows a numbered placeholder, so the selector works before any capture.
+⚠️ Thumbnails (and `story_thumbs/`) are **MCR content, not framework** — exclude on
+promotion to `main`/PyPI (like `CAS_logo.png`, §9).
+
+Put a `scene_menu` on its own scene with `"hold": true` (the MCR's last scene,
+`scene-menu`). A **scene-selection button** (grid icon) sits in the playback HUD before
+the red Exit button — `ctrl.story_menu` → `engine.goto_menu()` jumps to that scene.
+Tests: `test_scene_menu_expands_to_clickable_grid`, `test_scene_menu_include_cards`,
+`test_goto_menu_jumps_to_the_scene_selector_scene`.

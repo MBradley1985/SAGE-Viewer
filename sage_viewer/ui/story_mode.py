@@ -41,6 +41,11 @@ def init_story_mode(server, scene) -> StoryPlayer:
     # Overlays are shipped as JSON and rendered by sage_viewer.js OUTSIDE Vue
     # (so KaTeX's DOM writes can't corrupt Vue's virtual DOM).
     state.story_overlays_json = "[]"
+    # Scene-selector relay: a scene_menu cell click writes "<index>:<seq>" here
+    # (the seq forces a change even when the same cell is clicked twice). This
+    # is the only reliable external-JS → server path in Trame 3 (see the PTY
+    # relay in navigation_panel.py).
+    state.story_goto_relay = ""
 
     # Right-panel visibility — a Story Mode scene backend option only
     # (scene.chrome.hide_panel). Declared before the client mounts so Vue
@@ -101,6 +106,30 @@ def init_story_mode(server, scene) -> StoryPlayer:
     def _story_pause():
         player.pause()
 
+    @ctrl.set("story_menu")
+    def _story_menu():
+        player.goto_menu()
+
+    @ctrl.set("story_capture_thumbs")
+    def _story_capture_thumbs():
+        # Authoring one-off: screenshot every scene so a scene_menu shows
+        # thumbnails. Runs off the event loop so the UI stays responsive.
+        import asyncio
+
+        asyncio.ensure_future(player.capture_thumbnails())
+
+    @server.state.change("story_goto_relay")
+    def _on_story_goto(story_goto_relay, **_):
+        # Value is "<scene-index>:<seq>"; jump to the chosen scene.
+        v = str(story_goto_relay or "")
+        if not v:
+            return
+        try:
+            idx = int(v.split(":", 1)[0])
+        except ValueError:
+            return
+        player.goto(idx)
+
     # Populate the list once at startup.
     _story_refresh()
 
@@ -148,6 +177,15 @@ def build_story_button(server) -> None:
             )
             v3.VDivider()
             v3.VListItem(
+                title="Capture thumbnails",
+                subtitle="Screenshot every scene for the menu grid",
+                prepend_icon="mdi-camera-burst",
+                click=ctrl.story_capture_thumbs,
+                color="cyan",
+                density="compact",
+                v_show=("story_active",),
+            )
+            v3.VListItem(
                 title="Exit Story Mode",
                 prepend_icon="mdi-close",
                 click=ctrl.story_exit,
@@ -181,6 +219,17 @@ def build_story_overlays(server) -> None:
     html.Input(
         id="sage-overlays-relay",
         value=("story_overlays_json",),
+        type="text",
+        style=(
+            "position:fixed;left:-9999px;"
+            "width:1px;height:1px;opacity:0;pointer-events:none;"
+        ),
+    )
+    # Scene-selector relay: sage_viewer.js writes the clicked cell's index here
+    # (v_model carries it to the server's story_goto_relay @state.change).
+    html.Input(
+        id="sage-story-goto-relay",
+        v_model=("story_goto_relay",),
         type="text",
         style=(
             "position:fixed;left:-9999px;"
@@ -266,11 +315,20 @@ def build_story_hud(server) -> None:
                 click=ctrl.story_next,
             )
             v3.VBtn(
+                icon="mdi-view-grid",
+                variant="text",
+                density="compact",
+                color="white",
+                title="Scene selection",
+                click=ctrl.story_menu,
+                style="margin-left:8px;",
+            )
+            v3.VBtn(
                 icon="mdi-close-thick",
                 variant="text",
                 density="compact",
                 color="#ef4444",
                 title="Exit Story Mode",
                 click=ctrl.story_exit,
-                style="margin-left:8px;",
+                style="margin-left:2px;",
             )

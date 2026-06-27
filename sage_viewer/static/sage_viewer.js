@@ -633,7 +633,77 @@
   // children of #sage-overlay-root ourselves. Vue owns the container element
   // but never its children, so KaTeX's DOM writes can't corrupt Vue's vDOM.
   (function () {
+    // Write a scene-selector cell's index to the hidden goto relay so Vue's
+    // reactivity carries it to the server (the only external-JS → server path
+    // in Trame 3). A monotonic seq forces a state change on repeat clicks.
+    var _nativeSet = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, 'value'
+    ).set;
+    var _gotoSeq = 0;
+    function _gotoScene(index) {
+      var el = document.getElementById('sage-story-goto-relay');
+      if (!el) return;
+      _nativeSet.call(el, String(index) + ':' + (_gotoSeq++));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function makeMenu(it) {
+      // Clickable grid of scenes (the scene_menu overlay). The container stays
+      // click-through; only the cells take pointer events so the camera below
+      // is still draggable in the gaps.
+      var wrap = document.createElement('div');
+      wrap.style.cssText = it.style || '';
+      var grid = document.createElement('div');
+      grid.style.cssText =
+        'display:grid;gap:14px;pointer-events:auto;' +
+        'grid-template-columns:repeat(' + (it.cols || 4) + ',1fr);' +
+        'max-width:' + (it.max_width || 90) + 'vw;';
+      if (it.title) {
+        var h = document.createElement('div');
+        h.textContent = it.title;
+        h.style.cssText =
+          'grid-column:1/-1;text-align:center;color:#fff;font-weight:700;' +
+          'font-size:2rem;text-shadow:0 2px 8px rgba(0,0,0,0.8);';
+        grid.appendChild(h);
+      }
+      (it.cells || []).forEach(function (c) {
+        var cell = document.createElement('div');
+        cell.style.cssText =
+          'cursor:pointer;border:1px solid #06b6d4;border-radius:8px;' +
+          'overflow:hidden;background:rgba(8,12,20,0.72);' +
+          'display:flex;flex-direction:column;transition:transform .12s;';
+        cell.onmouseenter = function () { cell.style.transform = 'scale(1.04)'; };
+        cell.onmouseleave = function () { cell.style.transform = 'scale(1)'; };
+        if (c.thumb) {
+          var im = document.createElement('img');
+          im.src = c.thumb;
+          im.style.cssText = 'width:100%;height:auto;display:block;';
+          cell.appendChild(im);
+        } else {
+          var ph = document.createElement('div');
+          ph.textContent = c.n;
+          ph.style.cssText =
+            'aspect-ratio:16/9;display:flex;align-items:center;' +
+            'justify-content:center;font-size:2rem;color:#334155;' +
+            'background:#0b1220;';
+          cell.appendChild(ph);
+        }
+        var lab = document.createElement('div');
+        lab.textContent = c.n + '. ' + c.label;
+        lab.style.cssText =
+          'padding:6px 8px;color:#e2e8f0;font-size:0.85rem;' +
+          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+        cell.appendChild(lab);
+        cell.onclick = function () { _gotoScene(c.index); };
+        grid.appendChild(cell);
+      });
+      wrap.appendChild(grid);
+      return wrap;
+    }
+
     function makeItem(it) {
+      // Scene-selector grid (clickable thumbnails of every scene).
+      if (it.menu) return makeMenu(it);
       // Video overlays (e.g. the TNG movie) carry a src + the video flag.
       // Muted is required for browsers to honour autoplay.
       if (it.video) {

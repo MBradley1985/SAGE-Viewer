@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 from copy import deepcopy
+from pathlib import Path
 
 import numpy as np
 
@@ -152,15 +153,40 @@ def _normalize_overlay(item: dict) -> dict:
     return out
 
 
-def resolve_snap(value, count: int) -> int:
+def _parse_redshift_spec(value):
+    """Return the redshift float for a ``"z=1.5"`` / ``"z1.5"`` spec, else None."""
+    if not isinstance(value, str):
+        return None
+    s = value.strip().lower().replace(" ", "")
+    if s.startswith("z="):
+        s = s[2:]
+    elif s.startswith("z"):
+        s = s[1:]
+    else:
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def resolve_snap(value, count: int, table=None) -> int:
     """Resolve a (possibly symbolic) snapshot reference for a model.
 
-    Accepts an int (absolute), ``"first"`` / ``"last"``, or a percentage
-    string like ``"40%"`` — so a story is portable across models with
-    different snapshot counts.  Always clamped to ``[0, count-1]``.
+    Accepts an int (absolute), ``"first"`` / ``"last"``, a percentage string
+    like ``"40%"``, or a redshift spec like ``"z=1.5"`` / ``"z1.5"`` — so a
+    story is portable across models with different snapshot counts/redshifts.
+    A redshift is resolved to the **closest** snapshot via the model's redshift
+    *table* (so it carries over to whatever box is loaded); without a table it
+    falls back to the last snapshot.  Always clamped to ``[0, count-1]``.
     """
     last = max(0, int(count) - 1)
     if isinstance(value, str):
+        z = _parse_redshift_spec(value)
+        if z is not None:
+            if table is not None and getattr(table, "count", 0) > 0:
+                return max(0, min(last, int(table.z_to_snap(z))))
+            return last
         v = value.strip().lower()
         if v == "last":
             return last
@@ -189,9 +215,14 @@ class StoryPlayer:
         self._paused = False  # True after pause() → next play() resumes in place
         self._task: asyncio.Task | None = None
         self._saved: dict | None = None  # user state stashed on enter
-        # Scene indices whose fly-through intro (reset → approach → clusters)
-        # has already played, so a pause/resume doesn't restart the tour.
+        # Per-scene fly-through state. ``_ft_done`` holds scene indices whose
+        # centre-approach intro has already played, and ``_ft_idx`` the current
+        # target index per scene. Both are cleared when a scene is freshly
+        # staged (apply_scene), so entering a fly-through scene always replays
+        # the full sequence (reset → centre → clusters → groups), but are kept
+        # across a pause/resume so Play simply continues the tour in place.
         self._ft_done: set[int] = set()
+        self._ft_idx: dict[int, int] = {}
         # Per-scene snapshot_sweep frame index, so a pause/resume continues the
         # evolution in place instead of restarting from the first snapshot.
         self._sweep_k: dict[int, int] = {}
@@ -209,6 +240,16 @@ class StoryPlayer:
     def _push(self) -> None:
         if hasattr(self.ctrl, "view_update"):
             self.ctrl.view_update()
+
+    def _render_push(self) -> None:
+        """Render the plotter, THEN push — needed after data changes that don't
+        themselves render (e.g. ``set_snapshot``), so ``view_update`` doesn't
+        ship a stale frame (camera moves render via the motion helpers)."""
+        try:
+            self._scene.plotter.render()
+        except Exception:
+            pass
+        self._push()
 
     def _start(self, coro) -> None:
         """Cancel any running task and start *coro*."""
@@ -352,6 +393,15 @@ class StoryPlayer:
         self._playing = True
         self._start(self._go(i, play=True))
 
+    def goto_menu(self) -> None:
+        """Jump to the scene that holds the scene-selector grid (if any)."""
+        if self._story is None:
+            return
+        for idx, s in enumerate(self._story.scenes):
+            if self._scene_has_menu(s):
+                self.goto(idx)
+                return
+
     # ---- async drivers --------------------------------------------------
 
     async def _go(self, i: int, *, play: bool) -> None:
@@ -389,30 +439,44 @@ class StoryPlayer:
         scene = self._scene
         sc = self._story.scenes[i]
         self._index = i
-        # Freshly staging a scene clears any paused/resume state and replays
-        # this scene's fly-through intro on the next motion run.
         self._paused = False
-        self._ft_done.discard(i)
         self._sweep_k.pop(i, None)  # fresh staging → sweep starts from the top
+        # Fresh staging restarts the fly-through from the top (reset → centre →
+        # clusters → groups); pause/resume keeps these so Play continues in
+        # place. So switching scenes/models always replays the full sequence,
+        # while take-control/pause/play never interferes with it.
+        self._ft_done.discard(i)
+        self._ft_idx.pop(i, None)
         self._push_hud()
 
         # Model / multi-box layout first — it changes the active data.
         await self._apply_models(sc)
         # Data: snapshot (triggers filter re-apply via callbacks).
         self._apply_snapshot(sc)
-        # Apply all reactive state, then flush ONCE so the client re-renders a
-        # single time per scene (multiple flushes caused playback stutter).
+
+        # Resolve the camera now (needs the model/box). For an INSTANT cut set
+        # it BEFORE the flush, so the client never renders the new scene's data
+        # under the previous camera — that mismatch is the next/back flicker.
+        cam = scene.plotter.camera
+        pos1, foc1, up1 = self._resolve_camera(sc)
+        secs = float(sc.transition.get("duration_secs", 0.0)) if transition else 0.0
+        if secs <= 0.05:
+            cam.position = tuple(pos1)
+            cam.focal_point = tuple(foc1)
+            cam.up = tuple(up1)
+
+        # Apply all reactive state + focus/target, then flush ONCE so the client
+        # re-renders a single time per scene (multiple flushes caused stutter).
         self._apply_flat_state(sc)
         self._propagate_layer_visibility(sc)
         self._apply_theme(sc)
         self._apply_chrome(sc)
         self._apply_overlays(sc)
+        self._apply_focus(sc)
+        self._apply_target(sc)
         self.state.flush()
 
-        # Camera (resolved — supports "box"/"reset" framing for portability).
-        cam = scene.plotter.camera
-        pos1, foc1, up1 = self._resolve_camera(sc)
-        secs = float(sc.transition.get("duration_secs", 0.0)) if transition else 0.0
+        # An animated transition flies into the (already-applied) new scene.
         if secs > 0.05:
             await smooth_move(
                 cam,
@@ -425,17 +489,14 @@ class StoryPlayer:
                 is_active=lambda: True,
                 push=self._push,
             )
-        else:
-            cam.position = tuple(pos1)
-            cam.focal_point = tuple(foc1)
-            cam.up = tuple(up1)
-            self._push()
 
-        # Focus + target after camera is settled (single flush).
-        self._apply_focus(sc)
-        self._apply_target(sc)
-        self.state.flush()
-        self._push()
+        # Render the fully-staged scene ONCE before pushing, so the client gets
+        # the new frame in one shot instead of flickering through the old view.
+        self._render_push()
+        # Lazily capture a thumbnail for the scene selector the first time a
+        # scene is shown, so the menu grid fills in as the talk is navigated
+        # (best-effort; the menu scene itself is skipped).
+        self._maybe_capture_thumb(sc)
 
     # ---- symbolic resolution (portability across models) ----------------
 
@@ -502,7 +563,11 @@ class StoryPlayer:
     def _apply_snapshot(self, sc) -> None:
         scene = self._scene
         active = scene.active_model
-        snap = resolve_snap(sc.snap_num, active.snap_count)
+        # Pass each model's own redshift table so a redshift spec ("z=1.5")
+        # resolves to that box's closest snapshot — it carries over on a switch.
+        snap = resolve_snap(
+            sc.snap_num, active.snap_count, active.snap_table
+        )
         if snap != scene.current_snap:
             scene.set_snapshot(snap)
         # Pre-position every other on-screen box at its own equivalent snapshot
@@ -511,7 +576,9 @@ class StoryPlayer:
         for mdl in self._displayed_models():
             if mdl is active:
                 continue
-            mdl.set_snapshot(resolve_snap(sc.snap_num, mdl.snap_count))
+            mdl.set_snapshot(
+                resolve_snap(sc.snap_num, mdl.snap_count, mdl.snap_table)
+            )
             scene.refresh_label(mdl.name)
 
     def _apply_flat_state(self, sc) -> None:
@@ -656,8 +723,161 @@ class StoryPlayer:
         # Ship overlays as JSON for the client to render OUTSIDE Vue's control
         # (sage_viewer.js builds the DOM + runs KaTeX). Rendering them via Vue
         # would let KaTeX's DOM mutations corrupt Vue's virtual DOM.
-        items = [_normalize_overlay(o) for o in (sc.overlays or [])]
+        items = []
+        for o in (sc.overlays or []):
+            if o.get("kind") == "scene_menu":
+                # Auto-expanded into a clickable grid of the story's scenes;
+                # the client renders the cells and each one jumps via goto.
+                items.append(self._build_scene_menu(o, sc.id))
+            else:
+                items.append(_normalize_overlay(o))
         self.state.story_overlays_json = json.dumps(items)
+
+    # ---- scene-selector grid + thumbnails -------------------------------
+
+    def _thumbs_dir(self) -> Path:
+        """Folder holding captured scene thumbnails (served at /sage_static/)."""
+        return Path(__file__).resolve().parent.parent / "static" / "story_thumbs"
+
+    def _story_slug(self) -> str:
+        """Stable per-story prefix for thumbnail filenames."""
+        sp = getattr(self._story, "source_path", None) if self._story else None
+        if sp:
+            return Path(sp).stem
+        title = (self._story.title if self._story else "") or "story"
+        return title.lower().replace(" ", "_")
+
+    def _thumb_file(self, scene) -> Path:
+        return self._thumbs_dir() / f"{self._story_slug()}__{scene.id}.png"
+
+    def _thumb_src(self, scene) -> str:
+        """Served URL for a scene's thumbnail, or '' if not captured yet."""
+        f = self._thumb_file(scene)
+        return f"/sage_static/story_thumbs/{f.name}" if f.exists() else ""
+
+    def _build_scene_menu(self, item: dict, current_id: str) -> dict:
+        """Expand a ``{"kind":"scene_menu"}`` overlay into a grid spec.
+
+        Lists every scene except the menu scene itself (and, unless
+        ``include_cards`` is true, the ``card-*`` divider scenes). Each cell
+        carries its scene index (for goto), a 1-based number, a label, and a
+        thumbnail URL when one has been captured.
+        """
+        scenes = self._story.scenes if self._story else []
+        include_cards = bool(item.get("include_cards", False))
+        cells = []
+        for i, s in enumerate(scenes):
+            if s.id == current_id:
+                continue
+            if not include_cards and str(s.id).startswith("card-"):
+                continue
+            cells.append({
+                "index": i,
+                "n": i + 1,
+                "label": s.title or s.id or f"Scene {i + 1}",
+                "thumb": self._thumb_src(s),
+            })
+        anchor = item.get("anchor", "center")
+        style = (
+            _overlay_position_style(anchor, item.get("x", 0), item.get("y", 0))
+            + "pointer-events:none;"
+        )
+        return {
+            "menu": True,
+            "cols": int(item.get("cols", 4)),
+            "title": item.get("title", ""),
+            "max_width": float(item.get("max_width", 90)),
+            "cells": cells,
+            "style": style,
+        }
+
+    def _capture_image(self):
+        """Grab the current render-window image as an (H, W, 3) uint8 array.
+
+        Uses ``vtkWindowToImageFilter`` directly because the remote-view plotter
+        is never ``.show()``n, so pyvista's ``screenshot()`` refuses to run.
+        Returns ``None`` if capture fails.
+        """
+        try:
+            from vtkmodules.util.numpy_support import vtk_to_numpy
+            from vtkmodules.vtkRenderingCore import vtkWindowToImageFilter
+
+            rw = self._scene.plotter.ren_win
+            rw.Render()
+            w2if = vtkWindowToImageFilter()
+            w2if.SetInput(rw)
+            w2if.SetInputBufferTypeToRGB()
+            w2if.ReadFrontBufferOff()
+            w2if.Update()
+            vimg = w2if.GetOutput()
+            w, h, _ = vimg.GetDimensions()
+            arr = vtk_to_numpy(
+                vimg.GetPointData().GetScalars()
+            ).reshape(h, w, -1)
+            return arr[::-1].copy()  # VTK image origin is bottom-left
+        except Exception:
+            return None
+
+    @staticmethod
+    def _scene_has_menu(scene) -> bool:
+        return any(
+            (o or {}).get("kind") == "scene_menu" for o in (scene.overlays or [])
+        )
+
+    def _save_thumb(self, scene, *, width: int = 360) -> bool:
+        """Screenshot the current render window into the scene's thumbnail PNG.
+
+        Returns True on success. Best-effort: never raises (capture/encode
+        failures just return False so playback is never interrupted).
+        """
+        try:
+            from PIL import Image
+
+            arr = self._capture_image()
+            if arr is None:
+                return False
+            img = Image.fromarray(arr[:, :, :3], "RGB")
+            w, h = img.size
+            if w > width:
+                img = img.resize((width, max(1, round(h * width / w))))
+            self._thumbs_dir().mkdir(parents=True, exist_ok=True)
+            img.save(str(self._thumb_file(scene)), "PNG")
+            return True
+        except Exception:
+            return False
+
+    def _maybe_capture_thumb(self, scene) -> None:
+        """Capture a thumbnail the first time a scene is shown (lazy fill).
+
+        Skips the scene-selector scene itself and anything already captured, so
+        the menu grid populates automatically as the talk is navigated.
+        """
+        if self._story is None or self._scene_has_menu(scene):
+            return
+        if self._thumb_file(scene).exists():
+            return
+        self._save_thumb(scene)
+
+    async def capture_thumbnails(self, *, width: int = 360) -> None:
+        """Walk every scene, stage it, and (re)save its thumbnail.
+
+        Run from the Story Mode menu → "Capture thumbnails" to refresh the whole
+        set at once; normal navigation also fills thumbnails in lazily via
+        ``_maybe_capture_thumb``.
+        """
+        if self._story is None:
+            return
+        self.pause()  # stop any auto-advance/motion before stepping scenes
+        start = self._index
+        for i, s in enumerate(self._story.scenes):
+            if self._scene_has_menu(s):
+                continue
+            await self.apply_scene(i, transition=False)
+            await asyncio.sleep(0.4)  # let the staged scene render server-side
+            self._save_thumb(s, width=width)
+        # Return to where the author was, refreshing the menu so new thumbs show.
+        await self.apply_scene(start, transition=False)
+        self.state.flush()
 
     def _apply_focus(self, sc) -> None:
         scene = self._scene
@@ -795,20 +1015,25 @@ class StoryPlayer:
         return [h_pos[i] for i in g_idx], [h_pos[i] for i in c_idx]
 
     async def _motion_flythrough(self, sc, m) -> None:
-        """Cinematic fly-through that keeps touring groups until Next.
+        """Cinematic fly-through — the full sequence every time it is staged.
 
-        Reset → approach the box centre → visit the most-massive group →
-        visit every cluster (most→least, with focus) → then keep hopping
-        between groups (cycling the sorted list) until the presenter clicks
-        Next.  Drives the camera with the shared ``camera_motion`` helpers
-        (the same ones the toolbar uses) so the loop can keep visiting groups
-        instead of settling into a box orbit.  Honours ``self._playing``.
+        On a **fresh** start (every time a fly-through scene is staged via
+        next/prev/goto/enter, including a model switch): reset the camera, fly
+        into the box centre, then — repeated until Next — one uniform cycle per
+        target (clusters first, then groups, most-massive first): fly **in**
+        (search) → raise a **focus** ring → **orbit** it (rotate) → drop the
+        ring and go to the **next**. There is no settling box orbit at the end.
+
+        Only a **pause/resume** is exempt: Play after Pause re-enters here for
+        the same scene WITHOUT re-staging, so ``_ft_done`` / ``_ft_idx`` are
+        intact and the tour simply continues in place (the intro is skipped) —
+        so taking control then resuming never interferes with the fly-through.
+        Driven by the shared ``camera_motion`` helpers (the same ones the
+        toolbar uses). Honours ``self._playing``.
         """
         scene = self._scene
         st = self.state
         cam = scene.plotter.camera
-        bs, centre = self._box()
-        cx, cy, cz = (float(centre[0]), float(centre[1]), float(centre[2]))
         active = lambda: self._playing  # noqa: E731
 
         fps = _FPS
@@ -834,19 +1059,31 @@ class StoryPlayer:
                 fps, is_active=active, push=self._push,
             )
 
+        # Fresh staging (not a pause/resume) → play the centre-approach intro
+        # and restart the cursor. apply_scene clears _ft_done/_ft_idx for the
+        # scene on every fresh staging, so this replays the full sequence each
+        # time; only a pause/resume keeps them, continuing the tour in place.
+        idx = self._index
+        fresh = idx not in self._ft_done
+        self._ft_done.add(idx)
+
         groups, clusters = self._flythrough_targets()
-        # The intro (reset → approach → biggest group → clusters) plays only
-        # the first time this scene runs; a pause/resume skips straight to the
-        # group-touring loop so the tour isn't restarted from the top.
-        first_run = self._index not in self._ft_done
-        self._ft_done.add(self._index)
+        # Tour clusters first (most massive), then groups — each visited with
+        # the identical search → focus → rotate → next cycle.
+        targets = (
+            [(c, c_radius, c_dps) for c in clusters]
+            + [(g, g_radius, g_dps) for g in groups]
+        )
         try:
-            if first_run:
-                # Reset camera, then approach the box centre.
+            if fresh:
+                self._ft_idx[idx] = 0
+                # Into the box: reset to a pulled-back view, then approach centre.
+                bs, centre = self._box()
+                cx, cy, cz = float(centre[0]), float(centre[1]), float(centre[2])
                 cam.position = (cx, cy, bs * 2.2)
                 cam.focal_point = (cx, cy, cz)
                 cam.up = _UP
-                self._push()
+                self._render_push()
                 await asyncio.sleep(1.0 / fps)
                 if not await smooth_move(
                     cam, np.array([cx, cy, bs * 2.2]), np.array([cx, cy, cz]),
@@ -855,45 +1092,35 @@ class StoryPlayer:
                 ):
                     return
 
-                # Biggest group.
-                if groups:
-                    if not await fly_to(groups[0], g_radius, fly_secs):
-                        return
-                    if not await spin(groups[0], g_radius, g_dps):
-                        return
-
-                # Every cluster, most → least massive, with focus on each.
-                for cpos in clusters:
-                    if not await fly_to(cpos, c_radius, fly_secs):
-                        return
-                    scene.set_focus_sphere(
-                        tuple(float(v) for v in cpos), c_radius
-                    )
-                    st.focus_active = True
-                    st.flush()
-                    self._push()
-                    await asyncio.sleep(1.0 / fps)
-                    ok = active() and await spin(cpos, c_radius, c_dps)
-                    scene.clear_focus()
-                    st.focus_active = False
-                    st.flush()
-                    if not ok:
-                        return
-
-            # Then keep touring groups (cycling) until Next.
-            if not groups:
-                while active():  # no groups → gentle box orbit fallback
-                    if not await spin(centre, bs * 1.7, 8.0):
-                        return
+            if not targets:
+                # Empty box: hold the staged view until Next (no box orbit).
+                while active():
+                    await asyncio.sleep(0.1)
                 return
-            i = 0
+            # Continue from this scene's cursor (resume in place after a pause).
+            i = self._ft_idx.get(idx, 0) % len(targets)
             while active():
-                g = groups[i % len(groups)]
-                if not await fly_to(g, g_radius, fly_secs):
+                self._ft_idx[idx] = i  # checkpoint before the awaits
+                pos, radius, dps = targets[i]
+                # search: fly toward the structure.
+                if not await fly_to(pos, radius, fly_secs):
                     return
-                if not await spin(g, g_radius, g_dps):
+                # focus: raise the ring on it.
+                scene.set_focus_sphere(tuple(float(v) for v in pos), radius)
+                st.focus_active = True
+                st.flush()
+                self._render_push()
+                await asyncio.sleep(1.0 / fps)
+                # rotate: orbit the structure.
+                ok = active() and await spin(pos, radius, dps)
+                # next: drop the focus ring and advance to the next structure.
+                scene.clear_focus()
+                st.focus_active = False
+                st.flush()
+                self._render_push()
+                if not ok:
                     return
-                i += 1
+                i = (i + 1) % len(targets)
         finally:
             # Never leave a focus mask behind when the scene changes/pauses.
             if getattr(st, "focus_active", False):
@@ -911,8 +1138,8 @@ class StoryPlayer:
         lead = scene.primary
         from_spec = m.get("from", sc.snap_num)
         to_spec = m.get("to", sc.snap_num)
-        lo = resolve_snap(from_spec, lead.snap_count)
-        hi = resolve_snap(to_spec, lead.snap_count)
+        lo = resolve_snap(from_spec, lead.snap_count, lead.snap_table)
+        hi = resolve_snap(to_spec, lead.snap_count, lead.snap_table)
         fps = float(m.get("fps", 4.0))
         loop = bool(m.get("loop", False))
         # Frames = the lead box's span (it moves one snapshot per frame).
@@ -923,8 +1150,8 @@ class StoryPlayer:
         # than a shared index, which desyncs when counts differ).
         others = [
             (mdl,
-             resolve_snap(from_spec, mdl.snap_count),
-             resolve_snap(to_spec, mdl.snap_count))
+             resolve_snap(from_spec, mdl.snap_count, mdl.snap_table),
+             resolve_snap(to_spec, mdl.snap_count, mdl.snap_table))
             for mdl in self._displayed_models()
             if mdl is not lead
         ]
@@ -949,7 +1176,10 @@ class StoryPlayer:
                 for mdl, mlo, mhi in others:
                     mdl.set_snapshot(int(round(mlo + frac * (mhi - mlo))))
                     scene.refresh_label(mdl.name)  # keep its z-label live
-                self._push()
+                # set_snapshot updates the geometry but does NOT render, so
+                # render before pushing or view_update ships the previous frame
+                # (the box would appear frozen / "not evolving").
+                self._render_push()
                 await asyncio.sleep(1.0 / max(0.5, fps))
             self._sweep_k[i] = 0  # full pass done → next loop restarts at top
             if not loop:
