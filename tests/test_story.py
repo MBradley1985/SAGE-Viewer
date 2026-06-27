@@ -191,6 +191,115 @@ def test_resolve_model_ref_adaptive():
     assert p._resolve_model_ref(None, avail, "millennium", set()) is None
 
 
+def test_story_model_names_collects_all_referenced_models():
+    """Preload must cover every model the story uses: the launched primary,
+    requirements.models, and each scene's primary/adjacent refs (deduped,
+    symbolic refs resolved)."""
+    from sage_viewer.story.engine import StoryPlayer
+
+    class FakeScene:
+        primary_name = "millennium_vanilla"
+
+        def list_models(self):
+            return []
+
+    class FakeState:
+        models_list = [
+            {"name": "millennium_vanilla"}, {"name": "microuchuu"},
+            {"name": "millennium"},
+        ]
+
+    class FakeServer:
+        state = FakeState()
+        controller = object()
+
+    story = Story.from_dict({
+        "title": "T",
+        "requirements": {"models": ["millennium"]},
+        "scenes": [
+            {"id": "a", "models": {"primary": "current",
+                                   "adjacent": ["microuchuu"]}},
+            {"id": "b", "models": {"primary": "millennium_vanilla",
+                                   "adjacent": []}},
+        ],
+    })
+    p = StoryPlayer(FakeServer(), FakeScene())
+    names = p._story_model_names(story)
+    assert names[0] == "millennium_vanilla"          # launched primary first
+    assert set(names) == {"millennium_vanilla", "microuchuu", "millennium"}
+    assert len(names) == 3                            # no duplicates
+
+
+def test_propagate_layer_visibility_mirrors_all_boxes():
+    """Visibility toggled on the active box is mirrored to every loaded box
+    (so a paused multi-box scene resumes with both boxes matching)."""
+    from sage_viewer.story.engine import StoryPlayer
+
+    class FakeLayer:
+        def __init__(self):
+            self.visible = True
+
+    class FakeModel:
+        def __init__(self, name):
+            self.name = name
+            self.halo_layer = FakeLayer()
+            self.galaxy_layer = FakeLayer()
+
+    prim = FakeModel("millennium_vanilla")
+    adj = FakeModel("millennium")
+    # A third model is PRELOADED (in _models) but NOT displayed — it must be
+    # left alone, never made visible on top of the primary.
+    hidden = FakeModel("preloaded_hidden")
+    hidden.halo_layer.visible = False
+    hidden.galaxy_layer.visible = False
+
+    class FakeScene:
+        primary_name = "millennium_vanilla"
+        _adjacent_order = ["millennium"]
+        _models = {"millennium_vanilla": prim, "millennium": adj,
+                   "preloaded_hidden": hidden}
+
+        def list_models(self):
+            return list(self._models.values())
+
+    class FakeState:
+        halos_visible = True
+        galaxies_visible = True  # user just switched galaxies on while paused
+
+    class FakeServer:
+        state = FakeState()
+        controller = object()
+
+    p = StoryPlayer(FakeServer(), FakeScene())
+    p._propagate_layer_visibility(None)
+    # Both DISPLAYED boxes show galaxies; the preloaded-hidden model is untouched.
+    assert prim.galaxy_layer.visible and adj.galaxy_layer.visible
+    assert prim.halo_layer.visible and adj.halo_layer.visible
+    assert hidden.galaxy_layer.visible is False  # not stacked on the primary
+    assert hidden.halo_layer.visible is False
+
+    # Hiding galaxies mirrors across displayed boxes too.
+    FakeState.galaxies_visible = False
+    p._propagate_layer_visibility(None)
+    assert not prim.galaxy_layer.visible and not adj.galaxy_layer.visible
+
+    # Single-box scenes are left untouched (no mirroring needed).
+    solo = FakeModel("solo")
+    solo.galaxy_layer.visible = True
+
+    class SoloScene:
+        primary_name = "solo"
+        _adjacent_order: list = []
+        _models = {"solo": solo}
+
+        def list_models(self):
+            return [solo]
+
+    p2 = StoryPlayer(FakeServer(), SoloScene())
+    p2._propagate_layer_visibility(None)  # FakeState.galaxies_visible is False
+    assert solo.galaxy_layer.visible is True  # unchanged
+
+
 def test_portable_example_loads(tmp_path, monkeypatch):
     """The shipped example must parse with symbolic snap/camera values."""
     from sage_viewer.story.model import Scene

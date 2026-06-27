@@ -103,6 +103,29 @@ def _normalize_overlay(item: dict) -> dict:
         return {"id": str(item.get("id", "")), "style": style,
                 "src": item.get("src", "")}
 
+    # Video overlays (e.g. the TNG movie) carry a src + sizing like an image,
+    # plus playback flags. Served from sage_viewer/static/ at /sage_static/,
+    # so the file must live there (NOT the data Library). Use MP4/WebM.
+    if kind == "video":
+        w = item.get("width", 480)
+        width_css = w if isinstance(w, str) else f"{float(w):g}px"
+        # With controls on, the element must accept clicks so the user can use
+        # the native transport / fullscreen button; otherwise stay click-through.
+        controls = bool(item.get("controls", False))
+        style = (
+            _overlay_position_style(anchor, x, y)
+            + f"width:{width_css};height:auto;"
+            + f"opacity:{float(item.get('opacity', 1.0))};"
+            + ("pointer-events:auto;" if controls else "pointer-events:none;")
+            + "filter:drop-shadow(0 2px 8px rgba(0,0,0,0.8));"
+        )
+        return {"id": str(item.get("id", "")), "style": style,
+                "src": item.get("src", ""), "video": True,
+                "loop": bool(item.get("loop", True)),
+                "autoplay": bool(item.get("autoplay", True)),
+                "muted": bool(item.get("muted", True)),
+                "controls": controls}
+
     base = _OVERLAY_DEFAULTS.get(kind, _OVERLAY_DEFAULTS["text"])
 
     size = float(item.get("size", base["size"]))
@@ -169,6 +192,9 @@ class StoryPlayer:
         # Scene indices whose fly-through intro (reset → approach → clusters)
         # has already played, so a pause/resume doesn't restart the tour.
         self._ft_done: set[int] = set()
+        # Per-scene snapshot_sweep frame index, so a pause/resume continues the
+        # evolution in place instead of restarting from the first snapshot.
+        self._sweep_k: dict[int, int] = {}
 
     # ---- small helpers --------------------------------------------------
 
@@ -218,6 +244,10 @@ class StoryPlayer:
         self._index = 0
         self._playing = False
         self._save_user_state()
+        # Suppress the per-box name/redshift labels for a clean presentation
+        # view; restored on exit.
+        if hasattr(self._scene, "set_labels_enabled"):
+            self._scene.set_labels_enabled(False)
         self._start(self._enter_async(story))
 
     async def _enter_async(self, story: Story) -> None:
@@ -241,6 +271,9 @@ class StoryPlayer:
         self.state.story_playing = False
         self.state.story_overlays_json = "[]"
         self.state.flush()
+        # Restore the per-box labels that were suppressed on enter.
+        if hasattr(self._scene, "set_labels_enabled"):
+            self._scene.set_labels_enabled(True)
         # Restore (incl. async model switch-back) on a fresh task.
         self._start(self._exit_async())
 
@@ -257,13 +290,20 @@ class StoryPlayer:
         if self._story is None:
             return
         i = min(self._index + 1, len(self._story.scenes) - 1)
-        self._start(self._go(i, play=self._playing))
+        # Advancing the show plays the target scene's motion, even if playback
+        # was paused or had stopped at the end — otherwise a sweep/flythrough
+        # sits frozen on its first frame. (Pause to stop; Play to resume here.)
+        self._paused = False
+        self._playing = True
+        self._start(self._go(i, play=True))
 
     def prev(self) -> None:
         if self._story is None:
             return
         i = max(self._index - 1, 0)
-        self._start(self._go(i, play=self._playing))
+        self._paused = False
+        self._playing = True
+        self._start(self._go(i, play=True))
 
     def play(self) -> None:
         if self._story is None:
@@ -275,6 +315,10 @@ class StoryPlayer:
             self._paused = False
             self._playing = True
             self._apply_chrome(self._story.scenes[self._index])
+            # Mirror any visibility the user toggled while paused (e.g. galaxies
+            # on the active box) onto every loaded box, so a multi-box scene
+            # resumes with both boxes matching.
+            self._propagate_layer_visibility(self._story.scenes[self._index])
             self.state.flush()
             self._push_hud()
             self._start(self._resume())
@@ -304,7 +348,9 @@ class StoryPlayer:
         if self._story is None:
             return
         i = max(0, min(int(i), len(self._story.scenes) - 1))
-        self._start(self._go(i, play=self._playing))
+        self._paused = False
+        self._playing = True
+        self._start(self._go(i, play=True))
 
     # ---- async drivers --------------------------------------------------
 
@@ -319,7 +365,15 @@ class StoryPlayer:
     async def _autoplay_from(self, i: int) -> None:
         n = len(self._story.scenes)
         while self._playing:
-            await self._run_motion(self._story.scenes[i])
+            sc = self._story.scenes[i]
+            await self._run_motion(sc)
+            if not self._playing:
+                break
+            # hold=True parks here (motion done, but _playing stays True) until
+            # Next cancels this task — so nothing auto-advances off the scene,
+            # yet Next still resumes playback on the following scene.
+            while self._playing and sc.hold:
+                await asyncio.sleep(0.1)
             if not self._playing:
                 break
             if i + 1 >= n:
@@ -339,6 +393,7 @@ class StoryPlayer:
         # this scene's fly-through intro on the next motion run.
         self._paused = False
         self._ft_done.discard(i)
+        self._sweep_k.pop(i, None)  # fresh staging → sweep starts from the top
         self._push_hud()
 
         # Model / multi-box layout first — it changes the active data.
@@ -348,6 +403,7 @@ class StoryPlayer:
         # Apply all reactive state, then flush ONCE so the client re-renders a
         # single time per scene (multiple flushes caused playback stutter).
         self._apply_flat_state(sc)
+        self._propagate_layer_visibility(sc)
         self._apply_theme(sc)
         self._apply_chrome(sc)
         self._apply_overlays(sc)
@@ -399,11 +455,12 @@ class StoryPlayer:
             return None
         return np.asarray(value, dtype=float)
 
-    def _frame_boxes(self):
+    def _frame_boxes(self, zoom: float = 1.0):
         """Frame all currently-loaded boxes (primary + adjacent).
 
         Box-size aware and multi-box aware, so the same ``"box"`` camera works
-        whether one or several simulations are side-by-side.
+        whether one or several simulations are side-by-side. ``zoom`` > 1 pulls
+        the camera further back (smaller box on screen, e.g. to clear a heading).
         """
         scene = self._scene
         boxes = [(np.asarray(scene.primary.offset, dtype=float),
@@ -420,7 +477,7 @@ class StoryPlayer:
         center = (mins + maxs) / 2.0
         extent = float(np.max(maxs - mins))
         pos = np.array(
-            [center[0], center[1], maxs[2] + extent * 1.2], dtype=float
+            [center[0], center[1], maxs[2] + extent * 1.2 * zoom], dtype=float
         )
         return pos, center, np.array(_UP, dtype=float)
 
@@ -434,6 +491,9 @@ class StoryPlayer:
         spec = sc.camera
         if isinstance(spec, str):
             return self._frame_boxes()
+        # Box framing with a pull-back factor: {"frame": "box", "zoom": 1.4}.
+        if "frame" in spec:
+            return self._frame_boxes(zoom=float(spec.get("zoom", 1.0)))
         pos = np.asarray(spec.get("position", cam.position), dtype=float)
         foc = np.asarray(spec.get("focal_point", cam.focal_point), dtype=float)
         up = np.asarray(spec.get("up", _UP), dtype=float)
@@ -441,9 +501,18 @@ class StoryPlayer:
 
     def _apply_snapshot(self, sc) -> None:
         scene = self._scene
-        snap = resolve_snap(sc.snap_num, scene.active_model.snap_count)
+        active = scene.active_model
+        snap = resolve_snap(sc.snap_num, active.snap_count)
         if snap != scene.current_snap:
             scene.set_snapshot(snap)
+        # Pre-position every other on-screen box at its own equivalent snapshot
+        # so a multi-box scene doesn't flash the adjacent box at its default
+        # frame before the sweep starts.
+        for mdl in self._displayed_models():
+            if mdl is active:
+                continue
+            mdl.set_snapshot(resolve_snap(sc.snap_num, mdl.snap_count))
+            scene.refresh_label(mdl.name)
 
     def _apply_flat_state(self, sc) -> None:
         st = self.state
@@ -452,6 +521,41 @@ class StoryPlayer:
         for k, v in sc.state.items():
             setattr(st, k, deepcopy(v))
         st.dirty(*sc.state.keys())
+
+    def _displayed_models(self) -> list:
+        """Boxes actually on screen: the primary + any adjacent side-by-side
+        boxes. Excludes models that are only PRELOADED into the scene (loaded
+        hidden at the origin to warm their caches) — turning those visible
+        would stack a second box directly on top of the primary.
+        """
+        scene = self._scene
+        names = [scene.primary_name, *(getattr(scene, "_adjacent_order", []) or [])]
+        out: list = []
+        for n in names:
+            m = scene._models.get(n)
+            if m is not None and m not in out:
+                out.append(m)
+        return out
+
+    def _propagate_layer_visibility(self, sc) -> None:
+        """Mirror halo/galaxy visibility across the on-screen boxes.
+
+        The ``halos_visible`` / ``galaxies_visible`` state.change handlers route
+        to the ACTIVE box only (``scene.halo_layer`` → ``active_model``), and a
+        freshly added adjacent box turns *both* its layers on. So in a multi-box
+        scene a halo-only state would still show galaxies in the second box —
+        here we apply the scene's visibility to every DISPLAYED box for a
+        uniform view (preloaded-but-hidden models are left alone).
+        """
+        models = self._displayed_models()
+        if len(models) < 2:
+            return
+        st = self.state
+        halos = bool(getattr(st, "halos_visible", True))
+        gals = bool(getattr(st, "galaxies_visible", True))
+        for m in models:
+            m.halo_layer.visible = halos
+            m.galaxy_layer.visible = gals
 
     def _apply_theme(self, sc) -> None:
         theme = sc.theme or (self._story.theme if self._story else None)
@@ -530,6 +634,18 @@ class StoryPlayer:
             for name in current - wanted_set:
                 try:
                     await _maybe_await(ctrl.toggle_adjacent(name))
+                except Exception:
+                    pass
+
+        # Background-warm every loaded box's snapshots. Only the primary does
+        # this at scene-init; adjacent boxes would otherwise load on demand and
+        # stutter the first sweep. preload_all() is idempotent (skips in-flight
+        # snaps), so this is cheap to call on every scene.
+        for mdl in scene.list_models():
+            loader = getattr(mdl, "loader", None)
+            if loader is not None and hasattr(loader, "preload_all"):
+                try:
+                    loader.preload_all()
                 except Exception:
                     pass
 
@@ -787,68 +903,164 @@ class StoryPlayer:
 
     async def _motion_snapshot_sweep(self, sc, m) -> None:
         scene = self._scene
-        count = scene.active_model.snap_count
-        lo = resolve_snap(m.get("from", sc.snap_num), count)
-        hi = resolve_snap(m.get("to", sc.snap_num), count)
+        # Lead the sweep with the PRIMARY box so it always steps one snapshot
+        # per frame at the intended rate — independent of which box happens to
+        # be UI-active (clicking an adjacent box must not change the cadence).
+        if scene.active_box_name != scene.primary_name:
+            scene.set_active_box(scene.primary_name)
+        lead = scene.primary
+        from_spec = m.get("from", sc.snap_num)
+        to_spec = m.get("to", sc.snap_num)
+        lo = resolve_snap(from_spec, lead.snap_count)
+        hi = resolve_snap(to_spec, lead.snap_count)
         fps = float(m.get("fps", 4.0))
-        step = 1 if hi >= lo else -1
-        # In multi-box mode advance every loaded box (each clamped to its own
-        # snapshot count) — scene.set_snapshot only moves the active box.
-        multibox = len(getattr(scene, "_adjacent_order", []) or []) > 0
-        for s in range(lo, hi + step, step):
-            if not self._playing:
+        loop = bool(m.get("loop", False))
+        # Frames = the lead box's span (it moves one snapshot per frame).
+        n = abs(hi - lo) + 1
+        # Resolve each OTHER loaded box's own [lo, hi] so boxes with different
+        # snapshot counts stay in sync: every box starts and finishes together,
+        # advancing by the same fraction of its own range each frame (rather
+        # than a shared index, which desyncs when counts differ).
+        others = [
+            (mdl,
+             resolve_snap(from_spec, mdl.snap_count),
+             resolve_snap(to_spec, mdl.snap_count))
+            for mdl in self._displayed_models()
+            if mdl is not lead
+        ]
+        # Make sure every box's frames are cached before evolving so the first
+        # pass is stutter-free (the initial sandbox preload only covers the
+        # primary; adjacent boxes are warmed here off the event loop).
+        await self._warm_sweep([(lead, lo, hi), *others])
+        if not self._playing:
+            return
+
+        # loop=True replays the sweep until Next/Pause cancels the task; the
+        # auto-advance never fires, so the scene holds until the user steps on.
+        i = self._index
+        while True:
+            for k in range(self._sweep_k.get(i, 0), n):
+                if not self._playing:
+                    return
+                self._sweep_k[i] = k  # checkpoint BEFORE the await so a pause
+                #                       (which cancels the task) resumes here.
+                frac = k / (n - 1) if n > 1 else 0.0
+                scene.set_snapshot(int(round(lo + frac * (hi - lo))))
+                for mdl, mlo, mhi in others:
+                    mdl.set_snapshot(int(round(mlo + frac * (mhi - mlo))))
+                    scene.refresh_label(mdl.name)  # keep its z-label live
+                self._push()
+                await asyncio.sleep(1.0 / max(0.5, fps))
+            self._sweep_k[i] = 0  # full pass done → next loop restarts at top
+            if not loop:
                 return
-            scene.set_snapshot(int(s))  # active box + state/label
-            if multibox:
-                active = scene.active_model
-                for mdl in scene.list_models():
-                    if mdl is active:
-                        continue
-                    mdl.set_snapshot(min(int(s), mdl.snap_count - 1))
-            self._push()
-            await asyncio.sleep(1.0 / max(0.5, fps))
+
+    async def _warm_sweep(self, ranges) -> None:
+        """Block (off the event loop) until each (model, lo, hi) range is cached.
+
+        Already-warm snapshots are skipped via the loader's tree cache, so a
+        resume — where everything is already loaded — returns immediately.
+        """
+        st = self.state
+        warmed = False
+        for mdl, mlo, mhi in ranges:
+            loader = getattr(mdl, "loader", None)
+            if loader is None:
+                continue
+            a, b = (mlo, mhi) if mlo <= mhi else (mhi, mlo)
+            for s in range(a, b + 1):
+                if not self._playing:
+                    break
+                if loader.get_tree(int(s)) is not None:
+                    continue  # already loaded
+                st.preload_status = f"Warming {getattr(mdl, 'name', 'model')}..."
+                st.flush()
+                warmed = True
+                try:
+                    await asyncio.to_thread(loader.get, int(s))
+                except Exception:
+                    pass
+        if warmed:
+            st.preload_status = ""
+            st.flush()
 
     # ---- sandbox preload ------------------------------------------------
 
-    def _required_snaps(self, story: Story) -> list[int]:
-        """Snapshots to warm, resolved against the active model's count.
+    def _story_model_names(self, story: Story) -> list[str]:
+        """Every model the story uses: the launched primary, explicit
+        ``requirements.models``, and each scene's ``models`` primary/adjacent
+        refs (symbolic refs resolved against the discovered models)."""
+        scene = self._scene
+        avail = self._available_models()
+        launched = scene.primary_name
+        names: list[str] = []
 
-        Handles symbolic refs (first/last/%) so a portable story preloads the
-        right frames for whatever model is connected.
-        """
-        count = self._scene.active_model.snap_count
-        snaps: set[int] = set()
-        req = story.requirements.get("snapshots")
-        if isinstance(req, dict):
-            lo = resolve_snap(req.get("from", 0), count)
-            hi = resolve_snap(req.get("to", lo), count)
-            snaps.update(range(min(lo, hi), max(lo, hi) + 1))
-        elif isinstance(req, (list, tuple)):
-            snaps.update(resolve_snap(s, count) for s in req)
+        def add(ref):
+            nm = self._resolve_model_ref(ref, avail, launched, set())
+            if nm and nm not in names:
+                names.append(nm)
+
+        add(launched)
+        for ref in (story.requirements.get("models") or []):
+            add(ref)
         for sc in story.scenes:
-            snaps.add(resolve_snap(sc.snap_num, count))
-            mm = sc.motion or {}
-            if mm.get("kind") == "snapshot_sweep":
-                lo = resolve_snap(mm.get("from", sc.snap_num), count)
-                hi = resolve_snap(mm.get("to", sc.snap_num), count)
-                snaps.update(range(min(lo, hi), max(lo, hi) + 1))
-        return sorted(snaps)
+            spec = sc.models or {}
+            if spec.get("primary"):
+                add(spec.get("primary"))
+            for a in (spec.get("adjacent") or []):
+                add(a)
+        return names
+
+    def _model_paths(self) -> dict[str, str]:
+        """Map discovered model name → parameter-file path (for loading)."""
+        out: dict[str, str] = {}
+        for m in (getattr(self.state, "models_list", None) or []):
+            if isinstance(m, dict) and m.get("name") and m.get("path"):
+                out[m["name"]] = m["path"]
+        return out
 
     async def _preload_sandbox(self, story: Story) -> None:
+        """Load EVERY model the story uses (hidden) and warm all its snapshots,
+        so playback, camera moves, and model switches are stall-free. The
+        original build only warmed the active model, which left adjacent boxes
+        to load on demand and stutter the first sweep."""
         scene = self._scene
         st = self.state
-        loader = scene.active_model.loader
-        snaps = self._required_snaps(story)
-        n = len(snaps)
-        for i, s in enumerate(snaps, start=1):
-            if self._story is None:  # exited while loading
-                return
-            st.preload_status = f"Loading story... {i}/{n}"
-            st.flush()
-            try:
-                await asyncio.to_thread(loader.get, int(s))
-            except Exception:
-                pass
+        names = self._story_model_names(story)
+        paths = self._model_paths()
+
+        # Resolve each model to a (loaded) loader + the snapshots to warm.
+        plan: list[tuple] = []  # (loader, [snaps])
+        for name in names:
+            mdl = scene._models.get(name) if scene.has_model(name) else None
+            if mdl is None and name in paths:
+                try:
+                    mdl = scene.add_model(paths[name])  # loads hidden
+                except Exception:
+                    mdl = None
+            loader = getattr(mdl, "loader", None)
+            if loader is None:
+                continue
+            if hasattr(loader, "preload_all"):
+                try:
+                    loader.preload_all()  # kick background loads of the rest
+                except Exception:
+                    pass
+            plan.append((loader, list(range(mdl.snap_count))))
+
+        total = sum(len(s) for _, s in plan) or 1
+        done = 0
+        for loader, snaps in plan:
+            for s in snaps:
+                if self._story is None:  # exited while loading
+                    return
+                done += 1
+                st.preload_status = f"Loading story... {done}/{total}"
+                st.flush()
+                try:
+                    await asyncio.to_thread(loader.get, int(s))
+                except Exception:
+                    pass
         st.preload_status = ""
         st.flush()
 

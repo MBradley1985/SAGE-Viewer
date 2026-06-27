@@ -634,6 +634,23 @@
   // but never its children, so KaTeX's DOM writes can't corrupt Vue's vDOM.
   (function () {
     function makeItem(it) {
+      // Video overlays (e.g. the TNG movie) carry a src + the video flag.
+      // Muted is required for browsers to honour autoplay.
+      if (it.video) {
+        var vid = document.createElement('video');
+        vid.src = it.src;
+        vid.style.cssText = it.style || '';
+        vid.loop = it.loop !== false;
+        vid.muted = it.muted !== false;
+        vid.autoplay = it.autoplay !== false;
+        vid.controls = !!it.controls;
+        vid.playsInline = true;
+        if (vid.autoplay) {
+          var p = vid.play();
+          if (p && p.catch) p.catch(function () {});
+        }
+        return vid;
+      }
       // Image overlays (logos etc.) carry a src instead of text/latex.
       if (it.src != null) {
         var img = document.createElement('img');

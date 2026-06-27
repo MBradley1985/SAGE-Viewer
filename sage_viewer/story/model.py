@@ -63,6 +63,8 @@ class Scene:
     )
     dwell_secs: float = DEFAULT_DWELL_SECS
     motion: dict[str, Any] = field(default_factory=lambda: {"kind": "still"})
+    # hold=True → never auto-advance off this scene during Play; wait for Next.
+    hold: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -77,6 +79,8 @@ class Scene:
             "dwell_secs": self.dwell_secs,
             "motion": deepcopy(self.motion),
         }
+        if self.hold:
+            d["hold"] = True
         if self.theme is not None:
             d["theme"] = self.theme
         if self.target is not None:
@@ -115,6 +119,7 @@ class Scene:
             ),
             dwell_secs=float(d.get("dwell_secs", DEFAULT_DWELL_SECS)),
             motion=deepcopy(d.get("motion", {"kind": "still"})),
+            hold=bool(d.get("hold", False)),
         )
 
 

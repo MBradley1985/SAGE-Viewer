@@ -4,33 +4,209 @@
   "author": "Michael Bradley",
   "description": "PhD Mid-Candidature Review presentation, built with Story Mode on the story-mode branch.",
   "theme": "dos_blue",
-  "requirements": {},
+  "requirements": {
+    "models": ["millennium_vanilla", "millennium"]
+  },
   "autoplay": true,
   "scenes": [
     {
       "id": "title",
-      "title": "Title",
+      "title": "Michael Bradley MCR",
       "caption": "",
       "snap_num": "last",
       "camera": "box",
+      "models": { "primary": "millennium_vanilla", "adjacent": [] },
       "state": {
         "halos_visible": true,
         "galaxies_visible": true,
-        "halo_opacity": 0.12,
         "galaxy_color_mode": "structure"
       },
       "focus": { "kind": "none" },
       "chrome": { "hide_panel": true },
       "overlays": [
-        { "kind": "title", "text": "Mid-Candidature Review", "anchor": "top-right", "x": 5, "y": 50, "align": "right", "size": 3.4 },
-        { "kind": "heading", "text": "Michael Bradley", "anchor": "top-right", "x": 5, "y": 59, "align": "right", "color": "#ffffff" },
-        { "kind": "text", "text": "Supervisors:\nDarren\nRobert\nMichelle", "anchor": "top-right", "x": 5, "y": 66, "align": "right" },
-        { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 150 },
-        { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "150px", "y": 0, "width": 190 }
+        { "kind": "title", "text": "Mid-Candidature Review", "anchor": "top-right", "x": 5, "y": 50, "align": "right", "size": 5.0 },
+        { "kind": "heading", "text": "Michael Bradley", "anchor": "top-right", "x": 5, "y": 62, "align": "right", "color": "#ffffff" },
+        { "kind": "text", "text": "Supervisors:\nDarren Croton\nRobert Mostoghiu Paun\nMichelle Cluver", "anchor": "top-right", "x": 5, "y": 66, "align": "right" },
+        { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 },
+        { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "200px", "y": 0, "width": 290 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0,
       "motion": { "kind": "flythrough" }
+    },
+    {
+      "id": "card-intro",
+      "title": "Introduction",
+      "caption": "",
+      "snap_num": "last",
+      "camera": "box",
+      "models": { "adjacent": [] },
+      "state": {
+        "halos_visible": false,
+        "galaxies_visible": false
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "hold": true,
+      "overlays": [
+        { "kind": "title", "text": "Introduction", "anchor": "center", "align": "center", "size": 4.0 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0
+    },
+    {
+      "id": "sims-sweep",
+      "title": "Simulations",
+      "caption": "Structure assembling from high-z to z=0",
+      "snap_num": "first",
+      "camera": { "frame": "box", "zoom": 1.4 },
+      "models": { "primary": "millennium_vanilla", "adjacent": [] },
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": false,
+        "halo_color_mode": "mvir",
+        "halo_colormap": "viridis"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "overlays": [
+        { "kind": "heading", "text": "Simulations", "anchor": "top", "y": 6, "align": "center", "size": 3.0 },
+        { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 },
+        { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "200px", "y": 0, "width": 290 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0,
+      "motion": { "kind": "snapshot_sweep", "from": "first", "to": "last", "fps": 4.5, "loop": true }
+    },
+    {
+      "id": "sims-tng-video",
+      "title": "Simulations",
+      "caption": "A TNG50 zoom of a single galaxy forming",
+      "snap_num": "last",
+      "camera": "box",
+      "models": { "primary": "millennium_vanilla", "adjacent": [] },
+      "state": {
+        "halos_visible": false,
+        "galaxies_visible": false
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "hold": true,
+      "overlays": [
+        { "kind": "heading", "text": "Simulations", "anchor": "top", "y": 6, "align": "center", "size": 3.0 },
+        { "kind": "video", "src": "/sage_static/tng50_galaxy_formation.mp4", "anchor": "center", "x": 0, "y": 4, "width": "55vw", "loop": true, "autoplay": true, "muted": true, "controls": true },
+        { "kind": "citation", "text": "TNG50 (IllustrisTNG)", "anchor": "bottom-right", "x": 3, "y": 3 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0
+    },
+    {
+      "id": "sims-add-galaxies",
+      "title": "Simulations",
+      "caption": "Pause, switch on galaxies, then resume",
+      "snap_num": "first",
+      "camera": { "frame": "box", "zoom": 1.4 },
+      "models": { "primary": "millennium_vanilla", "adjacent": [] },
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": false,
+        "halo_color_mode": "mvir",
+        "halo_colormap": "viridis"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "overlays": [
+        { "kind": "heading", "text": "Simulations", "anchor": "top", "y": 6, "align": "center", "size": 3.0 },
+        { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 },
+        { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "200px", "y": 0, "width": 290 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0,
+      "motion": { "kind": "snapshot_sweep", "from": "first", "to": "last", "fps": 4.5, "loop": true }
+    },
+    {
+      "id": "card-local-universe",
+      "title": "Local Universe",
+      "caption": "",
+      "snap_num": "last",
+      "camera": "box",
+      "models": { "primary": "millennium_vanilla", "adjacent": [] },
+      "state": {
+        "halos_visible": false,
+        "galaxies_visible": false
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "hold": true,
+      "overlays": [
+        { "kind": "title", "text": "Local Universe", "anchor": "center", "align": "center", "size": 4.0 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0
+    },
+    {
+      "id": "galaxies-vanilla",
+      "title": "Local Universe",
+      "caption": "miniMillennium (SAGE16) galaxies at z=0",
+      "snap_num": "last",
+      "camera": "box",
+      "models": { "primary": "millennium_vanilla", "adjacent": [] },
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": true,
+        "galaxy_color_mode": "structure"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "hold": true,
+      "overlays": [
+        { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 },
+        { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "200px", "y": 0, "width": 290 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0
+    },
+    {
+      "id": "galaxies-millennium",
+      "title": "Local Universe",
+      "caption": "miniMillennium (SAGE26) galaxies at z=0",
+      "snap_num": "last",
+      "camera": "box",
+      "models": { "primary": "millennium", "adjacent": [] },
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": true,
+        "galaxy_color_mode": "structure"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "hold": true,
+      "overlays": [
+        { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 },
+        { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "200px", "y": 0, "width": 290 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0
+    },
+    {
+      "id": "card-cosmic-noon",
+      "title": "Cosmic Noon",
+      "caption": "",
+      "snap_num": "last",
+      "camera": "box",
+      "models": { "adjacent": [] },
+      "state": {
+        "halos_visible": false,
+        "galaxies_visible": false
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "hold": true,
+      "overlays": [
+        { "kind": "title", "text": "Cosmic Noon", "anchor": "center", "align": "center", "size": 4.0 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0
     }
   ]
 }
