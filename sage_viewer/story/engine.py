@@ -1109,6 +1109,9 @@ class StoryPlayer:
         rw = scene.plotter.ren_win
         prev_off = rw.GetOffScreenRendering()
         rw.SetOffScreenRendering(1)  # read-back needs the off-screen FBO
+        # One warm-up render after switching context so points_gaussian shaders
+        # compile in the off-screen FBO before we start capturing frames.
+        rw.Render()
         try:
             for k, s in enumerate(order):
                 if not self._playing:
