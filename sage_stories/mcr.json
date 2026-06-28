@@ -261,11 +261,11 @@
       "chrome": { "hide_panel": true },
       "hold": true,
       "overlays": [
-        { "kind": "heading", "text": "Remaining PhD Timeline", "anchor": "top", "y": 18, "align": "center", "size": 2.2 },
+        { "kind": "heading", "text": "Remaining PhD Timeline", "anchor": "top", "y": 18, "align": "center", "size": 2.4 },
         {
           "kind": "text",
           "text": "14 Jul 2026   —   Mid-Candidature Review  ◀ today\n\nAug 2026   —   300 Collaboration Annual Meeting\n\nOct 2026   —   SAGE26 Papers I (model) & II (FFBs) submitted\n\nNov 2026   —   CDM ECR / Annual Workshop / Conference\n\nJan 2027   —   SAGE26 Paper III (ICS) submitted, or with Papers I & II\n\nFeb 2027   —   Paper IV — High-z MQGs  (Karl, Darren, Harry, Amrita & Jayde)\n\nMar 2027   —   Thesis writing\n\nMay / Jun 2027   —   Draft thesis review\n\nSep 2027   —   Thesis submission",
-          "anchor": "top", "y": 28, "align": "center", "size": 1.1, "max_width": 78
+          "anchor": "top", "y": 28, "align": "center", "size": 1.5, "max_width": 78
         }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
@@ -289,22 +289,22 @@
       "hold": true,
       "overlays": [
         { "kind": "heading", "text": "Summary", "anchor": "top", "y": 5, "align": "center", "size": 2.5 },
-        { "kind": "heading", "text": "Key Findings", "anchor": "top", "y": 14, "align": "center", "size": 1.2 },
+        { "kind": "heading", "text": "Key Findings", "anchor": "top", "y": 11, "align": "center", "size": 1.8 },
         {
           "kind": "text",
           "text": "•  Implementing a distinct CGM reservoir with dedicated inflow physics results in a more detailed galaxy structure, more analogous to observations.\n\n•  Ensuring star formation is fuelled from H₂ rather than total cold gas results in a physically precise stellar growth mechanism through time.\n\n•  A FIRE-inspired supernova feedback model produces more realistic mass loading values and regulates galaxy growth through time.\n\n•  FFBs reproduce galaxies seen by JWST and provide theoretical reasoning for how these galaxies evolved.\n\n•  Many other fixes, changes and bug-hunts under the hood of SAGE26.",
-          "anchor": "top", "y": 20, "align": "center", "size": 0.88, "max_width": 70
+          "anchor": "top", "y": 16, "align": "center", "size": 1.45, "max_width": 84
         },
-        { "kind": "heading", "text": "Next Steps", "anchor": "top", "y": 45, "align": "center", "size": 1.2 },
+        { "kind": "heading", "text": "Next Steps", "anchor": "top", "y": 56, "align": "center", "size": 1.8 },
         {
           "kind": "text",
           "text": "•  SAGE26 Paper I: Modelling the baryon cycle from cosmic dawn to the present day\n\n•  SAGE26 Paper II: Modelling JWST massive galaxies with Feedback-Free Bursts\n\n•  SAGE26 Paper III: Intracluster Stars and the Brightest Cluster Galaxy\n\n•  Paper IV: High Redshift Massive Quiescent Galaxies analogous to Erigeneia",
-          "anchor": "top", "y": 51, "align": "center", "size": 0.9, "max_width": 70
+          "anchor": "top", "y": 61, "align": "center", "size": 1.45, "max_width": 84
         },
         {
           "kind": "citation",
           "text": "SAGE-PSO: github.com/MBradley1985/SAGE-PSO\nSAGE26: github.com/MBradley1985/SAGE26\nSAGE-Viewer: github.com/MBradley1985/SAGE-Viewer\nsage-home: github.com/sage-home",
-          "anchor": "bottom-right", "x": 20, "y": 1, "align": "right"
+          "anchor": "bottom-right", "x": "360px", "y": "10px", "align": "right"
         },
         { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 },
         { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "210px", "y": 0, "width": 290 },
