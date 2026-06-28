@@ -725,6 +725,24 @@
         }
         return vid;
       }
+      // Audio overlays (e.g. a short intro sting) carry a src + the audio flag
+      // and render no visible element. They play independently of the engine,
+      // so the run() loop pauses/resumes them with the show's play/pause state.
+      if (it.audio) {
+        var au = document.createElement('audio');
+        au.src = it.src;
+        au.loop = !!it.loop;
+        au.muted = !!it.muted;
+        au.volume = (it.volume == null) ? 1.0 : it.volume;
+        au.autoplay = it.autoplay !== false;
+        au.style.cssText =
+          'position:absolute;width:0;height:0;opacity:0;pointer-events:none;';
+        if (au.autoplay) {
+          var pa = au.play();
+          if (pa && pa.catch) pa.catch(function () {});
+        }
+        return au;
+      }
       // Image overlays (logos etc.) carry a src instead of text/latex.
       if (it.src != null) {
         var img = document.createElement('img');
@@ -754,8 +772,10 @@
     function run() {
       var relay = document.getElementById('sage-overlays-relay');
       var root = document.getElementById('sage-overlay-root');
+      var playRelay = document.getElementById('sage-story-playing-relay');
       if (!relay || !root) { setTimeout(run, 200); return; }
       var last = null;
+      var lastPlaying = null;
       function tick() {
         var v = relay.value || '[]';
         if (v !== last) {
@@ -768,6 +788,27 @@
           last = v;
           root.innerHTML = '';
           items.forEach(function (it) { root.appendChild(makeItem(it)); });
+          // Re-apply the show's play/pause state to the rebuilt <audio> set
+          // (so audio only sounds while the show is playing).
+          lastPlaying = null;
+        }
+        // <audio> overlays play independently of the engine, so Pause must
+        // silence them and Play must resume them explicitly.
+        if (playRelay) {
+          var pv = playRelay.value;
+          if (pv !== lastPlaying) {
+            lastPlaying = pv;
+            var playing = (pv === 'true' || pv === 'True' || pv === '1');
+            var auds = root.getElementsByTagName('audio');
+            for (var i = 0; i < auds.length; i++) {
+              if (playing) {
+                var pr = auds[i].play();
+                if (pr && pr.catch) pr.catch(function () {});
+              } else {
+                auds[i].pause();
+              }
+            }
+          }
         }
         setTimeout(tick, 150);
       }

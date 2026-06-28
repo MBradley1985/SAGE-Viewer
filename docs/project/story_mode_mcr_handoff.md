@@ -408,6 +408,26 @@ clear a heading). Default `zoom` 1.0. (`engine._resolve_camera` /
 fullscreen); otherwise it's click-through. Use MP4/WebM. Rendered as a `<video>`
 by `sage_viewer.js`; normalised in `engine._normalize_overlay`.
 
+### Overlay kind: `audio` (sound cue, no visual)
+`{ "kind":"audio", "src":"/sage_static/<file>.mp3", "autoplay":true, "volume":0.6 }`.
+A per-scene sound with **no visible element** — served from `/sage_static/` like
+image/video (use MP3/OGG; URL-encode spaces, e.g. `X-Men%20-%20TAS.mp3`). Unlike
+`video` it defaults **unmuted** and plays **once** (`autoplay` default `true`,
+`loop`/`muted` default `false`); `volume` is 0–1 (default 1.0). Autoplay-with-sound
+is allowed because opening the story is a user gesture. Rendered as an `<audio>` by
+`sage_viewer.js`; normalised in `engine._normalize_overlay`.
+- **Play/pause aware:** `<audio>` plays independently of the engine, so the client
+  pauses it on the show's **Pause** and resumes on **Play**, driven by a new
+  `story_playing` relay input (`#sage-story-playing-relay` in `ui/story_mode.py`,
+  mirroring the overlays relay). Audio only sounds while the show is playing.
+- **Stops on scene change:** advancing rebuilds the overlay layer
+  (`root.innerHTML=''`), removing the element — so the clip ends when you leave the
+  scene; returning replays it. Pair with scene `"hold": true` so a short clip isn't
+  cut off by auto-advance. Used by `card-intro` (the X-Men intro sting).
+  ⚠️ Audio files under `static/` are **MCR content, not framework** — exclude on
+  promotion to `main`/PyPI (like `CAS_logo.png`, §9). Test:
+  `test_normalize_overlay_audio`.
+
 ### Motion `snapshot_sweep` → `loop`
 `loop` (default `false`) replays the sweep until Next/Pause; auto-advance never
 fires, so the scene holds until the user steps on. A pause/resume continues the

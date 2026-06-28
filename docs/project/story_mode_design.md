@@ -125,13 +125,14 @@ camera interaction). Overlay item fields:
 
 | Field | Meaning |
 |---|---|
-| `kind` | `title` · `heading` · `text` · `citation` · `equation` (text kinds — set size/weight/italic defaults) · `image` · `video` · `scene_menu` (clickable scene grid — see below) |
+| `kind` | `title` · `heading` · `text` · `citation` · `equation` (text kinds — set size/weight/italic defaults) · `image` · `video` · `audio` (sound only, no visual) · `scene_menu` (clickable scene grid — see below) |
 | `text` | content for non-equation kinds |
 | `latex` | LaTeX source for `equation` kind; set `"inline": true` for inline math |
-| `src` | for `image` / `video`: file served from `sage_viewer/static/` at `/sage_static/<file>` (NOT the data Library) |
+| `src` | for `image` / `video` / `audio`: file served from `sage_viewer/static/` at `/sage_static/<file>` (NOT the data Library) |
 | `width` | for `image` / `video`: px (number) or any CSS length (e.g. `"55vw"`) |
 | `opacity` | for `image` / `video`: 0–1 (default 1.0) |
-| `loop`, `autoplay`, `muted` | `video` only — playback flags (each default `true`) |
+| `loop`, `autoplay`, `muted` | `video`: all default `true`. `audio`: `autoplay` default `true`, `loop`/`muted` default `false` |
+| `volume` | `audio` only — 0–1 (default 1.0) |
 | `controls` | `video` only — show native transport (default `false`); when `true` the video accepts clicks (otherwise it's click-through) |
 | `anchor` | 9-grid: `top-left`…`center`…`bottom-right` |
 | `x`, `y` | nudge from the anchor edges — **percentage when numeric, a CSS length when a string** (e.g. `"150px"`) |
@@ -140,7 +141,13 @@ camera interaction). Overlay item fields:
 
 `image` overlays carry only `src` + sizing (`width`, `opacity`). `video` overlays add
 the playback flags above; use **MP4/WebM** (and **PNG/JPG/SVG, not PDF** for images).
-Both are normalised in `engine._normalize_overlay` and emitted by `sage_viewer.js`.
+`audio` overlays carry just `src` + `volume`/`loop`/`autoplay` and render **no visible
+element** — a sound cue tied to the scene (use **MP3/OGG**). They play independently of
+the engine, so the client pauses/resumes them with the show's play/pause state
+(`#sage-story-playing-relay`), and they stop when the scene changes (the overlay layer
+is rebuilt). Pair with scene `"hold": true` so a short clip isn't cut off by
+auto-advance. All are normalised in `engine._normalize_overlay` and emitted by
+`sage_viewer.js`.
 
 ### Scene-selector grid (`scene_menu`)
 

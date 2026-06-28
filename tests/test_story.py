@@ -143,6 +143,22 @@ def test_normalize_overlay_image():
     assert "left:150px" in px["style"] and "bottom:0.0%" in px["style"]
 
 
+def test_normalize_overlay_audio():
+    from sage_viewer.story.engine import _normalize_overlay
+
+    au = _normalize_overlay(
+        {"kind": "audio", "src": "/sage_static/intro.mp3",
+         "autoplay": True, "volume": 0.6}
+    )
+    assert au["audio"] is True
+    assert au["src"] == "/sage_static/intro.mp3"
+    assert au["autoplay"] is True and au["volume"] == 0.6
+    # Audio renders no visible element, so it carries no style/text/latex.
+    assert "style" not in au and "text" not in au and "latex" not in au
+    # Unlike video, audio defaults unmuted and plays once (loop off).
+    assert au["muted"] is False and au["loop"] is False
+
+
 def test_resolve_snap_symbolic():
     from sage_viewer.story.engine import resolve_snap
 

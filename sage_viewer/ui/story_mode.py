@@ -225,6 +225,17 @@ def build_story_overlays(server) -> None:
             "width:1px;height:1px;opacity:0;pointer-events:none;"
         ),
     )
+    # One-way relay of the play/pause state so the client can pause/resume
+    # <audio> overlays, which play independently of the engine's motion.
+    html.Input(
+        id="sage-story-playing-relay",
+        value=("story_playing",),
+        type="text",
+        style=(
+            "position:fixed;left:-9999px;"
+            "width:1px;height:1px;opacity:0;pointer-events:none;"
+        ),
+    )
     # Scene-selector relay: sage_viewer.js writes the clicked cell's index here
     # (v_model carries it to the server's story_goto_relay @state.change).
     html.Input(

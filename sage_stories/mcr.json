@@ -51,10 +51,11 @@
       "hold": true,
       "overlays": [
         { "kind": "title", "text": "Introduction", "anchor": "center", "align": "center", "size": 4.0 },
+        { "kind": "audio", "src": "/sage_static/X-Men%20-%20TAS%20(trimmed).mov", "autoplay": true, "volume": 0.6 },
         { "kind": "image", "src": "/sage_static/cyclops.png", "anchor": "top-left", "x": "24px", "y": "5%", "width": 250 },
         { "kind": "image", "src": "/sage_static/deadpool.png", "anchor": "top-left", "x": "500px", "y": "15%", "width": 200 },
         { "kind": "image", "src": "/sage_static/wolverine.png", "anchor": "top-right", "x": "24px", "y": "5%", "width": 280 },
-        { "kind": "image", "src": "/sage_static/spiderman.png", "anchor": "top-right", "x": "400px", "y": "1%", "width": 200 },
+        { "kind": "image", "src": "/sage_static/spiderman.png", "anchor": "top-right", "x": "425px", "y": "1%", "width": 200 },
         { "kind": "image", "src": "/sage_static/psylocke.png", "anchor": "bottom-left", "x": "500px", "y": "15%", "width": 280 },
         { "kind": "image", "src": "/sage_static/beast.png", "anchor": "bottom-left", "x": "24px", "y": "1%", "width": 280 },
         { "kind": "image", "src": "/sage_static/nightcrawler.png", "anchor": "bottom-right", "x": "24px", "y": "6%", "width": 300 },

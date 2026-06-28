@@ -127,6 +127,18 @@ def _normalize_overlay(item: dict) -> dict:
                 "muted": bool(item.get("muted", True)),
                 "controls": controls}
 
+    # Audio overlays (e.g. a short intro sting) carry only a src + playback
+    # flags and render NO visible element. Served from /sage_static/ like
+    # image/video. Unlike video they default unmuted and play once (loop off);
+    # the client pauses/resumes them with the show's play/pause state.
+    if kind == "audio":
+        return {"id": str(item.get("id", "")),
+                "src": item.get("src", ""), "audio": True,
+                "loop": bool(item.get("loop", False)),
+                "autoplay": bool(item.get("autoplay", True)),
+                "muted": bool(item.get("muted", False)),
+                "volume": float(item.get("volume", 1.0))}
+
     base = _OVERLAY_DEFAULTS.get(kind, _OVERLAY_DEFAULTS["text"])
 
     size = float(item.get("size", base["size"]))
