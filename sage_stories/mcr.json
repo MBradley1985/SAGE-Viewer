@@ -72,7 +72,7 @@
       "chrome": { "hide_panel": true },
       "overlays": [
         { "kind": "heading", "text": "Simulations", "anchor": "top", "y": 6, "align": "center", "size": 3.0 },
-        { "kind": "image", "src": "/sage_static/Uchuu.jpeg", "anchor": "left", "x": "24px", "width": 420 },
+        { "kind": "image", "src": "/sage_static/Uchuu.jpg", "anchor": "left", "x": "24px", "width": 420 },
         { "kind": "image", "src": "/sage_static/Millennium.jpg", "anchor": "right", "x": "24px", "width": 420 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
