@@ -50,7 +50,21 @@
       "chrome": { "hide_panel": true },
       "hold": true,
       "overlays": [
-        { "kind": "title", "text": "Introduction", "anchor": "center", "align": "center", "size": 4.0 }
+        { "kind": "title", "text": "Introduction", "anchor": "center", "align": "center", "size": 4.0 },
+        { "kind": "image", "src": "/sage_static/cyclops.png", "anchor": "top-left", "x": "24px", "y": "5%", "width": 250 },
+        { "kind": "image", "src": "/sage_static/deadpool.png", "anchor": "top-left", "x": "500px", "y": "15%", "width": 200 },
+        { "kind": "image", "src": "/sage_static/wolverine.png", "anchor": "top-right", "x": "24px", "y": "5%", "width": 280 },
+        { "kind": "image", "src": "/sage_static/spiderman.png", "anchor": "top-right", "x": "400px", "y": "1%", "width": 200 },
+        { "kind": "image", "src": "/sage_static/psylocke.png", "anchor": "bottom-left", "x": "500px", "y": "15%", "width": 280 },
+        { "kind": "image", "src": "/sage_static/beast.png", "anchor": "bottom-left", "x": "24px", "y": "1%", "width": 280 },
+        { "kind": "image", "src": "/sage_static/nightcrawler.png", "anchor": "bottom-right", "x": "24px", "y": "6%", "width": 300 },
+        { "kind": "image", "src": "/sage_static/jubilee.webp", "anchor": "bottom-right", "x": "325px", "y": "15%", "width": 300 },
+        { "kind": "image", "src": "/sage_static/jeangrey.png", "anchor": "top", "y": "12%", "width": 380 },
+        { "kind": "image", "src": "/sage_static/cable.png", "anchor": "bottom", "y": "7%", "width": 220 },
+        { "kind": "image", "src": "/sage_static/scarletwitch.png", "anchor": "right", "x": "55%", "width": 300 },
+        { "kind": "image", "src": "/sage_static/storm.png", "anchor": "left", "x": "53%", "width": 400 },
+        { "kind": "image", "src": "/sage_static/gambit.png", "anchor": "left", "x": "2%", "width": 350 },
+        { "kind": "image", "src": "/sage_static/rogue.png", "anchor": "right", "x": "2%", "width": 250 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0
@@ -317,7 +331,7 @@
           "text": "SAGE-PSO: github.com/MBradley1985/SAGE-PSO\nSAGE26: github.com/MBradley1985/SAGE26\nSAGE-Viewer: github.com/MBradley1985/SAGE-Viewer\nsage-home: github.com/sage-home",
           "anchor": "bottom-right", "x": "360px", "y": "10px", "align": "right"
         },
-        { "kind": "image", "src": "/sage_static/skeletor_nope.gif", "anchor": "left", "x": "20px", "width": 380 },
+        { "kind": "image", "src": "/sage_static/skeletor_nope.gif", "anchor": "left", "x": "100px", "width": 380 },
         { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 },
         { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "210px", "y": 0, "width": 290 },
         { "kind": "image", "src": "/sage_static/CDM.webp", "anchor": "bottom-left", "x": "510px", "y": 0, "width": 269 }
