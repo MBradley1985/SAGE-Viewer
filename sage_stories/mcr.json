@@ -71,13 +71,17 @@
       "focus": { "kind": "none" },
       "chrome": { "hide_panel": true },
       "overlays": [
-        { "kind": "heading", "text": "Simulations", "anchor": "top", "y": 6, "align": "center", "size": 3.0 },
-        { "kind": "image", "src": "/sage_static/Uchuu.jpg", "anchor": "left", "x": "24px", "width": 420 },
-        { "kind": "image", "src": "/sage_static/Millennium.jpg", "anchor": "right", "x": "24px", "width": 420 }
+        { "kind": "heading", "text": "Dark Matter Simulations", "anchor": "top", "y": 6, "align": "center", "size": 3.0 },
+        { "kind": "image", "src": "/sage_static/Uchuu.jpg", "anchor": "top-left", "x": "24px", "y": "7%", "width": 360 },
+        { "kind": "image", "src": "/sage_static/Millennium.jpg", "anchor": "top-right", "x": "24px", "y": "7%", "width": 360 },
+        { "kind": "equation", "latex": "\\underline{\\textbf{Uchuu Simulation Suite}}", "inline": true, "anchor": "top-left", "x": "24px", "y": "62%", "align": "left", "size": 1.6 },
+        { "kind": "text", "text": "100 Mpc³ to 2 Gpc³\n640³ to 12800³ particles\nResolution from 2.63×10⁹ M⊙/h to 8.97×10⁵ M⊙/h\nPlanck Cosmology", "anchor": "top-left", "x": "24px", "y": "67%", "align": "left", "size": 1.15, "max_width": 38 },
+        { "kind": "equation", "latex": "\\underline{\\textbf{Millennium Simulation Suite}}", "inline": true, "anchor": "top-right", "x": "24px", "y": "62%", "align": "right", "size": 1.6 },
+        { "kind": "text", "text": "62.5 Mpc³ to 500 Mpc³\nUp to 2160³ particles\nResolution of 8.6×10⁸ M⊙\nPlanck/WMAP Cosmologies", "anchor": "top-right", "x": "24px", "y": "67%", "align": "right", "size": 1.15, "max_width": 38 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0,
-      "motion": { "kind": "snapshot_sweep", "from": "first", "to": "last", "fps": 4.5, "loop": true, "prerender": true }
+      "motion": { "kind": "snapshot_sweep", "from": "first", "to": "last", "fps": 2.5, "loop": true, "prerender": true }
     },
     {
       "id": "sims-tng-video",
@@ -94,10 +98,14 @@
       "chrome": { "hide_panel": true },
       "hold": true,
       "overlays": [
-        { "kind": "heading", "text": "Simulations", "anchor": "top", "y": 6, "align": "center", "size": 3.0 },
+        { "kind": "heading", "text": "Hydrodynamical Simulations", "anchor": "top", "y": 6, "align": "center", "size": 3.0 },
         { "kind": "video", "src": "/sage_static/tng50_single_galaxy_formation_g1_1080p_clean_gas_stars.mp4", "anchor": "center", "x": 0, "y": 4, "width": "55vw", "loop": true, "autoplay": true, "muted": true, "controls": true },
-        { "kind": "image", "src": "/sage_static/fire-logo.png", "anchor": "left", "x": "24px", "width": 340 },
-        { "kind": "image", "src": "/sage_static/TNG.jpeg", "anchor": "right", "x": "24px", "width": 380 },
+        { "kind": "image", "src": "/sage_static/fire-logo.png", "anchor": "top-left", "x": "24px", "y": "30%", "width": 340 },
+        { "kind": "equation", "latex": "\\underline{\\textbf{FIRE Simulation Suite}}", "inline": true, "anchor": "top-left", "x": "24px", "y": "51%", "align": "left", "size": 1.6 },
+        { "kind": "text", "text": "Many box sizes, cosmological volumes to come\nDepending on the simulation, but DM, gas, stars and cosmic rays", "anchor": "top-left", "x": "24px", "y": "56%", "align": "left", "size": 1.15, "max_width": 22 },
+        { "kind": "image", "src": "/sage_static/TNG.jpeg", "anchor": "top-right", "x": "24px", "y": "12%", "width": 320 },
+        { "kind": "equation", "latex": "\\underline{\\textbf{IllustrisTNG Simulation Suite}}", "inline": true, "anchor": "top-right", "x": "24px", "y": "61%", "align": "right", "size": 1.6 },
+        { "kind": "text", "text": "50 Mpc³, 100 Mpc³ and 300 Mpc³\nUp to 2500³ particles of DM and gas\nResolution for DM can go down to 4.5×10⁵ M⊙\nResolution for baryons can go down to 8.5×10⁴ M⊙", "anchor": "top-right", "x": "24px", "y": "66%", "align": "right", "size": 1.15, "max_width": 22 },
         { "kind": "citation", "text": "TNG50 (IllustrisTNG)", "anchor": "bottom-right", "x": 3, "y": 3 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
@@ -143,7 +151,8 @@
       "chrome": { "hide_panel": true },
       "hold": true,
       "overlays": [
-        { "kind": "title", "text": "Local Universe", "anchor": "center", "align": "center", "size": 4.0 }
+        { "kind": "title", "text": "Local Universe", "anchor": "center", "align": "center", "size": 4.0 },
+        { "kind": "image", "src": "/sage_static/skeletor_lying.png", "anchor": "top-left", "x": "45%", "y": "41%", "width": 600 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0
@@ -182,7 +191,8 @@
       "chrome": { "hide_panel": true },
       "hold": true,
       "overlays": [
-        { "kind": "title", "text": "Cosmic Noon", "anchor": "center", "align": "center", "size": 4.0 }
+        { "kind": "title", "text": "Cosmic Noon", "anchor": "center", "align": "center", "size": 4.0 },
+        { "kind": "image", "src": "/sage_static/skeletor_standing.png", "anchor": "right", "x": "24%", "width": 600 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0
@@ -204,7 +214,7 @@
       "overlays": [],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0,
-      "motion": { "kind": "flythrough", "rewind_to": "z=1.5", "rewind_fps": 30.0 }
+      "motion": { "kind": "flythrough", "rewind_to": "z=1.5", "rewind_fps": 24.0 }
     },
     {
       "id": "card-cosmic-dawn",
@@ -221,7 +231,8 @@
       "chrome": { "hide_panel": true },
       "hold": true,
       "overlays": [
-        { "kind": "title", "text": "High Redshift", "anchor": "center", "align": "center", "size": 4.0 }
+        { "kind": "title", "text": "High Redshift", "anchor": "center", "align": "center", "size": 4.0 },
+        { "kind": "image", "src": "/sage_static/skeletor_standing_pointing.png", "anchor": "top-left", "x": "25%", "y": "43%", "width": 380 }
       ],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0
@@ -243,7 +254,7 @@
       "overlays": [],
       "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
       "dwell_secs": 6.0,
-      "motion": { "kind": "flythrough", "targets": "ffb", "rewind_to": "z=7", "rewind_fps": 60.0 }
+      "motion": { "kind": "flythrough", "targets": "ffb", "rewind_to": "z=7", "rewind_fps": 30.0 }
     },
     {
       "id": "timeline",
@@ -306,6 +317,7 @@
           "text": "SAGE-PSO: github.com/MBradley1985/SAGE-PSO\nSAGE26: github.com/MBradley1985/SAGE26\nSAGE-Viewer: github.com/MBradley1985/SAGE-Viewer\nsage-home: github.com/sage-home",
           "anchor": "bottom-right", "x": "360px", "y": "10px", "align": "right"
         },
+        { "kind": "image", "src": "/sage_static/skeletor_nope.gif", "anchor": "left", "x": "20px", "width": 380 },
         { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 },
         { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "210px", "y": 0, "width": 290 },
         { "kind": "image", "src": "/sage_static/CDM.webp", "anchor": "bottom-left", "x": "510px", "y": 0, "width": 269 }
