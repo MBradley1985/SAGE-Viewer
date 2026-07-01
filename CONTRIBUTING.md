@@ -26,7 +26,6 @@ Tests use synthetic fixtures in `tests/data/` — no real simulation data requir
 
 Run checks:
 
-
 ```bash
 ruff check sage_viewer tests
 black --check sage_viewer tests
