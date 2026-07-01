@@ -332,7 +332,7 @@
           "text": "SAGE-PSO: github.com/MBradley1985/SAGE-PSO\nSAGE26: github.com/MBradley1985/SAGE26\nSAGE-Viewer: github.com/MBradley1985/SAGE-Viewer\nsage-home: github.com/sage-home",
           "anchor": "bottom-right", "x": "360px", "y": "10px", "align": "right"
         },
-        { "kind": "image", "src": "/sage_static/skeletor_nope.gif", "anchor": "left", "x": "100px", "width": 380 },
+        { "kind": "image", "src": "/sage_static/skeletor_nope.gif", "anchor": "left", "x": "100px", "width": 450 },
         { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 },
         { "kind": "image", "src": "/sage_static/CAS_logo.png", "anchor": "bottom-left", "x": "210px", "y": 0, "width": 290 },
         { "kind": "image", "src": "/sage_static/CDM.webp", "anchor": "bottom-left", "x": "510px", "y": 0, "width": 269 }
