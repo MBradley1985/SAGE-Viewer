@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install linting deps
-        run: pip install ruff black
+        run: pip install ruff==0.15.20 black==24.10.0
       - name: ruff
         run: ruff check sage_viewer tests
       - name: black

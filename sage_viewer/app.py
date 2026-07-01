@@ -22,7 +22,8 @@ from sage_viewer.utils.discover import find_models
 # ──────────────────────────────────────────────────────────────────────────
 # UI palettes
 # ──────────────────────────────────────────────────────────────────────────
-_THEME_CSS = dedent("""
+_THEME_CSS = dedent(
+    """
 /* Force the page root to black so no theme colour bleeds through
    above the toolbar or in any uncovered gap. */
 html, body, .v-application { background: #000000 !important; }
@@ -115,7 +116,8 @@ html, body, .v-application { background: #000000 !important; }
 .v-theme--dos_blue .v-text-field .v-field,
 .v-theme--dos_blue .v-select .v-field { border-radius: 0 !important; }
 .v-theme--dos_blue .v-chip { border-radius: 0 !important; }
-""")
+"""
+)
 from sage_viewer.ui.info_panel import build_info_panel
 from sage_viewer.ui.navigation_panel import build_navigation_panel
 from sage_viewer.ui.toolbar import build_toolbar
@@ -534,7 +536,12 @@ def create_app(
                     if m is not None:
                         off = m.offset
                         regions.append(
-                            (float(off[0]), float(off[1]), float(off[2]), m.box_size)
+                            (
+                                float(off[0]),
+                                float(off[1]),
+                                float(off[2]),
+                                m.box_size,
+                            )
                         )
                 scene.camera.focus_on_boxes(regions)
             else:

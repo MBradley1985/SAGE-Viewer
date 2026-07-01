@@ -7,8 +7,11 @@ clusters" leaving pairs on) and against documented forms not matching.
 from sage_viewer.utils.command_parser import CommandContext, execute_command
 
 ENV = (
-    "env_show_field", "env_show_isolated", "env_show_group",
-    "env_show_cluster", "env_show_pairs",
+    "env_show_field",
+    "env_show_isolated",
+    "env_show_group",
+    "env_show_cluster",
+    "env_show_pairs",
 )
 
 
@@ -40,22 +43,31 @@ def _env(s):
 def test_show_only_clusters_turns_everything_else_off():
     # The reported bug: "show only clusters" used to leave pairs shown.
     assert _env(_run("show only clusters")) == {
-        "field": False, "isolated": False, "group": False,
-        "cluster": True, "pairs": False,
+        "field": False,
+        "isolated": False,
+        "group": False,
+        "cluster": True,
+        "pairs": False,
     }
 
 
 def test_show_only_pairs_is_distinct_from_isolated():
     assert _env(_run("show only pairs")) == {
-        "field": False, "isolated": False, "group": False,
-        "cluster": False, "pairs": True,
+        "field": False,
+        "isolated": False,
+        "group": False,
+        "cluster": False,
+        "pairs": True,
     }
 
 
 def test_show_only_combines_named_classes():
     assert _env(_run("show only groups, clusters")) == {
-        "field": False, "isolated": False, "group": True,
-        "cluster": True, "pairs": False,
+        "field": False,
+        "isolated": False,
+        "group": True,
+        "cluster": True,
+        "pairs": False,
     }
 
 
@@ -75,7 +87,17 @@ def test_show_only_centrals_not_shadowed_by_env():
 
 
 def test_centrals_satellites_all_documented_forms():
-    for cmd in ("centrals", "only centrals", "show centrals", "show only centrals"):
+    for cmd in (
+        "centrals",
+        "only centrals",
+        "show centrals",
+        "show only centrals",
+    ):
         assert _run(cmd).filter_gal_type == "central"
-    for cmd in ("satellites", "only satellites", "show satellites", "show only satellites"):
+    for cmd in (
+        "satellites",
+        "only satellites",
+        "show satellites",
+        "show only satellites",
+    ):
         assert _run(cmd).filter_gal_type == "satellite"

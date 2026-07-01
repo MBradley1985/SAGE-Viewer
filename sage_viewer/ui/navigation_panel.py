@@ -1185,7 +1185,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         if galaxies.count > 0:
             off = scene.active_model.offset
-            d2 = np.sum(((galaxies.positions + off) - np.array(halo_pos)) ** 2, axis=1)
+            d2 = np.sum(
+                ((galaxies.positions + off) - np.array(halo_pos)) ** 2, axis=1
+            )
             state.nav_gal_idx = int(np.argmin(d2))
         # Always engage focus on Go in the Environment tab
         scene.set_focus_sphere(
@@ -1586,7 +1588,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
         )
         # Paint gold on top of the central's regime dot (larger point wins the depth fight)
         if 0 <= central_idx < galaxies.count and central_idx != gidx:
-            cam._add_central_gold_indicator(galaxies.positions[central_idx] + off)
+            cam._add_central_gold_indicator(
+                galaxies.positions[central_idx] + off
+            )
         # Selected galaxy: gold if it IS the central, else regime colour
         if 0 <= gidx < galaxies.count:
             if gidx == central_idx:
@@ -1598,7 +1602,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "cgm_regime", False
                 )
                 regime = int(galaxies.cgm_regime[gidx]) if has_regime else None
-                cam._add_selected_indicator(galaxies.positions[gidx] + off, regime)
+                cam._add_selected_indicator(
+                    galaxies.positions[gidx] + off, regime
+                )
         _push()
 
     # ------------------------------------------------------------------
@@ -2101,7 +2107,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
         # ── Live-mode frame writer (VTK capture) ──────────────────────────
         def _save_live_frame(force_render: bool = False) -> None:
             sc = _record_state["scale"]
-            raw = _vtk_to_pil(scale=sc) if force_render else _vtk_to_pil_passive(scale=sc)
+            raw = (
+                _vtk_to_pil(scale=sc)
+                if force_render
+                else _vtk_to_pil_passive(scale=sc)
+            )
             outpath = (
                 _record_state["dir"]
                 / f"frame_{_record_state['frames']:05d}.jpg"
@@ -2132,7 +2142,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 or (
                     bool(getattr(state, "groupinfo_show", False))
-                    and str(getattr(state, "nav_active_tab", "")) == "environment"
+                    and str(getattr(state, "nav_active_tab", ""))
+                    == "environment"
                 )
                 or bool(getattr(state, "console_popout_show", False))
             )
@@ -2150,7 +2161,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     except AttributeError:
                         _rs = _PIL.LANCZOS
                     img = img.resize((w * sc, h * sc), _rs)
-                _composite_overlays(img).save(str(snap_path), "JPEG", quality=95)
+                _composite_overlays(img).save(
+                    str(snap_path), "JPEG", quality=95
+                )
             else:
                 snap_path.write_bytes(raw_bytes)
 
@@ -2182,22 +2195,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                             # Lazy-init end-snap for one-pass detection
                             if _pb_end_snap[0] is None:
-                                snap_max = int(
-                                    getattr(state, "snap_max", 63)
-                                )
+                                snap_max = int(getattr(state, "snap_max", 63))
                                 reverse = bool(
                                     getattr(state, "is_reverse", False)
                                 )
-                                _pb_end_snap[0] = (
-                                    0 if reverse else snap_max
-                                )
+                                _pb_end_snap[0] = 0 if reverse else snap_max
 
                             # On every snap change write frames_per_snap
                             # copies of the overlay frame immediately.
-                            if (
-                                current_snap != _last_pb_snap[0]
-                                and pb_frame.startswith("data:")
-                            ):
+                            if current_snap != _last_pb_snap[
+                                0
+                            ] and pb_frame.startswith("data:"):
                                 play_speed = float(
                                     getattr(state, "play_speed", 1)
                                 )
@@ -2322,11 +2330,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
         frame_idx = 0
         n_snaps = len(snap_files)
 
-        for k, (img, entry) in enumerate(zip(imgs, snap_files)):
+        for k, (img, entry) in enumerate(zip(imgs, snap_files, strict=True)):
             if img is None:
                 continue
             count = entry["count"]
-            is_last = (k == n_snaps - 1)
+            is_last = k == n_snaps - 1
             next_img = imgs[k + 1] if not is_last else None
 
             if is_last or next_img is None:
@@ -2353,7 +2361,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 frame_idx += 1
 
         # Close PIL images and delete the unique snap files
-        for img, entry in zip(imgs, snap_files):
+        for img, entry in zip(imgs, snap_files, strict=True):
             try:
                 if img is not None:
                     img.close()
