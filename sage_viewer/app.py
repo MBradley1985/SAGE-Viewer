@@ -22,7 +22,8 @@ from sage_viewer.utils.discover import find_models
 # ──────────────────────────────────────────────────────────────────────────
 # UI palettes
 # ──────────────────────────────────────────────────────────────────────────
-_THEME_CSS = dedent("""
+_THEME_CSS = dedent(
+    """
 /* Force the page root to black so no theme colour bleeds through
    above the toolbar or in any uncovered gap. */
 html, body, .v-application { background: #000000 !important; }
@@ -115,7 +116,8 @@ html, body, .v-application { background: #000000 !important; }
 .v-theme--dos_blue .v-text-field .v-field,
 .v-theme--dos_blue .v-select .v-field { border-radius: 0 !important; }
 .v-theme--dos_blue .v-chip { border-radius: 0 !important; }
-""")
+"""
+)
 from sage_viewer.ui.info_panel import build_info_panel
 from sage_viewer.ui.navigation_panel import build_navigation_panel
 from sage_viewer.ui.toolbar import build_toolbar
@@ -170,7 +172,7 @@ def create_app(
         # nested assets (e.g. katex/katex.min.js) are cache-busted too.
         sub = rel.split("?", 1)[0]
         if sub.startswith("sage_static/"):
-            sub = sub[len("sage_static/"):]
+            sub = sub[len("sage_static/") :]
         try:
             mtime = int(
                 _os_static.path.getmtime(
@@ -230,7 +232,7 @@ def create_app(
         }
     }
     # Story Mode player + reactive state / controllers.
-    story_player = init_story_mode(server, scene)
+    init_story_mode(server, scene)
 
     _NAV_TABS = [
         ("Structure", "layers"),
@@ -553,7 +555,12 @@ def create_app(
                     if m is not None:
                         off = m.offset
                         regions.append(
-                            (float(off[0]), float(off[1]), float(off[2]), m.box_size)
+                            (
+                                float(off[0]),
+                                float(off[1]),
+                                float(off[2]),
+                                m.box_size,
+                            )
                         )
                 scene.camera.focus_on_boxes(regions)
             else:
@@ -822,9 +829,7 @@ def create_app(
                     ):
                         v3.VListItem(
                             title=(
-                                "m.overlay "
-                                "? '✓ ' + m.name "
-                                ": '+ ' + m.name",
+                                "m.overlay ? '✓ ' + m.name : '+ ' + m.name",
                             ),
                             prepend_icon=(
                                 "m.overlay ? 'mdi-layers' : 'mdi-layers-plus'",
@@ -1151,12 +1156,18 @@ def create_app(
                     # playback, where it flips through the cached frames. While
                     # frames are being rendered the live view stays put (the
                     # progress shows in the toolbar chip instead).
+                    # Opacity-driven (not v_show) so dropping it CROSSFADES to
+                    # the live view underneath — the server always renders the
+                    # staged scene before clearing playback_active, so the fade
+                    # lands on matching content instead of a hard cut.
                     with html.Div(
-                        v_show=("playback_active",),
                         style=(
-                            "position:absolute;inset:0;z-index:6;"
+                            "'position:absolute;inset:0;z-index:6;"
                             "background:#000;display:flex;"
                             "align-items:center;justify-content:center;"
+                            "transition:opacity 0.35s ease;' + "
+                            "(playback_active ? 'opacity:1;'"
+                            " : 'opacity:0;pointer-events:none;')",
                         ),
                     ):
                         html.Img(
@@ -1258,8 +1269,7 @@ def create_app(
                                 html.Div(
                                     "{{ entry.out }}",
                                     style=(
-                                        "color:#9ca3af;"
-                                        "white-space:pre-wrap;"
+                                        "color:#9ca3af;white-space:pre-wrap;"
                                     ),
                                 )
                         with html.Div(

@@ -788,6 +788,16 @@
           last = v;
           root.innerHTML = '';
           items.forEach(function (it) { root.appendChild(makeItem(it)); });
+          // Fade the fresh overlay set in so a scene change doesn't pop its
+          // text/logos on. Reset opacity with transitions off, force a
+          // reflow so the reset lands, then animate to visible.
+          if (items.length) {
+            root.style.transition = 'none';
+            root.style.opacity = '0';
+            void root.offsetWidth;
+            root.style.transition = 'opacity 0.35s ease';
+            root.style.opacity = '1';
+          }
           // Re-apply the show's play/pause state to the rebuilt <audio> set
           // (so audio only sounds while the show is playing).
           lastPlaying = null;
