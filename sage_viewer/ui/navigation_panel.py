@@ -217,7 +217,51 @@ _GAL_CB = {
     "metals_ics": ("Zics", "10^-2", "10^10 Msun"),
 }
 
-_CBAR_BASE = "height:8px;flex:1;min-width:0;border-radius:2px;" "background:"
+# Default colormap applied when a colour-by property is selected.  The user
+# can still pick any colormap afterwards; re-selecting a property snaps back
+# to its default.  Missing entries fall back to viridis.
+_HALO_CMAP_DEFAULTS = {
+    "mvir": "viridis",
+    "rvir": "cividis",
+    "vvir": "plasma",
+    "vmax": "plasma",
+}
+
+_GAL_CMAP_DEFAULTS = {
+    "stellar_mass": "inferno",
+    "sfr": "RdBu",
+    "ssfr": "RdBu",
+    "bt": "YlOrRd",
+    "age": "YlOrRd",
+    "type": "coolwarm",  # fixed — dropdown disabled in this mode
+    "bh_mass": "cividis",
+    "bulge_mass": "cividis",
+    "bulge_radius": "cividis",
+    "cgm_gas": "Greens",
+    "cold_gas": "Blues",
+    "cooling": "Blues",
+    "ejected_mass": "inferno",
+    "h1_gas": "turbo",
+    "h2_gas": "Greens",
+    "heating": "Reds",
+    "hot_gas": "Reds",
+    "ics_mass": "twilight",
+    "mass_loading": "inferno",
+    "metals_stellar_mass": "BrBG",
+    "metals_bulge_mass": "BrBG",
+    "metals_cold_gas": "BrBG",
+    "metals_hot_gas": "BrBG",
+    "metals_cgm_gas": "BrBG",
+    "metals_ejected_mass": "BrBG",
+    "metals_ics": "BrBG",
+    "outflow_rate": "inferno",
+    "sfr_bulge": "RdBu",
+    "sfr_disk": "RdBu",
+    "sfr_bulge_z": "RdBu",
+    "sfr_disk_z": "RdBu",
+}
+
+_CBAR_BASE = "height:8px;flex:1;min-width:0;border-radius:2px;background:"
 
 
 def _cbar_style(gradient: str) -> str:
@@ -856,8 +900,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @state.change("halo_color_mode")
     def on_halo_mode(halo_color_mode, **_):
         scene.halo_layer.color_mode = halo_color_mode
-        if halo_color_mode == "mvir":
-            state.halo_colormap = "viridis"
+        # Snap to the property's default colormap — unless the same update
+        # also set the colormap explicitly (story scenes, console commands).
+        if "halo_colormap" not in state.modified_keys:
+            state.halo_colormap = _HALO_CMAP_DEFAULTS.get(
+                halo_color_mode, "viridis"
+            )
         _, lo, hi = _HALO_CB[halo_color_mode]
         state.halo_cbar_min = lo
         state.halo_cbar_max = hi
@@ -866,6 +914,19 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @state.change("galaxy_color_mode")
     def on_galaxy_mode(galaxy_color_mode, **_):
         scene.galaxy_layer.color_mode = galaxy_color_mode
+        # Snap to the property's default colormap — unless the same update
+        # also set the colormap explicitly (story scenes, console commands).
+        # Structure mode has no colormap (dropdown disabled), so leave it.
+        # Type is fixed at coolwarm (dropdown disabled), so always force it.
+        if galaxy_color_mode == "type":
+            state.galaxy_colormap = _GAL_CMAP_DEFAULTS["type"]
+        elif (
+            galaxy_color_mode != "structure"
+            and "galaxy_colormap" not in state.modified_keys
+        ):
+            state.galaxy_colormap = _GAL_CMAP_DEFAULTS.get(
+                galaxy_color_mode, "viridis"
+            )
         # Categorical / multi-layer modes (density, type, structure) don't have
         # a single colormap range — fall back to a generic label.
         if galaxy_color_mode in _GAL_CB:
@@ -1185,7 +1246,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
         if galaxies.count > 0:
             off = scene.active_model.offset
-            d2 = np.sum(((galaxies.positions + off) - np.array(halo_pos)) ** 2, axis=1)
+            d2 = np.sum(
+                ((galaxies.positions + off) - np.array(halo_pos)) ** 2, axis=1
+            )
             state.nav_gal_idx = int(np.argmin(d2))
         # Always engage focus on Go in the Environment tab
         scene.set_focus_sphere(
@@ -1586,7 +1649,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
         )
         # Paint gold on top of the central's regime dot (larger point wins the depth fight)
         if 0 <= central_idx < galaxies.count and central_idx != gidx:
-            cam._add_central_gold_indicator(galaxies.positions[central_idx] + off)
+            cam._add_central_gold_indicator(
+                galaxies.positions[central_idx] + off
+            )
         # Selected galaxy: gold if it IS the central, else regime colour
         if 0 <= gidx < galaxies.count:
             if gidx == central_idx:
@@ -1598,7 +1663,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     "cgm_regime", False
                 )
                 regime = int(galaxies.cgm_regime[gidx]) if has_regime else None
-                cam._add_selected_indicator(galaxies.positions[gidx] + off, regime)
+                cam._add_selected_indicator(
+                    galaxies.positions[gidx] + off, regime
+                )
         _push()
 
     # ------------------------------------------------------------------
@@ -2101,7 +2168,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
         # ── Live-mode frame writer (VTK capture) ──────────────────────────
         def _save_live_frame(force_render: bool = False) -> None:
             sc = _record_state["scale"]
-            raw = _vtk_to_pil(scale=sc) if force_render else _vtk_to_pil_passive(scale=sc)
+            raw = (
+                _vtk_to_pil(scale=sc)
+                if force_render
+                else _vtk_to_pil_passive(scale=sc)
+            )
             outpath = (
                 _record_state["dir"]
                 / f"frame_{_record_state['frames']:05d}.jpg"
@@ -2132,7 +2203,8 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 )
                 or (
                     bool(getattr(state, "groupinfo_show", False))
-                    and str(getattr(state, "nav_active_tab", "")) == "environment"
+                    and str(getattr(state, "nav_active_tab", ""))
+                    == "environment"
                 )
                 or bool(getattr(state, "console_popout_show", False))
             )
@@ -2150,7 +2222,9 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     except AttributeError:
                         _rs = _PIL.LANCZOS
                     img = img.resize((w * sc, h * sc), _rs)
-                _composite_overlays(img).save(str(snap_path), "JPEG", quality=95)
+                _composite_overlays(img).save(
+                    str(snap_path), "JPEG", quality=95
+                )
             else:
                 snap_path.write_bytes(raw_bytes)
 
@@ -2182,22 +2256,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
 
                             # Lazy-init end-snap for one-pass detection
                             if _pb_end_snap[0] is None:
-                                snap_max = int(
-                                    getattr(state, "snap_max", 63)
-                                )
+                                snap_max = int(getattr(state, "snap_max", 63))
                                 reverse = bool(
                                     getattr(state, "is_reverse", False)
                                 )
-                                _pb_end_snap[0] = (
-                                    0 if reverse else snap_max
-                                )
+                                _pb_end_snap[0] = 0 if reverse else snap_max
 
                             # On every snap change write frames_per_snap
                             # copies of the overlay frame immediately.
-                            if (
-                                current_snap != _last_pb_snap[0]
-                                and pb_frame.startswith("data:")
-                            ):
+                            if current_snap != _last_pb_snap[
+                                0
+                            ] and pb_frame.startswith("data:"):
                                 play_speed = float(
                                     getattr(state, "play_speed", 1)
                                 )
@@ -2322,11 +2391,11 @@ def build_navigation_panel(server, scene: Scene) -> None:
         frame_idx = 0
         n_snaps = len(snap_files)
 
-        for k, (img, entry) in enumerate(zip(imgs, snap_files)):
+        for k, (img, entry) in enumerate(zip(imgs, snap_files, strict=False)):
             if img is None:
                 continue
             count = entry["count"]
-            is_last = (k == n_snaps - 1)
+            is_last = k == n_snaps - 1
             next_img = imgs[k + 1] if not is_last else None
 
             if is_last or next_img is None:
@@ -2353,7 +2422,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 frame_idx += 1
 
         # Close PIL images and delete the unique snap files
-        for img, entry in zip(imgs, snap_files):
+        for img, entry in zip(imgs, snap_files, strict=False):
             try:
                 if img is not None:
                     img.close()
@@ -3522,14 +3591,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 pass
         elif tab == "box":
             try:
-                xmin, xmax = float(state.nav_box_xmin), float(
-                    state.nav_box_xmax
+                xmin, xmax = (
+                    float(state.nav_box_xmin),
+                    float(state.nav_box_xmax),
                 )
-                ymin, ymax = float(state.nav_box_ymin), float(
-                    state.nav_box_ymax
+                ymin, ymax = (
+                    float(state.nav_box_ymin),
+                    float(state.nav_box_ymax),
                 )
-                zmin, zmax = float(state.nav_box_zmin), float(
-                    state.nav_box_zmax
+                zmin, zmax = (
+                    float(state.nav_box_zmin),
+                    float(state.nav_box_zmax),
                 )
                 scene.set_focus_box(xmin, xmax, ymin, ymax, zmin, zmax)
                 state.focus_active = True
@@ -3818,9 +3890,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         density="compact",
                         # Structure mode is the bare composition (no outer
                         # property halo) — the colormap doesn't apply.
-                        # For every other mode the colormap drives the
-                        # outermost layer that sits around the envelope.
-                        disabled=("galaxy_color_mode === 'structure'",),
+                        # Type is fixed at coolwarm. For every other mode
+                        # the colormap drives the outermost layer that sits
+                        # around the envelope.
+                        disabled=(
+                            "galaxy_color_mode === 'structure' || "
+                            "galaxy_color_mode === 'type'",
+                        ),
                     )
                 with v3.VSheet(
                     color="transparent", style="padding:4px 0 8px;"
@@ -4292,8 +4368,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         v_for=("c in consoles_list",),
                         key=("c.id",),
                         style=(
-                            "display:inline-flex;align-items:center;"
-                            "gap:2px;"
+                            "display:inline-flex;align-items:center;gap:2px;"
                         ),
                     ):
                         v3.VBtn(
@@ -4309,7 +4384,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                                 ": '#6b7280'",
                             ),
                             click=(
-                                "trigger('console_switch_trigger', " "[c.id])"
+                                "trigger('console_switch_trigger', [c.id])"
                             ),
                             style=(
                                 "text-transform:none;font-size:0.62rem;"
@@ -4323,9 +4398,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             variant="text",
                             color="#6b7280",
                             v_show=("consoles_list.length > 1",),
-                            click=(
-                                "trigger('console_close_trigger', " "[c.id])"
-                            ),
+                            click=("trigger('console_close_trigger', [c.id])"),
                             style="min-width:18px;padding:0;height:22px;",
                         )
                     v3.VBtn(
