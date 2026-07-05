@@ -343,12 +343,3 @@ def build_story_hud(server) -> None:
                 click=ctrl.story_menu,
                 style="margin-left:8px;",
             )
-            v3.VBtn(
-                icon="mdi-close-thick",
-                variant="text",
-                density="compact",
-                color="#ef4444",
-                title="Exit Story Mode",
-                click=ctrl.story_exit,
-                style="margin-left:2px;",
-            )
