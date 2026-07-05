@@ -316,7 +316,7 @@
         {
           "kind": "citation",
           "text": "SAGE-PSO: github.com/MBradley1985/SAGE-PSO\nSAGE26: github.com/MBradley1985/SAGE26\nSAGE-Viewer: github.com/MBradley1985/SAGE-Viewer\nsage-home: github.com/sage-home",
-          "anchor": "bottom-right", "x": "400px", "y": "10px", "align": "right", "size": 1.5, "max_width": 40
+          "anchor": "bottom-right", "x": "430px", "y": "10px", "align": "right", "size": 1.5, "max_width": 40
         },
         { "kind": "image", "src": "/sage_static/skeletor_nope.gif", "anchor": "left", "x": "80px", "width": 500 },
         { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 },
