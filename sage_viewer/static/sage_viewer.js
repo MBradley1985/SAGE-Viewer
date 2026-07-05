@@ -644,6 +644,45 @@
       window.HTMLInputElement.prototype, 'value'
     ).set;
     var _gotoSeq = 0;
+
+    // ── Fixed overlay stage ───────────────────────────────────────────
+    // Every slide is authored against a fixed virtual canvas (default 16:9,
+    // overridable via #sage-overlay-root's data-stage-w/h). We build all
+    // overlays inside a #sage-overlay-stage of exactly that pixel size, then
+    // scale it uniformly to fit the render area. Because text (rem), image
+    // widths (px) and positions (% of the stage) are ALL measured against the
+    // same fixed canvas, the layout is locked: it keeps its exact proportions
+    // and never overlaps — the whole slide just grows/shrinks as one unit to
+    // fit any window or screen size.
+    var STAGE_W = 1600, STAGE_H = 900;
+    var _stage = null;
+    function ensureStage(root) {
+      if (_stage && _stage.parentNode === root) return _stage;
+      var dw = parseFloat(root.getAttribute('data-stage-w'));
+      var dh = parseFloat(root.getAttribute('data-stage-h'));
+      if (dw > 0) STAGE_W = dw;
+      if (dh > 0) STAGE_H = dh;
+      _stage = document.createElement('div');
+      _stage.id = 'sage-overlay-stage';
+      _stage.style.cssText =
+        'position:absolute;left:0;top:0;pointer-events:none;' +
+        'transform-origin:0 0;' +
+        'width:' + STAGE_W + 'px;height:' + STAGE_H + 'px;';
+      root.appendChild(_stage);
+      return _stage;
+    }
+    function fitStage(root) {
+      if (!_stage) return;
+      var rw = root.clientWidth, rh = root.clientHeight;
+      if (!rw || !rh) return;            // hidden (display:none) — nothing to fit
+      // Contain: fit the whole canvas inside the render area (letterbox), so no
+      // slide content is ever clipped and the layout is identical everywhere.
+      var s = Math.min(rw / STAGE_W, rh / STAGE_H);
+      var tx = (rw - STAGE_W * s) / 2;   // centre the scaled canvas
+      var ty = (rh - STAGE_H * s) / 2;
+      _stage.style.transform =
+        'translate(' + tx + 'px,' + ty + 'px) scale(' + s + ')';
+    }
     function _gotoScene(index) {
       var el = document.getElementById('sage-story-goto-relay');
       if (!el) return;
@@ -661,7 +700,8 @@
       grid.style.cssText =
         'display:grid;gap:14px;pointer-events:auto;' +
         'grid-template-columns:repeat(' + (it.cols || 4) + ',1fr);' +
-        'max-width:' + (it.max_width || 90) + 'vw;';
+        // % of the fixed stage width (not vw) so it scales with the stage.
+        'max-width:' + ((it.max_width || 90) / 100 * STAGE_W) + 'px;';
       if (it.title) {
         var h = document.createElement('div');
         h.textContent = it.title;
@@ -774,6 +814,14 @@
       var root = document.getElementById('sage-overlay-root');
       var playRelay = document.getElementById('sage-story-playing-relay');
       if (!relay || !root) { setTimeout(run, 200); return; }
+      var stage = ensureStage(root);
+      fitStage(root);
+      // Re-fit the stage whenever the render area changes size — window resize,
+      // and (via ResizeObserver) the panel showing/hiding or any layout shift.
+      window.addEventListener('resize', function () { fitStage(root); });
+      if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(function () { fitStage(root); }).observe(root);
+      }
       var last = null;
       var lastPlaying = null;
       function tick() {
@@ -786,17 +834,19 @@
           var needsKatex = items.some(function (it) { return it.latex != null; });
           if (needsKatex && !window.katex) { setTimeout(tick, 100); return; }
           last = v;
-          root.innerHTML = '';
-          items.forEach(function (it) { root.appendChild(makeItem(it)); });
+          stage.innerHTML = '';
+          items.forEach(function (it) { stage.appendChild(makeItem(it)); });
+          fitStage(root);   // new content may mount while the area is a new size
           // Fade the fresh overlay set in so a scene change doesn't pop its
           // text/logos on. Reset opacity with transitions off, force a
-          // reflow so the reset lands, then animate to visible.
+          // reflow so the reset lands, then animate to visible. (Opacity only —
+          // the scale transform stays instant so there's no zoom on fade-in.)
           if (items.length) {
-            root.style.transition = 'none';
-            root.style.opacity = '0';
-            void root.offsetWidth;
-            root.style.transition = 'opacity 0.35s ease';
-            root.style.opacity = '1';
+            stage.style.transition = 'none';
+            stage.style.opacity = '0';
+            void stage.offsetWidth;
+            stage.style.transition = 'opacity 0.35s ease';
+            stage.style.opacity = '1';
           }
           // Re-apply the show's play/pause state to the rebuilt <audio> set
           // (so audio only sounds while the show is playing).
@@ -809,7 +859,7 @@
           if (pv !== lastPlaying) {
             lastPlaying = pv;
             var playing = (pv === 'true' || pv === 'True' || pv === '1');
-            var auds = root.getElementsByTagName('audio');
+            var auds = stage.getElementsByTagName('audio');
             for (var i = 0; i < auds.length; i++) {
               if (playing) {
                 var pr = auds[i].play();

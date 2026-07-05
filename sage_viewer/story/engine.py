@@ -180,7 +180,9 @@ def _normalize_overlay(item: dict) -> dict:
         + ("font-style:italic;" if italic else "")
         + "white-space:pre-wrap;pointer-events:none;"
         + "text-shadow:0 2px 8px rgba(0,0,0,0.8);line-height:1.25;"
-        + f"max-width:{float(item.get('max_width', 60))}vw;"
+        # % of the fixed overlay stage (not vw) so it scales together with the
+        # rest of the slide when the stage is fitted to the window (sage_viewer.js).
+        + f"max-width:{float(item.get('max_width', 60))}%;"
     )
     out: dict = {"id": str(item.get("id", "")), "style": style}
     if kind == "equation":

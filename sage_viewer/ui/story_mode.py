@@ -210,10 +210,19 @@ def build_story_overlays(server) -> None:
         v_show=("story_active",),
         # Sits inside the VTK sheet (the visible render area), so inset:0 is
         # correct whether or not a story has hidden the panel.
+        #
+        # data-stage-w/h define the fixed virtual canvas the overlays are
+        # authored against. sage_viewer.js builds a #sage-overlay-stage of
+        # exactly this size and scales it uniformly to fit the render area, so
+        # every slide keeps its exact layout (text + image sizes and positions)
+        # on any screen or window size — it just grows/shrinks as one unit.
+        # These match the render area the MCR talk was authored in (~2.11:1);
+        # change them only if you re-author against a differently shaped window.
         style=(
             "position:absolute;inset:0;z-index:40;"
             "pointer-events:none;overflow:hidden;"
         ),
+        raw_attrs=['data-stage-w="2393"', 'data-stage-h="1133"'],
     )
     # One-way relay of the overlay JSON for the client renderer to poll.
     html.Input(
