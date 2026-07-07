@@ -3382,8 +3382,21 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         "kind": kind,
                         "ext": ext.lstrip("."),
                         "size_kb": int(size_kb),
+                        "folder": str(rel.parent),
                     }
                 )
+        # Group by source folder first, then by file type, then
+        # alphabetically within each type. Flag the first entry of each
+        # folder and each type so the UI can draw section headers / dividers.
+        out.sort(key=lambda e: (e["folder"], e["ext"], e["name"].lower()))
+        prev_folder = None
+        prev_ext = None
+        for e in out:
+            e["first_in_folder"] = e["folder"] != prev_folder
+            # A new folder always restarts the type grouping.
+            e["first_in_group"] = e["first_in_folder"] or e["ext"] != prev_ext
+            prev_folder = e["folder"]
+            prev_ext = e["ext"]
         return out
 
     @ctrl.set("library_refresh")
@@ -4630,56 +4643,98 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 ):
                     with html.Div():
-                        with html.Div(
+                        with html.Template(
                             v_for=("entry in library_files",),
                             key=("entry.path",),
-                            style=(
-                                "display:flex;align-items:center;gap:6px;"
-                                "padding:4px 6px;border-bottom:1px solid #1f2937;"
-                                "cursor:pointer;"
-                            ),
                         ):
-                            v3.VIcon(
-                                icon=(
-                                    "entry.kind === 'video' "
-                                    "? 'mdi-movie-open-outline' : 'mdi-image-outline'",
-                                ),
-                                color="cyan",
-                                size="small",
-                                style="flex-shrink:0;",
-                            )
+                            # Folder header — primary grouping. Shown above
+                            # the first file of each source folder.
                             with html.Div(
-                                style="flex:1;min-width:0;",
-                                dblclick=(
-                                    server.controller.library_open,
-                                    "[entry.path]",
+                                v_if=("entry.first_in_folder",),
+                                style=(
+                                    "display:flex;align-items:center;gap:4px;"
+                                    "padding:8px 6px 4px;"
+                                    "border-top:2px solid #475569;"
+                                    "background:#111827;"
                                 ),
                             ):
+                                v3.VIcon(
+                                    "mdi-folder-outline",
+                                    color="#94a3b8",
+                                    size="x-small",
+                                    style="flex-shrink:0;",
+                                )
                                 html.Div(
-                                    "{{ entry.name }}",
+                                    "{{ entry.folder }}",
                                     style=(
-                                        "font-size:0.72rem;color:#e5e7eb;"
+                                        "font-size:0.65rem;color:#cbd5e1;"
+                                        "font-weight:700;letter-spacing:0.04em;"
                                         "white-space:nowrap;overflow:hidden;"
                                         "text-overflow:ellipsis;"
                                     ),
                                 )
-                                html.Div(
-                                    "{{ entry.ext.toUpperCase() }}"
-                                    " · {{ entry.size_kb }} KB",
-                                    style="font-size:0.6rem;color:#6b7280;",
-                                )
-                            v3.VBtn(
-                                icon="mdi-delete-outline",
-                                density="compact",
-                                size="x-small",
-                                color="red",
-                                variant="text",
-                                style="flex-shrink:0;",
-                                click=(
-                                    server.controller.library_delete,
-                                    "[entry.path]",
+                            # Type sub-divider within a folder (types sorted,
+                            # files alphabetical within each type).
+                            html.Div(
+                                "{{ entry.ext.toUpperCase() }}",
+                                v_if=("entry.first_in_group",),
+                                style=(
+                                    "font-size:0.6rem;color:#22d3ee;"
+                                    "letter-spacing:0.08em;font-weight:600;"
+                                    "padding:4px 6px 2px 14px;"
+                                    "background:#0d1117;"
                                 ),
                             )
+                            with html.Div(
+                                style=(
+                                    "display:flex;align-items:center;gap:6px;"
+                                    "padding:4px 6px;"
+                                    "border-bottom:1px solid #1f2937;"
+                                    "cursor:pointer;"
+                                ),
+                            ):
+                                v3.VIcon(
+                                    icon=(
+                                        "entry.kind === 'video' "
+                                        "? 'mdi-movie-open-outline' "
+                                        ": 'mdi-image-outline'",
+                                    ),
+                                    color="cyan",
+                                    size="small",
+                                    style="flex-shrink:0;",
+                                )
+                                with html.Div(
+                                    style="flex:1;min-width:0;",
+                                    dblclick=(
+                                        server.controller.library_open,
+                                        "[entry.path]",
+                                    ),
+                                ):
+                                    html.Div(
+                                        "{{ entry.name }}",
+                                        style=(
+                                            "font-size:0.72rem;color:#e5e7eb;"
+                                            "white-space:nowrap;overflow:hidden;"
+                                            "text-overflow:ellipsis;"
+                                        ),
+                                    )
+                                    html.Div(
+                                        "{{ entry.ext.toUpperCase() }}"
+                                        " · {{ entry.size_kb }} KB",
+                                        style="font-size:0.6rem;color:#6b7280;",
+                                    )
+                                v3.VBtn(
+                                    icon="mdi-delete-outline",
+                                    density="compact",
+                                    size="x-small",
+                                    color="red",
+                                    variant="text",
+                                    style="flex-shrink:0;",
+                                    click=(
+                                        server.controller.library_delete,
+                                        "[entry.path]",
+                                    ),
+                                )
                 # Bottom block — count + action buttons anchored to the
                 # panel's bottom edge, mirroring the Console tab layout.
                 with html.Div(
