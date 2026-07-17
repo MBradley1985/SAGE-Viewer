@@ -354,7 +354,7 @@ class StoryPlayer:
             self.state.playback_active = (
                 False  # no overlay when the title opens
             )
-            # The MCR opens at the Title slide.
+            # A story opens at its first scene (typically a title slide).
             await self.apply_scene(0, transition=False)
             # Story-level autoplay: begin playback immediately so a title
             # scene's motion (e.g. a fly-through) runs without a Play click.

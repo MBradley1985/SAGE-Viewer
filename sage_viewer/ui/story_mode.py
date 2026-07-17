@@ -216,8 +216,9 @@ def build_story_overlays(server) -> None:
         # exactly this size and scales it uniformly to fit the render area, so
         # every slide keeps its exact layout (text + image sizes and positions)
         # on any screen or window size — it just grows/shrinks as one unit.
-        # These match the render area the MCR talk was authored in (~2.11:1);
-        # change them only if you re-author against a differently shaped window.
+        # These match the render area the bundled stories were authored in
+        # (~2.11:1); change them only if you re-author against a differently
+        # shaped window.
         style=(
             "position:absolute;inset:0;z-index:40;"
             "pointer-events:none;overflow:hidden;"

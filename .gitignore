@@ -75,6 +75,6 @@ sage_library/
 !sage_viewer/static/*.png
 # Bundled Story Mode example stories (package data — must be committed)
 !sage_viewer/examples/*.json
-# MCR / personal stories (story-mode branch only — tracked on GitHub)
-!sage_stories/*.json
+# Personal stories in sage_stories/ stay local (covered by *.json above);
+# ship a story by adding it to sage_viewer/examples/ instead.
 .pypirc
