@@ -1,8 +1,10 @@
 # Story Mode — Design Reference
 
 !!! note "Status"
-    Design spec for an unreleased feature. This is the reference for the
-    implementation; update it if the schema changes during the build.
+    Design spec written before and during the build; kept as the internal
+    reference. The shipped, user-facing behaviour is documented in
+    `docs/user_guide/story_mode.md` — where the two disagree, the user guide
+    is authoritative.
 
 ## Overview
 
@@ -10,8 +12,8 @@
 A *story* is an ordered set of *scenes* — each a fully captured viewpoint
 (camera + render state + narration) — that the viewer steps through with
 Next / Previous, or plays back automatically. Stories live as JSON files in a
-`sage_stories/` folder so users can author their own; the first shipped story
-is the author's PhD Mid-Candidature Review (MCR).
+`sage_stories/` folder so users can author their own; bundled example stories
+ship with the package in `sage_viewer/examples/`.
 
 Conceptually, Story Mode is a generalisation of the existing **fly-through**
 (`toolbar.py`): the fly-through is a single hard-coded, non-interactive tour;
@@ -39,9 +41,9 @@ tab scans `sage_library/` / `sage_outputs/`).
 ```jsonc
 {
   "schema_version": 1,
-  "title": "Mid-Candidature Review",
-  "author": "M. Bradley",
-  "description": "The SAGE26 galaxy formation story for my MCR.",
+  "title": "My Conference Talk",
+  "author": "A. Presenter",
+  "description": "A guided tour of the SAGE26 galaxy formation story.",
   "theme": "dos_blue",              // story-wide default theme
   "requirements": {
     "model": "miniMillennium",      // single-box for MVP
@@ -181,9 +183,9 @@ steps through every scene, screenshots the render window via
 `screenshot()` can't run), downscales, and writes
 `static/story_thumbs/<story>__<scene_id>.png` (served at
 `/sage_static/story_thumbs/…`). A cell with no captured thumbnail falls back to
-a numbered placeholder, so the selector works before any capture. Thumbnails are
-**MCR content, not framework** — exclude them when promoting to `main`/PyPI
-(same as `CAS_logo.png`).
+a numbered placeholder, so the selector works before any capture. Thumbnails
+are **story content, not framework** — they belong to the story that generated
+them and are not committed or shipped.
 
 The overlay layer is rendered **entirely outside Vue**: the server ships the
 items as JSON (`story_overlays_json`) and `sage_viewer.js` builds the children of
@@ -276,7 +278,7 @@ runtime against the active model:
 The shipped **`example_tour.json` uses only these symbolic forms** and the
 currently-loaded model (no `models` block, no multi-box), so a fresh install
 plays it correctly regardless of which simulation is open. Model-specific stories
-(e.g. a personal MCR, or the dev `smoke_test.json`) may use absolute snapshots,
+(e.g. a personal talk, or the dev `smoke_test.json`) may use absolute snapshots,
 explicit cameras, and named `models` since their environment is known.
 
 ## Targeting resolution (position + index hint)
@@ -306,7 +308,7 @@ Cross-time object tracking is therefore out of scope for the MVP.
 | `snapshot_sweep` | `from`, `to`, `fps?`, `loop?`, `prerender?` | step `snap_num` across cosmic time while holding/orbiting the camera — reuses the preloaded cache. `prerender:true` plays cached pre-rendered frames (smooth, ≤30 fps display + frame-skip speed; single box only) |
 | `flythrough` | `style?` (`"story"`/`"normal"`), `approach_secs?`, `fly_secs?`, `group_radius?`, `cluster_radius?`, `group_dps?`, `cluster_dps?`, `spin_degrees?` (default 180), `targets?` (`"halos"`/`"ffb"`), `galaxy_radius?`, `galaxy_dps?`, `rewind_to?`, `rewind_fps?` | **`style:"story"` (default):** reset camera → fly into box centre → tour targets (fly in → focus → orbit `spin_degrees` → unfocus → next) until Next; no settling box orbit. `targets:"halos"` = clusters→groups; `targets:"ffb"` = FFB galaxies. `rewind_to` first steps the box's snapshot from `snap_num` to that redshift before touring. **`style:"normal"`:** the normal-mode (toolbar) fly-through — approach → group → clusters (focus+spin) → return → continuous gentle box orbit forever (calm background, e.g. the scene selector). Full sequence replays each staging; pause→play continues in place |
 
-`snapshot_sweep` is the headline capability for the MCR (e.g. "watch this halo
+`snapshot_sweep` is the headline presentation capability (e.g. "watch this halo
 assemble from z = 6 to z = 0"). Every snapshot in `[from, to]` must be declared
 in the story's `requirements.snapshots`. `fps` defaults to 4.0. `loop` (default
 `false`) replays the sweep until Next/Pause — auto-advance never fires, so the
@@ -336,9 +338,10 @@ Reuses the `box_profile.py` pattern (a key whitelist plus `save_profile(state)`
 - `STORY_SCENE_KEYS` = layer keys + cbar keys + canonical filter keys + env
   keys. Camera / focus / target are handled separately (they are
   scene/plotter objects, not flat state).
-- **Capture scene** (authoring button) → reads `STORY_SCENE_KEYS` + the current
-  camera pose + current focus geometry → appends a scene dict → writes JSON.
-  This is how the MCR story is authored from inside the app.
+- **Capture scene** (authoring button, designed but not implemented — stories
+  are currently authored by editing the JSON directly) → would read
+  `STORY_SCENE_KEYS` + the current camera pose + current focus geometry →
+  append a scene dict → write JSON.
 - **Enter Story Mode** → `save_profile()` of the user's current state is
   stashed for restore on exit.
 - **Apply scene** → `load_profile`-style write of `STORY_SCENE_KEYS`,
