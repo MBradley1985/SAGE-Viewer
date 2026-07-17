@@ -58,6 +58,36 @@ def galaxy_world_radii(
     return (r_min + norm * (r_max - r_min)).astype(np.float32)
 
 
+def galaxy_world_radii_rvir(
+    rvir: np.ndarray,
+    mvir_raw: np.ndarray | None = None,
+    scale: float = 1.0,
+    r_min: float = 0.02,  # Mpc/h visibility floor
+) -> np.ndarray:
+    """Per-galaxy world-space gaussian radius (Mpc/h): the subhalo Rvir.
+
+    The whole layered galaxy composition (outer CGM/Hot envelope, cold-gas
+    envelope, focus-only disk/bulge) is keyed off this radius, so a galaxy's
+    rendered extent is its subhalo's virial radius rather than a fixed
+    stellar-mass mapping.
+
+    Where Rvir is missing (<= 0), falls back to the analytic virial radius
+    of ``mvir_raw`` (raw SAGE units, 10^10 Msun/h; Δ=200 × ρ_crit), then to
+    the ``r_min`` visibility floor.
+    """
+    if len(rvir) == 0:
+        return np.array([], dtype=np.float32)
+    r = np.asarray(rvir, dtype=np.float64).copy()
+    bad = ~(r > 0)
+    if mvir_raw is not None and np.any(bad):
+        m = np.maximum(  # Msun/h
+            np.asarray(mvir_raw, dtype=np.float64)[bad] * 1.0e10, 1.0
+        )
+        rho_crit = 2.775e11  # h^2 Msun / Mpc^3
+        r[bad] = (3.0 * m / (4.0 * np.pi * 200.0 * rho_crit)) ** (1.0 / 3.0)
+    return np.maximum(r * scale, r_min).astype(np.float32)
+
+
 def halo_world_radii(
     masses: np.ndarray,
     r_min: float = 0.15,  # Mpc/h  (low-mass end)
