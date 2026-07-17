@@ -94,7 +94,7 @@ class Scene:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Scene":
+    def from_dict(cls, d: dict[str, Any]) -> Scene:
         return cls(
             id=str(d["id"]),
             title=d.get("title", ""),
@@ -154,6 +154,7 @@ class Story:
         Symbolic refs (``"first"``/``"last"``/``"40%"``) are skipped here — they
         are resolved at runtime against the active model by the engine.
         """
+
         def _as_int(v):
             try:
                 return int(v)
@@ -194,7 +195,7 @@ class Story:
     @classmethod
     def from_dict(
         cls, d: dict[str, Any], *, source_path: str | None = None
-    ) -> "Story":
+    ) -> Story:
         return cls(
             title=d.get("title", "Untitled Story"),
             author=d.get("author", ""),

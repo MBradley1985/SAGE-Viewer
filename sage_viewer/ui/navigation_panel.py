@@ -2391,7 +2391,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
         frame_idx = 0
         n_snaps = len(snap_files)
 
-        for k, (img, entry) in enumerate(zip(imgs, snap_files, strict=False)):
+        for k, (img, entry) in enumerate(zip(imgs, snap_files, strict=True)):
             if img is None:
                 continue
             count = entry["count"]
@@ -2422,7 +2422,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 frame_idx += 1
 
         # Close PIL images and delete the unique snap files
-        for img, entry in zip(imgs, snap_files, strict=False):
+        for img, entry in zip(imgs, snap_files, strict=True):
             try:
                 if img is not None:
                     img.close()

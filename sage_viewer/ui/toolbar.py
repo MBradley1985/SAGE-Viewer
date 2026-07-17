@@ -619,13 +619,13 @@ def build_toolbar(server, scene: Scene) -> None:
     #   5. Return       : fly back to box orbit + continuous orbit
     # ------------------------------------------------------------------
 
-    _FT_FPS = 15            # render rate during fly-through
+    _FT_FPS = 15  # render rate during fly-through
     _FT_APPROACH_SECS = 10.0  # fly-in duration (reset → box centre)
-    _FT_BOX_DPS = 8.0         # box orbit speed deg/s (return orbit)
-    _FT_GROUP_RADIUS = 15.0   # standoff radius for group spin
-    _FT_CLUSTER_RADIUS = 30.0 # standoff radius for cluster spin
-    _FT_GROUP_DPS = 10.0      # group spin speed deg/s
-    _FT_CLUSTER_DPS = 8.0     # cluster spin speed deg/s
+    _FT_BOX_DPS = 8.0  # box orbit speed deg/s (return orbit)
+    _FT_GROUP_RADIUS = 15.0  # standoff radius for group spin
+    _FT_CLUSTER_RADIUS = 30.0  # standoff radius for cluster spin
+    _FT_GROUP_DPS = 10.0  # group spin speed deg/s
+    _FT_CLUSTER_DPS = 8.0  # cluster spin speed deg/s
 
     async def _flythrough_loop():
         import numpy as _np
@@ -644,14 +644,27 @@ def build_toolbar(server, scene: Scene) -> None:
             # ── Shared camera-motion helpers (see scene/camera_motion.py) ──
             async def _smooth_move(p0, f0, p1, f1, secs):
                 return await smooth_move(
-                    cam, p0, f0, p1, f1, secs, _FT_FPS,
-                    is_active=_active, push=_push,
+                    cam,
+                    p0,
+                    f0,
+                    p1,
+                    f1,
+                    secs,
+                    _FT_FPS,
+                    is_active=_active,
+                    push=_push,
                 )
 
             async def _orbit_around(target, radius, spin_degs, dps):
                 return await orbit_around(
-                    cam, target, radius, spin_degs, dps, _FT_FPS,
-                    is_active=_active, push=_push,
+                    cam,
+                    target,
+                    radius,
+                    spin_degs,
+                    dps,
+                    _FT_FPS,
+                    is_active=_active,
+                    push=_push,
                 )
 
             # Fly to the orbit-start position around a target, keeping the
@@ -662,7 +675,9 @@ def build_toolbar(server, scene: Scene) -> None:
                 return await _smooth_move(
                     _np.array(cam.position, dtype=float),
                     _np.array(cam.focal_point, dtype=float),
-                    dest_pos, t3, secs,
+                    dest_pos,
+                    t3,
+                    secs,
                 )
 
             # ── Snap to reset and begin ────────────────────────────────────
@@ -694,16 +709,16 @@ def build_toolbar(server, scene: Scene) -> None:
             cluster_positions = []
 
             if halos.count > 0:
-                log_m = _np.log10(_np.maximum(
-                    _np.array(halos.masses, dtype=float), 1.0
-                ))
+                log_m = _np.log10(
+                    _np.maximum(_np.array(halos.masses, dtype=float), 1.0)
+                )
                 h_pos = _np.array(halos.positions, dtype=float) + off
 
                 grp_mask = (log_m >= 12.5) & (log_m < 14.0)
                 if grp_mask.any():
-                    best = int(_np.argmax(
-                        _np.where(grp_mask, halos.masses, 0.0)
-                    ))
+                    best = int(
+                        _np.argmax(_np.where(grp_mask, halos.masses, 0.0))
+                    )
                     group_pos = h_pos[best]
 
                 # All clusters, sorted most-to-least massive
@@ -755,15 +770,19 @@ def build_toolbar(server, scene: Scene) -> None:
 
             # ── Phase 5: Return to box orbit ──────────────────────────────
             # Pick the orbit angle that minimises the fly-back distance.
-            diff = _np.array(cam.position, dtype=float) - _np.array([cx, cy, cz])
+            diff = _np.array(cam.position, dtype=float) - _np.array(
+                [cx, cy, cz]
+            )
             diff[1] = 0.0
             nrm = _np.linalg.norm(diff)
             theta = _np.arctan2(diff[0], diff[2]) if nrm > 1e-6 else 0.0
-            rtn_pos = _np.array([
-                cx + orbit_r * _np.sin(theta),
-                cy,
-                cz + orbit_r * _np.cos(theta),
-            ])
+            rtn_pos = _np.array(
+                [
+                    cx + orbit_r * _np.sin(theta),
+                    cy,
+                    cz + orbit_r * _np.cos(theta),
+                ]
+            )
             if not await _smooth_move(
                 _np.array(cam.position, dtype=float),
                 _np.array(cam.focal_point, dtype=float),
@@ -808,7 +827,9 @@ def build_toolbar(server, scene: Scene) -> None:
 
     @ctrl.set("toggle_flythrough")
     def on_toggle_flythrough():
-        state.flythrough_active = not bool(getattr(state, "flythrough_active", False))
+        state.flythrough_active = not bool(
+            getattr(state, "flythrough_active", False)
+        )
 
     # ------------------------------------------------------------------
     # Snapshot preloading — warm the whole cache in the background so

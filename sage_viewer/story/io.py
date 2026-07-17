@@ -58,7 +58,7 @@ def discover_stories() -> list[Story]:
 
 def load_story(path: str | Path) -> Story:
     path = Path(path)
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
     return Story.from_dict(data, source_path=str(path))
 
@@ -66,7 +66,9 @@ def load_story(path: str | Path) -> Story:
 def save_story(story: Story, path: str | Path | None = None) -> Path:
     """Write *story* to JSON.  Defaults to its ``source_path`` or a slug."""
     if path is None:
-        path = story.source_path or (stories_dir() / f"{_slug(story.title)}.json")
+        path = story.source_path or (
+            stories_dir() / f"{_slug(story.title)}.json"
+        )
     path = Path(path)
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(story.to_dict(), fh, indent=2)
@@ -77,4 +79,3 @@ def save_story(story: Story, path: str | Path | None = None) -> Path:
 def _slug(text: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     return s or "story"
-

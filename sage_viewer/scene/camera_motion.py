@@ -19,7 +19,7 @@ The caller supplies two callbacks:
 from __future__ import annotations
 
 import asyncio
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 
@@ -104,9 +104,7 @@ async def orbit_around(
     return True
 
 
-def orbit_start_position(
-    camera, target, radius: float
-) -> np.ndarray:
+def orbit_start_position(camera, target, radius: float) -> np.ndarray:
     """Return the orbit-start position at *radius* around *target*.
 
     Keeps the camera on its current bearing so there is no direction flip when

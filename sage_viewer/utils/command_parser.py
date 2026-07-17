@@ -448,7 +448,9 @@ _COMMANDS: list[tuple[re.Pattern, Handler]] = [
         _h_layer_visibility,
     ),
     (
-        re.compile(r"^(?:show only |show |only )?(?P<type>centrals?|satellites?)$"),
+        re.compile(
+            r"^(?:show only |show |only )?(?P<type>centrals?|satellites?)$"
+        ),
         _h_type_filter,
     ),
     # Navigation

@@ -14,10 +14,18 @@ def _sample_story():
         title="The box",
         caption="z = 0",
         snap_num=63,
-        camera={"position": [1.0, 2.0, 3.0], "focal_point": [0, 0, 0], "up": [0, 1, 0]},
+        camera={
+            "position": [1.0, 2.0, 3.0],
+            "focal_point": [0, 0, 0],
+            "up": [0, 1, 0],
+        },
         state={"halos_visible": True, "filter_gal_smass": [9.0, 14.0]},
         focus={"kind": "sphere", "center": [1.0, 2.0, 3.0], "radius": 5.0},
-        target={"position": [1.0, 2.0, 3.0], "radius": 5.0, "galaxy_index": 42},
+        target={
+            "position": [1.0, 2.0, 3.0],
+            "radius": 5.0,
+            "galaxy_index": 42,
+        },
         motion={"kind": "snapshot_sweep", "from": 60, "to": 63},
     )
     sc2 = Scene(id="end", title="Done", snap_num=50)
@@ -42,7 +50,9 @@ def test_story_round_trip():
 def test_autoplay_round_trip_and_default():
     st = _sample_story()
     assert st.autoplay is False  # default off
-    assert Story.from_dict({"title": "X", "autoplay": True, "scenes": []}).autoplay
+    assert Story.from_dict(
+        {"title": "X", "autoplay": True, "scenes": []}
+    ).autoplay
     st.autoplay = True
     assert Story.from_dict(st.to_dict()).autoplay is True
 
@@ -100,9 +110,13 @@ def test_empty_optional_fields_omitted():
 def test_normalize_overlay_equation_and_citation():
     from sage_viewer.story.engine import _normalize_overlay
 
-    eq = _normalize_overlay({"kind": "equation", "latex": "x^2", "anchor": "top"})
+    eq = _normalize_overlay(
+        {"kind": "equation", "latex": "x^2", "anchor": "top"}
+    )
     assert eq["latex"] == "x^2" and eq["display"] is True
-    assert "content" not in eq  # equations carry raw latex, not wrapped content
+    assert (
+        "content" not in eq
+    )  # equations carry raw latex, not wrapped content
     assert "translateX(-50%)" in eq["style"]  # top anchor centres horizontally
 
     inline = _normalize_overlay(
@@ -122,8 +136,12 @@ def test_normalize_overlay_image():
     from sage_viewer.story.engine import _normalize_overlay
 
     img = _normalize_overlay(
-        {"kind": "image", "src": "/sage_static/SAGElogo.jpg",
-         "anchor": "bottom-left", "width": 160}
+        {
+            "kind": "image",
+            "src": "/sage_static/SAGElogo.jpg",
+            "anchor": "bottom-left",
+            "width": 160,
+        }
     )
     assert img["src"] == "/sage_static/SAGElogo.jpg"
     assert "text" not in img and "latex" not in img  # image carries no text
@@ -137,8 +155,13 @@ def test_normalize_overlay_image():
     # x/y pass through as pixel offsets so logos pin together regardless of
     # window width (rather than drifting as percentages).
     px = _normalize_overlay(
-        {"kind": "image", "src": "x", "anchor": "bottom-left",
-         "x": "150px", "y": 0}
+        {
+            "kind": "image",
+            "src": "x",
+            "anchor": "bottom-left",
+            "x": "150px",
+            "y": 0,
+        }
     )
     assert "left:150px" in px["style"] and "bottom:0.0%" in px["style"]
 
@@ -147,8 +170,12 @@ def test_normalize_overlay_audio():
     from sage_viewer.story.engine import _normalize_overlay
 
     au = _normalize_overlay(
-        {"kind": "audio", "src": "/sage_static/intro.mp3",
-         "autoplay": True, "volume": 0.6}
+        {
+            "kind": "audio",
+            "src": "/sage_static/intro.mp3",
+            "autoplay": True,
+            "volume": 0.6,
+        }
     )
     assert au["audio"] is True
     assert au["src"] == "/sage_static/intro.mp3"
@@ -167,9 +194,9 @@ def test_resolve_snap_symbolic():
     assert resolve_snap("first", 64) == 0
     assert resolve_snap("50%", 64) == round(0.5 * 63)
     assert resolve_snap(40, 64) == 40
-    assert resolve_snap(999, 64) == 63          # clamp high
-    assert resolve_snap(-5, 64) == 0            # clamp low
-    assert resolve_snap("nonsense", 64) == 63   # graceful fallback
+    assert resolve_snap(999, 64) == 63  # clamp high
+    assert resolve_snap(-5, 64) == 0  # clamp low
+    assert resolve_snap("nonsense", 64) == 63  # graceful fallback
     # portability: "last" adapts to a smaller model
     assert resolve_snap("last", 50) == 49
 
@@ -185,7 +212,8 @@ def test_resolve_model_ref_adaptive():
 
     class FakeState:
         models_list = [
-            {"name": "millennium"}, {"name": "microuchuu"},
+            {"name": "millennium"},
+            {"name": "microuchuu"},
             {"name": "millennium_mbk"},
         ]
 
@@ -196,12 +224,19 @@ def test_resolve_model_ref_adaptive():
     p = StoryPlayer(FakeServer(), FakeScene())
     avail = p._available_models()
     assert avail == ["millennium", "microuchuu", "millennium_mbk"]
-    assert p._resolve_model_ref("current", avail, "millennium", set()) == "millennium"
-    assert p._resolve_model_ref("other", avail, "millennium", set()) == "microuchuu"
+    assert (
+        p._resolve_model_ref("current", avail, "millennium", set())
+        == "millennium"
+    )
+    assert (
+        p._resolve_model_ref("other", avail, "millennium", set())
+        == "microuchuu"
+    )
     # 'auto' skips excluded names
-    assert p._resolve_model_ref(
-        "auto", avail, "millennium", {"microuchuu"}
-    ) == "millennium_mbk"
+    assert (
+        p._resolve_model_ref("auto", avail, "millennium", {"microuchuu"})
+        == "millennium_mbk"
+    )
     # explicit names pass through; None stays None
     assert p._resolve_model_ref("foo", avail, "millennium", set()) == "foo"
     assert p._resolve_model_ref(None, avail, "millennium", set()) is None
@@ -221,7 +256,8 @@ def test_story_model_names_collects_all_referenced_models():
 
     class FakeState:
         models_list = [
-            {"name": "millennium_vanilla"}, {"name": "microuchuu"},
+            {"name": "millennium_vanilla"},
+            {"name": "microuchuu"},
             {"name": "millennium"},
         ]
 
@@ -229,21 +265,33 @@ def test_story_model_names_collects_all_referenced_models():
         state = FakeState()
         controller = object()
 
-    story = Story.from_dict({
-        "title": "T",
-        "requirements": {"models": ["millennium"]},
-        "scenes": [
-            {"id": "a", "models": {"primary": "current",
-                                   "adjacent": ["microuchuu"]}},
-            {"id": "b", "models": {"primary": "millennium_vanilla",
-                                   "adjacent": []}},
-        ],
-    })
+    story = Story.from_dict(
+        {
+            "title": "T",
+            "requirements": {"models": ["millennium"]},
+            "scenes": [
+                {
+                    "id": "a",
+                    "models": {
+                        "primary": "current",
+                        "adjacent": ["microuchuu"],
+                    },
+                },
+                {
+                    "id": "b",
+                    "models": {
+                        "primary": "millennium_vanilla",
+                        "adjacent": [],
+                    },
+                },
+            ],
+        }
+    )
     p = StoryPlayer(FakeServer(), FakeScene())
     names = p._story_model_names(story)
-    assert names[0] == "millennium_vanilla"          # launched primary first
+    assert names[0] == "millennium_vanilla"  # launched primary first
     assert set(names) == {"millennium_vanilla", "microuchuu", "millennium"}
-    assert len(names) == 3                            # no duplicates
+    assert len(names) == 3  # no duplicates
 
 
 def test_propagate_layer_visibility_mirrors_all_boxes():
@@ -272,8 +320,11 @@ def test_propagate_layer_visibility_mirrors_all_boxes():
     class FakeScene:
         primary_name = "millennium_vanilla"
         _adjacent_order = ["millennium"]
-        _models = {"millennium_vanilla": prim, "millennium": adj,
-                   "preloaded_hidden": hidden}
+        _models = {
+            "millennium_vanilla": prim,
+            "millennium": adj,
+            "preloaded_hidden": hidden,
+        }
 
         def list_models(self):
             return list(self._models.values())
@@ -320,10 +371,14 @@ def test_portable_example_loads(tmp_path, monkeypatch):
     """The shipped example must parse with symbolic snap/camera values."""
     from sage_viewer.story.model import Scene
 
-    sc = Scene.from_dict({
-        "id": "x", "snap_num": "last", "camera": "box",
-        "motion": {"kind": "snapshot_sweep", "from": "40%", "to": "last"},
-    })
+    sc = Scene.from_dict(
+        {
+            "id": "x",
+            "snap_num": "last",
+            "camera": "box",
+            "motion": {"kind": "snapshot_sweep", "from": "40%", "to": "last"},
+        }
+    )
     assert sc.snap_num == "last"
     assert sc.camera == "box"
     # required_snapshots tolerates symbolic refs (skips them, no crash)
@@ -356,16 +411,23 @@ def test_scene_menu_expands_to_clickable_grid():
         state = FakeState()
         controller = object()
 
-    story = Story.from_dict({
-        "title": "T",
-        "scenes": [
-            {"id": "intro", "title": "Intro"},
-            {"id": "card-x", "title": "Divider"},
-            {"id": "galaxies", "title": "Galaxies"},
-            {"id": "menu", "title": "",
-             "overlays": [{"kind": "scene_menu", "title": "Jump", "cols": 3}]},
-        ],
-    })
+    story = Story.from_dict(
+        {
+            "title": "T",
+            "scenes": [
+                {"id": "intro", "title": "Intro"},
+                {"id": "card-x", "title": "Divider"},
+                {"id": "galaxies", "title": "Galaxies"},
+                {
+                    "id": "menu",
+                    "title": "",
+                    "overlays": [
+                        {"kind": "scene_menu", "title": "Jump", "cols": 3}
+                    ],
+                },
+            ],
+        }
+    )
     server = FakeServer()
     p = StoryPlayer(server, object())
     p._story = story
@@ -396,14 +458,20 @@ def test_scene_menu_include_cards():
         state = FakeState()
         controller = object()
 
-    story = Story.from_dict({
-        "title": "T",
-        "scenes": [
-            {"id": "card-x", "title": "Divider"},
-            {"id": "menu", "overlays": [
-                {"kind": "scene_menu", "include_cards": True}]},
-        ],
-    })
+    story = Story.from_dict(
+        {
+            "title": "T",
+            "scenes": [
+                {"id": "card-x", "title": "Divider"},
+                {
+                    "id": "menu",
+                    "overlays": [
+                        {"kind": "scene_menu", "include_cards": True}
+                    ],
+                },
+            ],
+        }
+    )
     server = FakeServer()
     p = StoryPlayer(server, object())
     p._story = story
@@ -424,14 +492,16 @@ def test_goto_menu_jumps_to_the_scene_selector_scene():
         state = FakeState()
         controller = object()
 
-    story = Story.from_dict({
-        "title": "T",
-        "scenes": [
-            {"id": "intro", "title": "Intro"},
-            {"id": "mid", "title": "Mid"},
-            {"id": "menu", "overlays": [{"kind": "scene_menu"}]},
-        ],
-    })
+    story = Story.from_dict(
+        {
+            "title": "T",
+            "scenes": [
+                {"id": "intro", "title": "Intro"},
+                {"id": "mid", "title": "Mid"},
+                {"id": "menu", "overlays": [{"kind": "scene_menu"}]},
+            ],
+        }
+    )
     p = StoryPlayer(FakeServer(), object())
     p._story = story
     jumped = []
@@ -455,12 +525,13 @@ def test_resolve_snap_redshift_spec():
 
         def z_to_snap(self, z):
             import numpy as np
+
             return int(np.argmin(np.abs(np.array(self._z) - z)))
 
     t = FakeTable()
-    assert resolve_snap("z=1.5", 5, t) == 2     # 1.4 is closest to 1.5
-    assert resolve_snap("z1.5", 5, t) == 2      # 'z' prefix form
-    assert resolve_snap("z=0", 5, t) == 4       # z=0 → last
+    assert resolve_snap("z=1.5", 5, t) == 2  # 1.4 is closest to 1.5
+    assert resolve_snap("z1.5", 5, t) == 2  # 'z' prefix form
+    assert resolve_snap("z=0", 5, t) == 4  # z=0 → last
     assert resolve_snap("z=2.1", 5, t) == 1
     # no table → safe fallback to last
     assert resolve_snap("z=1.5", 5) == 4
