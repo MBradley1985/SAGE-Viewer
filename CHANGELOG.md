@@ -6,6 +6,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- **Galaxy splats scale with the subhalo virial radius.** All galaxy layers
+  (CGM/Hot outer envelope, cold-gas envelope, focus-only disk/bulge, and the
+  Colour-by halo) are now sized by the galaxy's `Rvir` (read from the SAGE
+  output; analytic Δ=200 fallback from Mvir where missing) instead of a fixed
+  stellar-mass mapping. Most galaxies render tighter and less diffuse, while
+  massive cluster centrals gain their true extent.
+
+---
+
 ## [1.3.0] — 2026-07-17
 
 ### Added

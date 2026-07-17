@@ -12,6 +12,7 @@ class GalaxySnapshot:
     positions: np.ndarray  # (N, 3) float32, Mpc/h
     stellar_mass: np.ndarray  # (N,)   float32, Msun
     mvir: np.ndarray  # (N,)   float32, 10^10 Msun/h (raw)
+    rvir: np.ndarray  # (N,)   float32, Mpc/h (subhalo virial radius)
     sfr: np.ndarray  # (N,)   float32, Msun/yr
     ssfr: np.ndarray  # (N,)   float32, yr^-1
     cold_gas: np.ndarray  # (N,)   float32, Msun
@@ -82,6 +83,7 @@ class GalaxySnapshot:
             positions=np.empty((0, 3), dtype=np.float32),
             stellar_mass=z,
             mvir=z,
+            rvir=z,
             sfr=z,
             ssfr=z,
             cold_gas=z,
@@ -212,6 +214,7 @@ def load_galaxy_snapshot(
         ffb_regime_raw = _opt("FFBRegime", np.int32).astype(np.int32)
         cgm_regime_raw = _opt("Regime", np.int32).astype(np.int32)
         cmvir_raw = _opt("CentralMvir", np.float32)
+        rvir_raw = _opt("Rvir", np.float32)  # Mpc/h, no unit conversion
         h2_raw = _opt("H2gas", np.float32)
         cgm_gas_raw = _opt("CGMgas", np.float32)
         hot_gas_raw = _opt("HotGas", np.float32)
@@ -327,6 +330,7 @@ def load_galaxy_snapshot(
         positions=positions,
         stellar_mass=stellar_mass[indices],
         mvir=mvir_raw[indices].astype(np.float32),
+        rvir=rvir_raw[indices].astype(np.float32),
         sfr=sfr[indices],
         ssfr=ssfr[indices],
         cold_gas=cold_gas[indices],

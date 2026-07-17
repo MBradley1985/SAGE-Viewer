@@ -7,7 +7,7 @@ import pyvista as pv
 
 from sage_viewer.io.galaxy_reader import GalaxySnapshot
 from sage_viewer.utils.colormap import normalize_log
-from sage_viewer.utils.sizing import galaxy_world_radii
+from sage_viewer.utils.sizing import galaxy_world_radii_rvir
 
 ColorMode = Literal[
     "stellar_mass",
@@ -254,65 +254,27 @@ class GalaxyLayer:
         # Combined focus + filter mask
         mask = self._combined_mask()
         if mask is not None and len(mask) == snap.count:
+            from dataclasses import fields as _dc_fields
+
             from sage_viewer.io.galaxy_reader import GalaxySnapshot as _GS
 
-            snap = _GS(
-                positions=snap.positions[mask],
-                stellar_mass=snap.stellar_mass[mask],
-                mvir=snap.mvir[mask],
-                sfr=snap.sfr[mask],
-                ssfr=snap.ssfr[mask],
-                cold_gas=snap.cold_gas[mask],
-                bulge_mass=snap.bulge_mass[mask],
-                gal_type=snap.gal_type[mask],
-                bh_mass=snap.bh_mass[mask],
-                ics_mass=snap.ics_mass[mask],
-                ffb_regime=snap.ffb_regime[mask],
-                cgm_regime=snap.cgm_regime[mask],
-                central_mvir=snap.central_mvir[mask],
-                h2_mass=snap.h2_mass[mask],
-                cgm_gas=snap.cgm_gas[mask],
-                hot_gas=snap.hot_gas[mask],
-                galaxy_id=snap.galaxy_id[mask],
-                central_id=snap.central_id[mask],
-                time_of_infall=snap.time_of_infall[mask],
-                mean_age=snap.mean_age[mask],
-                len_particles=snap.len_particles[mask],
-                vmax=snap.vmax[mask],
-                concentration=snap.concentration[mask],
-                spin=snap.spin[mask],
-                disk_radius=snap.disk_radius[mask],
-                bulge_radius=snap.bulge_radius[mask],
-                merger_bulge_mass=snap.merger_bulge_mass[mask],
-                merger_bulge_radius=snap.merger_bulge_radius[mask],
-                instability_bulge_mass=snap.instability_bulge_mass[mask],
-                instability_bulge_radius=snap.instability_bulge_radius[mask],
-                h1_gas=snap.h1_gas[mask],
-                ejected_mass=snap.ejected_mass[mask],
-                outflow_rate=snap.outflow_rate[mask],
-                mass_loading=snap.mass_loading[mask],
-                cooling=snap.cooling[mask],
-                heating=snap.heating[mask],
-                sfr_bulge=snap.sfr_bulge[mask],
-                sfr_disk=snap.sfr_disk[mask],
-                sfr_bulge_z=snap.sfr_bulge_z[mask],
-                sfr_disk_z=snap.sfr_disk_z[mask],
-                metals_cold_gas=snap.metals_cold_gas[mask],
-                metals_stellar_mass=snap.metals_stellar_mass[mask],
-                metals_bulge_mass=snap.metals_bulge_mass[mask],
-                metals_hot_gas=snap.metals_hot_gas[mask],
-                metals_ejected_mass=snap.metals_ejected_mass[mask],
-                metals_ics=snap.metals_ics[mask],
-                metals_cgm_gas=snap.metals_cgm_gas[mask],
-                sage_indices=snap.sage_indices[mask],
-                snap_num=snap.snap_num,
-            )
+            # Mask every per-galaxy array field; pass scalars (snap_num)
+            # through unchanged.  Field-agnostic so new GalaxySnapshot
+            # fields are sliced automatically.
+            n = snap.count
+            kwargs = {}
+            for fld in _dc_fields(snap):
+                value = getattr(snap, fld.name)
+                if isinstance(value, np.ndarray) and len(value) == n:
+                    value = value[mask]
+                kwargs[fld.name] = value
+            snap = _GS(**kwargs)
             if snap.count == 0:
                 self._clear_actors()
                 self._cloud = None
                 return
 
-        radii = galaxy_world_radii(snap.stellar_mass)
+        radii = galaxy_world_radii_rvir(snap.rvir, snap.mvir)
         eff_pos = snap.positions + self._offset
 
         # Every mode shares the same Structure composition (BH core, cold-gas
@@ -399,8 +361,8 @@ class GalaxyLayer:
             return
 
         pos = snap.positions if positions is None else positions
-        # ---- Per-galaxy radii (Mpc/h) keyed off the default scaling -----
-        r_outer = np.maximum(radii, 1e-4)  # default 0.025–0.25 Mpc/h
+        # ---- Per-galaxy radii (Mpc/h) keyed off the subhalo Rvir --------
+        r_outer = np.maximum(radii, 1e-4)
         r_cold = 0.45 * r_outer
 
         # Convenience clamped log10
