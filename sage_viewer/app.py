@@ -121,6 +121,12 @@ html, body, .v-application { background: #000000 !important; }
 from sage_viewer.ui.info_panel import build_info_panel
 from sage_viewer.ui.navigation_panel import build_navigation_panel
 from sage_viewer.ui.toolbar import build_toolbar
+from sage_viewer.ui.story_mode import (
+    build_story_button,
+    build_story_hud,
+    build_story_overlays,
+    init_story_mode,
+)
 
 
 def create_app(
@@ -162,13 +168,15 @@ def create_app(
     # (which silently breaks client-side features like the pop-out
     # fullscreen toggle until a manual hard refresh).
     def _bust(rel):
+        # Map "sage_static/<subpath>" to the file under the static dir so
+        # nested assets (e.g. katex/katex.min.js) are cache-busted too.
+        sub = rel.split("?", 1)[0]
+        if sub.startswith("sage_static/"):
+            sub = sub[len("sage_static/") :]
         try:
             mtime = int(
                 _os_static.path.getmtime(
-                    _os_static.path.join(
-                        _sage_static_dir,
-                        _os_static.path.basename(rel),
-                    )
+                    _os_static.path.join(_sage_static_dir, sub)
                 )
             )
         except OSError:
@@ -178,8 +186,16 @@ def create_app(
     server.enable_module(
         {
             "serve": {"sage_static": _sage_static_dir},
-            "scripts": [_bust("sage_static/sage_viewer.js")],
-            "styles": [_bust("sage_static/sage_theme.css")],
+            # KaTeX (vendored, woff2-only) must load before sage_viewer.js,
+            # which calls katex.render() for Story Mode equation overlays.
+            "scripts": [
+                _bust("sage_static/katex/katex.min.js"),
+                _bust("sage_static/sage_viewer.js"),
+            ],
+            "styles": [
+                _bust("sage_static/katex/katex.min.css"),
+                _bust("sage_static/sage_theme.css"),
+            ],
         }
     )
 
@@ -215,6 +231,9 @@ def create_app(
             },
         }
     }
+    # Story Mode player + reactive state / controllers.
+    init_story_mode(server, scene)
+
     _NAV_TABS = [
         ("Structure", "layers"),
         ("Filters", "filters"),
@@ -810,9 +829,7 @@ def create_app(
                     ):
                         v3.VListItem(
                             title=(
-                                "m.overlay "
-                                "? '✓ ' + m.name "
-                                ": '+ ' + m.name",
+                                "m.overlay ? '✓ ' + m.name : '+ ' + m.name",
                             ),
                             prepend_icon=(
                                 "m.overlay ? 'mdi-layers' : 'mdi-layers-plus'",
@@ -913,6 +930,9 @@ def create_app(
                 style="margin-left:2px;",
             )
 
+            # ── Story Mode button + dropdown ───────────────────────────────
+            build_story_button(server)
+
             # ── Check / install updates ────────────────────────────────────
             v3.VBtn(
                 icon="mdi-update",
@@ -948,6 +968,9 @@ def create_app(
             # (sage_static/sage_theme.css) — that's the only path that reliably
             # reaches html/body from inside a Trame/Vue template.
             html.Style(_THEME_CSS)
+
+            # ── Story Mode playback overlay (hidden unless a story is active)
+            build_story_hud(server)
 
             # ── Export catalogue dialog ────────────────────────────────────
             _SCOPE_ITEMS = [
@@ -1126,16 +1149,25 @@ def create_app(
                     )
                     server.controller.view_update = view.update
 
+                    # Story Mode text / equation overlays (over the render).
+                    build_story_overlays(server)
+
                     # Pre-rendered playback overlay — shown only during
                     # playback, where it flips through the cached frames. While
                     # frames are being rendered the live view stays put (the
                     # progress shows in the toolbar chip instead).
+                    # Opacity-driven (not v_show) so dropping it CROSSFADES to
+                    # the live view underneath — the server always renders the
+                    # staged scene before clearing playback_active, so the fade
+                    # lands on matching content instead of a hard cut.
                     with html.Div(
-                        v_show=("playback_active",),
                         style=(
-                            "position:absolute;inset:0;z-index:6;"
+                            "'position:absolute;inset:0;z-index:6;"
                             "background:#000;display:flex;"
                             "align-items:center;justify-content:center;"
+                            "transition:opacity 0.35s ease;' + "
+                            "(playback_active ? 'opacity:1;'"
+                            " : 'opacity:0;pointer-events:none;')",
                         ),
                     ):
                         html.Img(
@@ -1237,8 +1269,7 @@ def create_app(
                                 html.Div(
                                     "{{ entry.out }}",
                                     style=(
-                                        "color:#9ca3af;"
-                                        "white-space:pre-wrap;"
+                                        "color:#9ca3af;white-space:pre-wrap;"
                                     ),
                                 )
                         with html.Div(
@@ -1418,7 +1449,10 @@ def create_app(
                             "backdrop-filter:blur(6px);"
                             "border:1px solid #374151;"
                             "color:#e2e8f0;"
-                            "z-index:5;`",
+                            # In Story Mode, lift library cards above the story
+                            # overlay layer (z40) + HUD (z50) so opened items sit
+                            # on top of the scene; normal-use layering unchanged.
+                            "z-index:${story_active ? 60 : 5};`",
                         ),
                         elevation=8,
                     ):
@@ -1579,17 +1613,15 @@ def create_app(
                                 ),
                             )
 
-                # Right panel — layers + navigation tabs.
-                # Locked to a fixed 300px width so layouts stay consistent
-                # across screen sizes; flex-shrink/grow disabled so the
-                # main viewport area absorbs all the slack. Internal scroll
-                # handles overflow on short windows.
+                # Right panel — layers + navigation tabs. Fixed 300px flex
+                # child. v_show lets a Story Mode scene hide it
+                # (chrome.hide_panel); there is no general-use toggle.
                 with v3.VSheet(
+                    v_show=("!panels_hidden",),
                     style=(
                         "width:300px;min-width:300px;max-width:300px;"
                         "flex:0 0 300px;"
-                        "height:100%;box-sizing:border-box;"
-                        "overflow:hidden;"
+                        "height:100%;box-sizing:border-box;overflow:hidden;"
                     ),
                     color="#000000",
                     rounded=False,

@@ -75,6 +75,13 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - **Overlay compositing** — Galaxy Info, Group Info, console pop-out, and open Library cards are all composited into screenshots and recordings exactly as they appear on screen
 - Catalogue export (CSV, HDF5, FITS, TXT) for the current filter selection, target, or box region — saves to `sage_outputs/catalogues/`
 
+### Story Mode
+- Play JSON-defined **stories** — ordered scenes of captured viewer state (snapshot, camera, layers, filters, focus) with text/media overlays — as full presentations over the live 3D view
+- Scenes carry titles, headings, body text, citations, LaTeX equations (vendored KaTeX, offline), images, videos, audio, and a clickable scene-menu grid
+- Camera motions per scene: orbit, snapshot sweeps through cosmic time (with pre-rendering for instant playback), and fly-throughs with optional snapshot rewind to a target redshift
+- Portable stories: symbolic snapshot references (`"first"`, `"last"`, `"40%"`, `"z=1.5"`) resolve against whatever model is loaded
+- Stories load from `sage_stories/` in your launch directory; a bundled **Presentation Template** provides a full talk skeleton to copy and fill in — see the [Story Mode guide](https://mbradley1985.github.io/SAGE-Viewer/user_guide/story_mode/)
+
 ### Launch Mode wizard
 - Guided setup flow for configuring and launching SAGE26, accessible standalone (`sage-viewer` with no `--par`) or from the Explore Mode hamburger menu
 - Step chips in the header track progress (cyan = current step, green = done, white = pending)

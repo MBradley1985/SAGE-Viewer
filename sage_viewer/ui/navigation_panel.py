@@ -217,7 +217,51 @@ _GAL_CB = {
     "metals_ics": ("Zics", "10^-2", "10^10 Msun"),
 }
 
-_CBAR_BASE = "height:8px;flex:1;min-width:0;border-radius:2px;" "background:"
+# Default colormap applied when a colour-by property is selected.  The user
+# can still pick any colormap afterwards; re-selecting a property snaps back
+# to its default.  Missing entries fall back to viridis.
+_HALO_CMAP_DEFAULTS = {
+    "mvir": "viridis",
+    "rvir": "cividis",
+    "vvir": "plasma",
+    "vmax": "plasma",
+}
+
+_GAL_CMAP_DEFAULTS = {
+    "stellar_mass": "inferno",
+    "sfr": "RdBu",
+    "ssfr": "RdBu",
+    "bt": "YlOrRd",
+    "age": "YlOrRd",
+    "type": "coolwarm",  # fixed — dropdown disabled in this mode
+    "bh_mass": "cividis",
+    "bulge_mass": "cividis",
+    "bulge_radius": "cividis",
+    "cgm_gas": "Greens",
+    "cold_gas": "Blues",
+    "cooling": "Blues",
+    "ejected_mass": "inferno",
+    "h1_gas": "turbo",
+    "h2_gas": "Greens",
+    "heating": "Reds",
+    "hot_gas": "Reds",
+    "ics_mass": "twilight",
+    "mass_loading": "inferno",
+    "metals_stellar_mass": "BrBG",
+    "metals_bulge_mass": "BrBG",
+    "metals_cold_gas": "BrBG",
+    "metals_hot_gas": "BrBG",
+    "metals_cgm_gas": "BrBG",
+    "metals_ejected_mass": "BrBG",
+    "metals_ics": "BrBG",
+    "outflow_rate": "inferno",
+    "sfr_bulge": "RdBu",
+    "sfr_disk": "RdBu",
+    "sfr_bulge_z": "RdBu",
+    "sfr_disk_z": "RdBu",
+}
+
+_CBAR_BASE = "height:8px;flex:1;min-width:0;border-radius:2px;background:"
 
 
 def _cbar_style(gradient: str) -> str:
@@ -856,8 +900,12 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @state.change("halo_color_mode")
     def on_halo_mode(halo_color_mode, **_):
         scene.halo_layer.color_mode = halo_color_mode
-        if halo_color_mode == "mvir":
-            state.halo_colormap = "viridis"
+        # Snap to the property's default colormap — unless the same update
+        # also set the colormap explicitly (story scenes, console commands).
+        if "halo_colormap" not in state.modified_keys:
+            state.halo_colormap = _HALO_CMAP_DEFAULTS.get(
+                halo_color_mode, "viridis"
+            )
         _, lo, hi = _HALO_CB[halo_color_mode]
         state.halo_cbar_min = lo
         state.halo_cbar_max = hi
@@ -866,6 +914,19 @@ def build_navigation_panel(server, scene: Scene) -> None:
     @state.change("galaxy_color_mode")
     def on_galaxy_mode(galaxy_color_mode, **_):
         scene.galaxy_layer.color_mode = galaxy_color_mode
+        # Snap to the property's default colormap — unless the same update
+        # also set the colormap explicitly (story scenes, console commands).
+        # Structure mode has no colormap (dropdown disabled), so leave it.
+        # Type is fixed at coolwarm (dropdown disabled), so always force it.
+        if galaxy_color_mode == "type":
+            state.galaxy_colormap = _GAL_CMAP_DEFAULTS["type"]
+        elif (
+            galaxy_color_mode != "structure"
+            and "galaxy_colormap" not in state.modified_keys
+        ):
+            state.galaxy_colormap = _GAL_CMAP_DEFAULTS.get(
+                galaxy_color_mode, "viridis"
+            )
         # Categorical / multi-layer modes (density, type, structure) don't have
         # a single colormap range — fall back to a generic label.
         if galaxy_color_mode in _GAL_CB:
@@ -3321,8 +3382,21 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         "kind": kind,
                         "ext": ext.lstrip("."),
                         "size_kb": int(size_kb),
+                        "folder": str(rel.parent),
                     }
                 )
+        # Group by source folder first, then by file type, then
+        # alphabetically within each type. Flag the first entry of each
+        # folder and each type so the UI can draw section headers / dividers.
+        out.sort(key=lambda e: (e["folder"], e["ext"], e["name"].lower()))
+        prev_folder = None
+        prev_ext = None
+        for e in out:
+            e["first_in_folder"] = e["folder"] != prev_folder
+            # A new folder always restarts the type grouping.
+            e["first_in_group"] = e["first_in_folder"] or e["ext"] != prev_ext
+            prev_folder = e["folder"]
+            prev_ext = e["ext"]
         return out
 
     @ctrl.set("library_refresh")
@@ -3530,14 +3604,17 @@ def build_navigation_panel(server, scene: Scene) -> None:
                 pass
         elif tab == "box":
             try:
-                xmin, xmax = float(state.nav_box_xmin), float(
-                    state.nav_box_xmax
+                xmin, xmax = (
+                    float(state.nav_box_xmin),
+                    float(state.nav_box_xmax),
                 )
-                ymin, ymax = float(state.nav_box_ymin), float(
-                    state.nav_box_ymax
+                ymin, ymax = (
+                    float(state.nav_box_ymin),
+                    float(state.nav_box_ymax),
                 )
-                zmin, zmax = float(state.nav_box_zmin), float(
-                    state.nav_box_zmax
+                zmin, zmax = (
+                    float(state.nav_box_zmin),
+                    float(state.nav_box_zmax),
                 )
                 scene.set_focus_box(xmin, xmax, ymin, ymax, zmin, zmax)
                 state.focus_active = True
@@ -3826,9 +3903,13 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         density="compact",
                         # Structure mode is the bare composition (no outer
                         # property halo) — the colormap doesn't apply.
-                        # For every other mode the colormap drives the
-                        # outermost layer that sits around the envelope.
-                        disabled=("galaxy_color_mode === 'structure'",),
+                        # Type is fixed at coolwarm. For every other mode
+                        # the colormap drives the outermost layer that sits
+                        # around the envelope.
+                        disabled=(
+                            "galaxy_color_mode === 'structure' || "
+                            "galaxy_color_mode === 'type'",
+                        ),
                     )
                 with v3.VSheet(
                     color="transparent", style="padding:4px 0 8px;"
@@ -4300,8 +4381,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                         v_for=("c in consoles_list",),
                         key=("c.id",),
                         style=(
-                            "display:inline-flex;align-items:center;"
-                            "gap:2px;"
+                            "display:inline-flex;align-items:center;gap:2px;"
                         ),
                     ):
                         v3.VBtn(
@@ -4317,7 +4397,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                                 ": '#6b7280'",
                             ),
                             click=(
-                                "trigger('console_switch_trigger', " "[c.id])"
+                                "trigger('console_switch_trigger', [c.id])"
                             ),
                             style=(
                                 "text-transform:none;font-size:0.62rem;"
@@ -4331,9 +4411,7 @@ def build_navigation_panel(server, scene: Scene) -> None:
                             variant="text",
                             color="#6b7280",
                             v_show=("consoles_list.length > 1",),
-                            click=(
-                                "trigger('console_close_trigger', " "[c.id])"
-                            ),
+                            click=("trigger('console_close_trigger', [c.id])"),
                             style="min-width:18px;padding:0;height:22px;",
                         )
                     v3.VBtn(
@@ -4565,56 +4643,98 @@ def build_navigation_panel(server, scene: Scene) -> None:
                     ),
                 ):
                     with html.Div():
-                        with html.Div(
+                        with html.Template(
                             v_for=("entry in library_files",),
                             key=("entry.path",),
-                            style=(
-                                "display:flex;align-items:center;gap:6px;"
-                                "padding:4px 6px;border-bottom:1px solid #1f2937;"
-                                "cursor:pointer;"
-                            ),
                         ):
-                            v3.VIcon(
-                                icon=(
-                                    "entry.kind === 'video' "
-                                    "? 'mdi-movie-open-outline' : 'mdi-image-outline'",
-                                ),
-                                color="cyan",
-                                size="small",
-                                style="flex-shrink:0;",
-                            )
+                            # Folder header — primary grouping. Shown above
+                            # the first file of each source folder.
                             with html.Div(
-                                style="flex:1;min-width:0;",
-                                dblclick=(
-                                    server.controller.library_open,
-                                    "[entry.path]",
+                                v_if=("entry.first_in_folder",),
+                                style=(
+                                    "display:flex;align-items:center;gap:4px;"
+                                    "padding:8px 6px 4px;"
+                                    "border-top:2px solid #475569;"
+                                    "background:#111827;"
                                 ),
                             ):
+                                v3.VIcon(
+                                    "mdi-folder-outline",
+                                    color="#94a3b8",
+                                    size="x-small",
+                                    style="flex-shrink:0;",
+                                )
                                 html.Div(
-                                    "{{ entry.name }}",
+                                    "{{ entry.folder }}",
                                     style=(
-                                        "font-size:0.72rem;color:#e5e7eb;"
+                                        "font-size:0.65rem;color:#cbd5e1;"
+                                        "font-weight:700;letter-spacing:0.04em;"
                                         "white-space:nowrap;overflow:hidden;"
                                         "text-overflow:ellipsis;"
                                     ),
                                 )
-                                html.Div(
-                                    "{{ entry.ext.toUpperCase() }}"
-                                    " · {{ entry.size_kb }} KB",
-                                    style="font-size:0.6rem;color:#6b7280;",
-                                )
-                            v3.VBtn(
-                                icon="mdi-delete-outline",
-                                density="compact",
-                                size="x-small",
-                                color="red",
-                                variant="text",
-                                style="flex-shrink:0;",
-                                click=(
-                                    server.controller.library_delete,
-                                    "[entry.path]",
+                            # Type sub-divider within a folder (types sorted,
+                            # files alphabetical within each type).
+                            html.Div(
+                                "{{ entry.ext.toUpperCase() }}",
+                                v_if=("entry.first_in_group",),
+                                style=(
+                                    "font-size:0.6rem;color:#22d3ee;"
+                                    "letter-spacing:0.08em;font-weight:600;"
+                                    "padding:4px 6px 2px 14px;"
+                                    "background:#0d1117;"
                                 ),
                             )
+                            with html.Div(
+                                style=(
+                                    "display:flex;align-items:center;gap:6px;"
+                                    "padding:4px 6px;"
+                                    "border-bottom:1px solid #1f2937;"
+                                    "cursor:pointer;"
+                                ),
+                            ):
+                                v3.VIcon(
+                                    icon=(
+                                        "entry.kind === 'video' "
+                                        "? 'mdi-movie-open-outline' "
+                                        ": 'mdi-image-outline'",
+                                    ),
+                                    color="cyan",
+                                    size="small",
+                                    style="flex-shrink:0;",
+                                )
+                                with html.Div(
+                                    style="flex:1;min-width:0;",
+                                    dblclick=(
+                                        server.controller.library_open,
+                                        "[entry.path]",
+                                    ),
+                                ):
+                                    html.Div(
+                                        "{{ entry.name }}",
+                                        style=(
+                                            "font-size:0.72rem;color:#e5e7eb;"
+                                            "white-space:nowrap;overflow:hidden;"
+                                            "text-overflow:ellipsis;"
+                                        ),
+                                    )
+                                    html.Div(
+                                        "{{ entry.ext.toUpperCase() }}"
+                                        " · {{ entry.size_kb }} KB",
+                                        style="font-size:0.6rem;color:#6b7280;",
+                                    )
+                                v3.VBtn(
+                                    icon="mdi-delete-outline",
+                                    density="compact",
+                                    size="x-small",
+                                    color="red",
+                                    variant="text",
+                                    style="flex-shrink:0;",
+                                    click=(
+                                        server.controller.library_delete,
+                                        "[entry.path]",
+                                    ),
+                                )
                 # Bottom block — count + action buttons anchored to the
                 # panel's bottom edge, mirroring the Console tab layout.
                 with html.Div(

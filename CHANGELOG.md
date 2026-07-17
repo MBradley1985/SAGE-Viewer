@@ -6,6 +6,67 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.0] — 2026-07-17
+
+### Added
+
+#### Story Mode — presentation playback over the live 3D view
+
+A new **Story Mode** button (next to Fly-through) opens a dropdown of
+*stories* — JSON files defining an ordered set of *scenes*, each a fully
+captured viewer state (snapshot, camera, layer/filter/environment state,
+focus) plus overlays and an optional camera motion — played back like slides
+with Previous / Play / Pause / Next in a bottom HUD.
+
+- **Discovery.** Stories load from `sage_stories/` in the launch directory
+  (user stories, local-only) plus the examples bundled with the package
+  (`sage_viewer/examples/`); a local story overrides a bundled one with the
+  same title. Two examples ship: **Example Tour** (minimal) and
+  **Presentation Template** (a full talk skeleton to copy and fill in).
+- **Portable scenes.** Snapshots may be symbolic — `"first"`, `"last"`,
+  `"40%"`, or a redshift like `"z=1.5"` — resolved against whatever model is
+  loaded, and `camera: "box"` frames the box regardless of box size, so
+  stories carry across outputs.
+- **Motion.** Scenes can be `still`, `orbit`, `snapshot_sweep` (animate
+  through cosmic time, with optional looping and pre-rendering during story
+  load for instant playback), or `flythrough` (tour the massive structures;
+  optional `rewind_to` plays a cached snapshot rewind back to a target
+  redshift; `targets` can select galaxies instead of haloes; `style:
+  "normal"` gives the calmer toolbar-style tour).
+- **Overlays.** Titles, headings, body text, citations, LaTeX equations
+  (vendored KaTeX under `static/katex/` — no network needed), images, videos,
+  audio, and a clickable `scene_menu` grid of every scene. Overlays are
+  authored on a fixed virtual stage that scales uniformly to fit any window,
+  and media is served from `sage_viewer/static/` at `/sage_static/`.
+- **Playback behaviour.** Story-level `autoplay` starts playback on entry;
+  per-scene `hold` waits for Next instead of auto-advancing; scene changes
+  are smoothed with a freeze-frame crossfade; per-scene `theme` and
+  `chrome.hide_panel` give full-bleed presentation chrome. Scenes can declare
+  a `models` layout (`primary` + `adjacent`); the pre-story layout, camera,
+  state, and theme are restored on exit.
+- **Sandbox preload.** Entering a story warms the snapshot cache for every
+  snapshot the story references before the first scene renders.
+- **Thumbnails.** A "Capture thumbnails" action screenshots every scene for
+  the scene-menu grid.
+- Camera moves reuse the shared `scene/camera_motion.py` helpers, which the
+  Fly-through now also uses. Authoring guide: `docs/user_guide/story_mode.md`;
+  design notes: `docs/project/story_mode_design.md`.
+
+#### Library panel
+
+- The Library panel sorts entries by file type with dividers, and supports
+  multiple `sage_library` folders.
+
+### Changed
+
+- User stories in `sage_stories/` are no longer tracked in the repository —
+  they stay local to the machine. Stories that should ship with the package
+  belong in `sage_viewer/examples/`.
+- The Story Mode HUD no longer shows a close cross, preventing accidental
+  exits mid-presentation.
+
+---
+
 ## [1.2.1] — 2026-06-25
 
 > **Note:** the `1.2.0` artifact on PyPI was built from the wrong commit (the

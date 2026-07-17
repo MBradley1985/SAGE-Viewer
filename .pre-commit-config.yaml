@@ -5,6 +5,8 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        # mkdocs.yml uses mkdocs-material's !!python/name: tags, which
+        # check-yaml cannot parse.
         exclude: ^docs/mkdocs\.yml$
       - id: check-added-large-files
         args: ['--maxkb=1000']
@@ -15,6 +17,9 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
+      # ruff-format removed: it fights black over implicit string concatenation
+      # (each reformats the other's output, so hooks never pass). Black is the
+      # project formatter per CONTRIBUTING.md; ruff is lint-only.
 
   - repo: https://github.com/psf/black
     rev: 24.10.0

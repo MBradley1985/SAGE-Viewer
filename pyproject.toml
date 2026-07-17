@@ -65,7 +65,10 @@ where = ["."]
 include = ["sage_viewer*"]
 
 [tool.setuptools.package-data]
-sage_viewer = ["static/*"]
+# Include nested static assets too (e.g. vendored KaTeX under static/katex/
+# and its fonts) — "static/*" alone does not recurse into subdirectories.
+# Also bundle the example Story Mode stories so they ship with the package.
+sage_viewer = ["static/*", "static/**/*", "examples/*.json"]
 
 [tool.ruff]
 line-length = 79

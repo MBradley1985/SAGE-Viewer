@@ -76,6 +76,10 @@
   document.addEventListener('mousedown', function (e) {
     var handle = e.target.closest && e.target.closest('.sage-popout-handle');
     if (!handle) return;
+    // Don't start a drag when the press lands on a button in the title bar
+    // (the ✕ close / maximize). Otherwise re-anchoring the card on mousedown
+    // resizes it and swallows the first click, so closing took two clicks.
+    if (e.target.closest('button, .v-btn')) return;
     var card = handle.closest('.sage-popout');
     if (!card) return;
     e.preventDefault();
@@ -626,5 +630,251 @@
       });
     });
   })).observe(document.body, { childList: true, subtree: true });
+
+  // ─── Story Mode text / equation overlays ──────────────────────────
+  // Overlays are rendered ENTIRELY by this code, not by Vue: the server ships
+  // a JSON list in the hidden #sage-overlays-relay input, and we build the
+  // children of #sage-overlay-root ourselves. Vue owns the container element
+  // but never its children, so KaTeX's DOM writes can't corrupt Vue's vDOM.
+  (function () {
+    // Write a scene-selector cell's index to the hidden goto relay so Vue's
+    // reactivity carries it to the server (the only external-JS → server path
+    // in Trame 3). A monotonic seq forces a state change on repeat clicks.
+    var _nativeSet = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, 'value'
+    ).set;
+    var _gotoSeq = 0;
+
+    // ── Fixed overlay stage ───────────────────────────────────────────
+    // Every slide is authored against a fixed virtual canvas (default 16:9,
+    // overridable via #sage-overlay-root's data-stage-w/h). We build all
+    // overlays inside a #sage-overlay-stage of exactly that pixel size, then
+    // scale it uniformly to fit the render area. Because text (rem), image
+    // widths (px) and positions (% of the stage) are ALL measured against the
+    // same fixed canvas, the layout is locked: it keeps its exact proportions
+    // and never overlaps — the whole slide just grows/shrinks as one unit to
+    // fit any window or screen size.
+    var STAGE_W = 1600, STAGE_H = 900;
+    var _stage = null;
+    function ensureStage(root) {
+      if (_stage && _stage.parentNode === root) return _stage;
+      var dw = parseFloat(root.getAttribute('data-stage-w'));
+      var dh = parseFloat(root.getAttribute('data-stage-h'));
+      if (dw > 0) STAGE_W = dw;
+      if (dh > 0) STAGE_H = dh;
+      _stage = document.createElement('div');
+      _stage.id = 'sage-overlay-stage';
+      _stage.style.cssText =
+        'position:absolute;left:0;top:0;pointer-events:none;' +
+        'transform-origin:0 0;' +
+        'width:' + STAGE_W + 'px;height:' + STAGE_H + 'px;';
+      root.appendChild(_stage);
+      return _stage;
+    }
+    function fitStage(root) {
+      if (!_stage) return;
+      var rw = root.clientWidth, rh = root.clientHeight;
+      if (!rw || !rh) return;            // hidden (display:none) — nothing to fit
+      // Contain: fit the whole canvas inside the render area (letterbox), so no
+      // slide content is ever clipped and the layout is identical everywhere.
+      var s = Math.min(rw / STAGE_W, rh / STAGE_H);
+      var tx = (rw - STAGE_W * s) / 2;   // centre the scaled canvas
+      var ty = (rh - STAGE_H * s) / 2;
+      _stage.style.transform =
+        'translate(' + tx + 'px,' + ty + 'px) scale(' + s + ')';
+    }
+    function _gotoScene(index) {
+      var el = document.getElementById('sage-story-goto-relay');
+      if (!el) return;
+      _nativeSet.call(el, String(index) + ':' + (_gotoSeq++));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function makeMenu(it) {
+      // Clickable grid of scenes (the scene_menu overlay). The container stays
+      // click-through; only the cells take pointer events so the camera below
+      // is still draggable in the gaps.
+      var wrap = document.createElement('div');
+      wrap.style.cssText = it.style || '';
+      var grid = document.createElement('div');
+      grid.style.cssText =
+        'display:grid;gap:14px;pointer-events:auto;' +
+        'grid-template-columns:repeat(' + (it.cols || 4) + ',1fr);' +
+        // % of the fixed stage width (not vw) so it scales with the stage.
+        'max-width:' + ((it.max_width || 90) / 100 * STAGE_W) + 'px;';
+      if (it.title) {
+        var h = document.createElement('div');
+        h.textContent = it.title;
+        h.style.cssText =
+          'grid-column:1/-1;text-align:center;color:#fff;font-weight:700;' +
+          'font-size:2rem;text-shadow:0 2px 8px rgba(0,0,0,0.8);';
+        grid.appendChild(h);
+      }
+      (it.cells || []).forEach(function (c) {
+        var cell = document.createElement('div');
+        cell.style.cssText =
+          'cursor:pointer;border:1px solid #06b6d4;border-radius:8px;' +
+          'overflow:hidden;background:rgba(8,12,20,0.72);' +
+          'display:flex;flex-direction:column;transition:transform .12s;';
+        cell.onmouseenter = function () { cell.style.transform = 'scale(1.04)'; };
+        cell.onmouseleave = function () { cell.style.transform = 'scale(1)'; };
+        if (c.thumb) {
+          var im = document.createElement('img');
+          im.src = c.thumb;
+          im.style.cssText = 'width:100%;height:auto;display:block;';
+          cell.appendChild(im);
+        } else {
+          var ph = document.createElement('div');
+          ph.textContent = c.n;
+          ph.style.cssText =
+            'aspect-ratio:16/9;display:flex;align-items:center;' +
+            'justify-content:center;font-size:2rem;color:#334155;' +
+            'background:#0b1220;';
+          cell.appendChild(ph);
+        }
+        var lab = document.createElement('div');
+        lab.textContent = c.n + '. ' + c.label;
+        lab.style.cssText =
+          'padding:6px 8px;color:#e2e8f0;font-size:0.85rem;' +
+          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+        cell.appendChild(lab);
+        cell.onclick = function () { _gotoScene(c.index); };
+        grid.appendChild(cell);
+      });
+      wrap.appendChild(grid);
+      return wrap;
+    }
+
+    function makeItem(it) {
+      // Scene-selector grid (clickable thumbnails of every scene).
+      if (it.menu) return makeMenu(it);
+      // Video overlays (e.g. the TNG movie) carry a src + the video flag.
+      // Muted is required for browsers to honour autoplay.
+      if (it.video) {
+        var vid = document.createElement('video');
+        vid.src = it.src;
+        vid.style.cssText = it.style || '';
+        vid.loop = it.loop !== false;
+        vid.muted = it.muted !== false;
+        vid.autoplay = it.autoplay !== false;
+        vid.controls = !!it.controls;
+        vid.playsInline = true;
+        if (vid.autoplay) {
+          var p = vid.play();
+          if (p && p.catch) p.catch(function () {});
+        }
+        return vid;
+      }
+      // Audio overlays (e.g. a short intro sting) carry a src + the audio flag
+      // and render no visible element. They play independently of the engine,
+      // so the run() loop pauses/resumes them with the show's play/pause state.
+      if (it.audio) {
+        var au = document.createElement('audio');
+        au.src = it.src;
+        au.loop = !!it.loop;
+        au.muted = !!it.muted;
+        au.volume = (it.volume == null) ? 1.0 : it.volume;
+        au.autoplay = it.autoplay !== false;
+        au.style.cssText =
+          'position:absolute;width:0;height:0;opacity:0;pointer-events:none;';
+        if (au.autoplay) {
+          var pa = au.play();
+          if (pa && pa.catch) pa.catch(function () {});
+        }
+        return au;
+      }
+      // Image overlays (logos etc.) carry a src instead of text/latex.
+      if (it.src != null) {
+        var img = document.createElement('img');
+        img.src = it.src;
+        img.style.cssText = it.style || '';
+        return img;
+      }
+      var d = document.createElement('div');
+      d.style.cssText = it.style || '';
+      if (it.latex != null && window.katex) {
+        try {
+          window.katex.render(it.latex, d, {
+            displayMode: !!it.display,
+            throwOnError: false,
+          });
+        } catch (e) {
+          d.textContent = it.latex;  // fall back to raw source
+        }
+      } else if (it.latex != null) {
+        d.textContent = it.latex;    // KaTeX not loaded yet
+      } else {
+        d.textContent = it.text || '';
+      }
+      return d;
+    }
+
+    function run() {
+      var relay = document.getElementById('sage-overlays-relay');
+      var root = document.getElementById('sage-overlay-root');
+      var playRelay = document.getElementById('sage-story-playing-relay');
+      if (!relay || !root) { setTimeout(run, 200); return; }
+      var stage = ensureStage(root);
+      fitStage(root);
+      // Re-fit the stage whenever the render area changes size — window resize,
+      // and (via ResizeObserver) the panel showing/hiding or any layout shift.
+      window.addEventListener('resize', function () { fitStage(root); });
+      if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(function () { fitStage(root); }).observe(root);
+      }
+      var last = null;
+      var lastPlaying = null;
+      function tick() {
+        var v = relay.value || '[]';
+        if (v !== last) {
+          var items = [];
+          try { items = JSON.parse(v); } catch (e) { items = []; }
+          // If equations are present but KaTeX hasn't loaded yet (scripts load
+          // asynchronously), retry next tick instead of caching raw LaTeX.
+          var needsKatex = items.some(function (it) { return it.latex != null; });
+          if (needsKatex && !window.katex) { setTimeout(tick, 100); return; }
+          last = v;
+          stage.innerHTML = '';
+          items.forEach(function (it) { stage.appendChild(makeItem(it)); });
+          fitStage(root);   // new content may mount while the area is a new size
+          // Fade the fresh overlay set in so a scene change doesn't pop its
+          // text/logos on. Reset opacity with transitions off, force a
+          // reflow so the reset lands, then animate to visible. (Opacity only —
+          // the scale transform stays instant so there's no zoom on fade-in.)
+          if (items.length) {
+            stage.style.transition = 'none';
+            stage.style.opacity = '0';
+            void stage.offsetWidth;
+            stage.style.transition = 'opacity 0.35s ease';
+            stage.style.opacity = '1';
+          }
+          // Re-apply the show's play/pause state to the rebuilt <audio> set
+          // (so audio only sounds while the show is playing).
+          lastPlaying = null;
+        }
+        // <audio> overlays play independently of the engine, so Pause must
+        // silence them and Play must resume them explicitly.
+        if (playRelay) {
+          var pv = playRelay.value;
+          if (pv !== lastPlaying) {
+            lastPlaying = pv;
+            var playing = (pv === 'true' || pv === 'True' || pv === '1');
+            var auds = stage.getElementsByTagName('audio');
+            for (var i = 0; i < auds.length; i++) {
+              if (playing) {
+                var pr = auds[i].play();
+                if (pr && pr.catch) pr.catch(function () {});
+              } else {
+                auds[i].pause();
+              }
+            }
+          }
+        }
+        setTimeout(tick, 150);
+      }
+      tick();
+    }
+    run();
+  })();
 
 })();

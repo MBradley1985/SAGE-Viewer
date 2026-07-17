@@ -8,6 +8,11 @@ import os as _os
 import numpy as np
 from trame.widgets import html, vuetify3 as v3
 
+from sage_viewer.scene.camera_motion import (
+    orbit_around,
+    orbit_start_position,
+    smooth_move,
+)
 from sage_viewer.scene.scene import Scene
 
 # Frames per second for each speed multiplier
@@ -636,59 +641,37 @@ def build_toolbar(server, scene: Scene) -> None:
             def _active():
                 return bool(getattr(state, "flythrough_active", False))
 
-            # ── Shared helper: smooth camera move (ease-in / ease-out) ────
+            # ── Shared camera-motion helpers (see scene/camera_motion.py) ──
             async def _smooth_move(p0, f0, p1, f1, secs):
-                n = max(1, int(secs * _FT_FPS))
-                for i in range(n):
-                    if not _active():
-                        return False
-                    t = (i + 1) / n
-                    ts = t * t * (3.0 - 2.0 * t)
-                    cam.position = tuple(p0 + ts * (p1 - p0))
-                    cam.focal_point = tuple(f0 + ts * (f1 - f0))
-                    cam.up = (0.0, 1.0, 0.0)
-                    _push()
-                    await asyncio.sleep(interval)
-                return True
+                return await smooth_move(
+                    cam,
+                    p0,
+                    f0,
+                    p1,
+                    f1,
+                    secs,
+                    _FT_FPS,
+                    is_active=_active,
+                    push=_push,
+                )
 
-            # ── Orbit around a point in the XZ plane ──────────────────────
-            # Continues from the camera's current position — no jump.
             async def _orbit_around(target, radius, spin_degs, dps):
-                t3 = _np.array(target, dtype=float)
-                diff = _np.array(cam.position, dtype=float) - t3
-                diff[1] = 0.0
-                nrm = _np.linalg.norm(diff)
-                theta = _np.arctan2(diff[0], diff[2]) if nrm > 1e-6 else 0.0
-                deg_step = dps * interval
-                n = max(1, int(spin_degs / dps * _FT_FPS))
-                for _ in range(n):
-                    if not _active():
-                        return False
-                    theta += _np.deg2rad(deg_step)
-                    cam.position = (
-                        t3[0] + radius * _np.sin(theta),
-                        t3[1],
-                        t3[2] + radius * _np.cos(theta),
-                    )
-                    cam.focal_point = tuple(t3)
-                    cam.up = (0.0, 1.0, 0.0)
-                    _push()
-                    await asyncio.sleep(interval)
-                return True
+                return await orbit_around(
+                    cam,
+                    target,
+                    radius,
+                    spin_degs,
+                    dps,
+                    _FT_FPS,
+                    is_active=_active,
+                    push=_push,
+                )
 
-            # ── Fly to orbit-start position around a target ────────────────
-            # Picks the approach angle that keeps the camera on its current
-            # bearing so there is no sudden direction flip.
+            # Fly to the orbit-start position around a target, keeping the
+            # camera on its current bearing so there is no direction flip.
             async def _fly_to_orbit(target, radius, secs):
                 t3 = _np.array(target, dtype=float)
-                diff = _np.array(cam.position, dtype=float) - t3
-                diff[1] = 0.0
-                nrm = _np.linalg.norm(diff)
-                if nrm > 1e-6:
-                    diff = diff / nrm * radius
-                else:
-                    diff = _np.array([0.0, 0.0, radius])
-                dest_pos = _np.array([t3[0] + diff[0], t3[1], t3[2] + diff[2]])
+                dest_pos = orbit_start_position(cam, t3, radius)
                 return await _smooth_move(
                     _np.array(cam.position, dtype=float),
                     _np.array(cam.focal_point, dtype=float),

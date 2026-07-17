@@ -68,6 +68,9 @@ class Scene:
 
         # Label actors keyed by model name (only shown when multiple boxes are loaded)
         self._label_actors: dict[str, list] = {}
+        # When False, the per-box name/redshift labels are suppressed entirely
+        # (e.g. Story Mode prefers a clean view). Restored on exit.
+        self._labels_enabled: bool = True
 
         self._camera = CameraController(self._plotter, primary.box_size)
 
@@ -309,6 +312,11 @@ class Scene:
 
     def _update_labels(self) -> None:
         """Rebuild labels for all boxes — only when more than one box is loaded."""
+        if not self._labels_enabled:
+            for name in list(self._label_actors):
+                self._remove_label(name)
+            self._plotter.render()
+            return
         if len(self._adjacent_order) == 0:
             # Back to a single box: remove any lingering labels
             for name in list(self._label_actors):
@@ -324,8 +332,18 @@ class Scene:
             self._add_label(name)
         self._plotter.render()
 
+    def set_labels_enabled(self, enabled: bool) -> None:
+        """Enable/disable the per-box name+redshift labels and rebuild/clear."""
+        enabled = bool(enabled)
+        if enabled == self._labels_enabled:
+            return
+        self._labels_enabled = enabled
+        self._update_labels()
+
     def refresh_label(self, name: str) -> None:
         """Refresh just one label (e.g. after a snapshot change)."""
+        if not self._labels_enabled:
+            return
         if len(self._adjacent_order) == 0:
             return
         if name in self._label_actors or name in (
