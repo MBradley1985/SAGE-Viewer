@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from sage_viewer.io.galaxy_reader import load_galaxy_snapshot
+from visage.io.galaxy_reader import load_galaxy_snapshot
 
 
 def test_loads_correct_snap(mini_hdf5_path):

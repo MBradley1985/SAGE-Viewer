@@ -6,14 +6,14 @@ Launch Mode is a guided setup flow for configuring and running SAGE26, accessibl
 
 ```bash
 cd /path/to/SAGE26
-sage-viewer
+visage
 ```
 
 Then open the printed URL in your browser. The wizard launches directly.
 
 You can also enter Launch Mode from inside Explore Mode via the hamburger menu → **Launch Mode**.
 
-## Where sage-viewer looks for things
+## Where visage looks for things
 
 The working directory you launch from is the anchor for the entire session:
 
@@ -24,7 +24,7 @@ The working directory you launch from is the anchor for the entire session:
 | Existing models | `<SAGE26>/output/`, `<CWD>/output/`, `<CWD>/sage_outputs/` |
 | Screenshots / recordings / exports | `<CWD>/sage_outputs/session_<timestamp>/` |
 
-**First-time install (no SAGE26 yet):** run `sage-viewer` from the folder where you want SAGE26 to live, then use **Clone SAGE26** in the wizard. The wizard will ask which parent directory to clone into (defaulting to your home folder), and will use that cloned directory for the rest of the session.
+**First-time install (no SAGE26 yet):** run `visage` from the folder where you want SAGE26 to live, then use **Clone SAGE26** in the wizard. The wizard will ask which parent directory to clone into (defaulting to your home folder), and will use that cloned directory for the rest of the session.
 
 **Existing SAGE26:** run from the SAGE26 root and the wizard finds everything automatically.
 

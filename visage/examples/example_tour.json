@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "title": "Example Tour",
+  "author": "ViSAGE",
+  "description": "A short, self-contained demonstration story. It uses only whatever model is currently loaded and resolves snapshots / framing at runtime, so it works on any output: 'last' = z=0, 'box' = frame the whole box. Copy this file and edit it to build your own.",
+  "theme": "dos_blue",
+  "requirements": {},
+  "scenes": [
+    {
+      "id": "wide",
+      "title": "The cosmic web at z = 0",
+      "caption": "Dark-matter haloes trace the cosmic web; galaxies sit at the nodes.",
+      "snap_num": "last",
+      "camera": "box",
+      "state": {
+        "halos_visible": true, "galaxies_visible": true,
+        "halo_opacity": 0.12, "galaxy_opacity": 1.0,
+        "galaxy_color_mode": "structure"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "overlays": [
+        { "kind": "title", "text": "The SAGE Universe", "anchor": "top", "y": 8 },
+        { "kind": "heading", "text": "Redshift z = 0", "anchor": "top", "y": 18, "color": "#06b6d4" },
+        { "kind": "citation", "text": "Croton et al. (2016)", "anchor": "bottom-right" }
+      ],
+      "transition": { "duration_secs": 5.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0,
+      "motion": { "kind": "still" }
+    },
+    {
+      "id": "equation",
+      "title": "Star formation",
+      "caption": "The disk star-formation prescription.",
+      "snap_num": "last",
+      "camera": "box",
+      "state": { "halos_visible": true, "galaxies_visible": true, "halo_opacity": 0.1 },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "overlays": [
+        { "kind": "heading", "text": "Disk star formation", "anchor": "top-left" },
+        { "kind": "equation", "latex": "\\dot{M}_* = \\alpha_{\\rm SF}\\,\\frac{M_{\\rm cold} - M_{\\rm crit}}{t_{\\rm dyn,disk}}", "anchor": "center", "size": 2.0 }
+      ],
+      "transition": { "duration_secs": 4.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0,
+      "motion": { "kind": "still" }
+    },
+    {
+      "id": "orbit",
+      "title": "A closer look",
+      "caption": "Orbiting the box to reveal its three-dimensional structure.",
+      "snap_num": "last",
+      "camera": "box",
+      "state": { "halos_visible": true, "galaxies_visible": true, "halo_opacity": 0.1 },
+      "focus": { "kind": "sphere", "center": "box", "radius_frac": 0.45 },
+      "chrome": { "hide_panel": true },
+      "transition": { "duration_secs": 4.0, "easing": "smoothstep" },
+      "dwell_secs": 2.0,
+      "motion": { "kind": "orbit", "dps": 12.0, "degrees": 360 }
+    },
+    {
+      "id": "time",
+      "title": "Assembly through cosmic time",
+      "caption": "Sweeping forward through cosmic time as structures grow and merge.",
+      "snap_num": "40%",
+      "camera": "box",
+      "state": { "halos_visible": true, "galaxies_visible": true, "halo_opacity": 0.12 },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "transition": { "duration_secs": 4.0, "easing": "smoothstep" },
+      "dwell_secs": 1.0,
+      "motion": { "kind": "snapshot_sweep", "from": "40%", "to": "last", "fps": 4.0 }
+    }
+  ]
+}

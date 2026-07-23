@@ -1,4 +1,4 @@
-"""Shared fixtures for the SAGE-Viewer test suite."""
+"""Shared fixtures for the ViSAGE test suite."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 import pytest
 
-from sage_viewer.io.halo_reader import HALO_DTYPE
+from visage.io.halo_reader import HALO_DTYPE
 
 FIXTURE_DIR = Path(__file__).parent / "data"
 

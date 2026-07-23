@@ -1,6 +1,6 @@
 # Multi-Box Comparison
 
-SAGE-Viewer can display two or more SAGE models side-by-side in a single viewport, each rendered as an independent simulation box.
+ViSAGE can display two or more SAGE models side-by-side in a single viewport, each rendered as an independent simulation box.
 
 ## Loading a second box
 

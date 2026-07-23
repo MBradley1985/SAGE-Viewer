@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "title": "Presentation Template",
+  "author": "ViSAGE",
+  "description": "A full presentation skeleton to copy and fill in: title slide, section cards, two-column layouts, media overlays, motion scenes and a clickable scene menu. It is model-agnostic (symbolic snapshots, no required model), so it runs on whatever output is loaded. Copy this file into sage_stories/, rename it, and replace the placeholder text. See docs/user_guide/story_mode.md for the full schema.",
+  "theme": "dos_blue",
+  "requirements": {},
+  "autoplay": true,
+  "scenes": [
+    {
+      "id": "title",
+      "title": "Title slide",
+      "caption": "",
+      "snap_num": "last",
+      "camera": "box",
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": true,
+        "galaxy_color_mode": "structure"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "overlays": [
+        { "kind": "title", "text": "Your Presentation Title", "anchor": "top-right", "x": 5, "y": 52, "align": "right", "size": 5.5 },
+        { "kind": "heading", "text": "Your Name", "anchor": "top-right", "x": 5, "y": 62, "align": "right", "color": "#ffffff", "size": 3.0, "max_width": 20 },
+        { "kind": "text", "text": "Collaborators:\nCollaborator One\nCollaborator Two\nCollaborator Three", "anchor": "top-right", "x": 5, "y": 68, "align": "right", "size": 2.0, "max_width": 20 },
+        { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0,
+      "motion": { "kind": "flythrough" }
+    },
+    {
+      "id": "card-section-one",
+      "title": "Section card",
+      "caption": "",
+      "snap_num": "last",
+      "camera": "box",
+      "state": {
+        "halos_visible": false,
+        "galaxies_visible": false
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "hold": true,
+      "overlays": [
+        { "kind": "title", "text": "Section One", "anchor": "center", "align": "center", "size": 4.0 },
+        { "kind": "text", "text": "A blank 'card' slide: all layers hidden, hold=true so playback\nwaits here until you press Next. Add an image overlay for flair.", "anchor": "top", "y": 62, "align": "center", "size": 1.6, "color": "#94a3b8", "max_width": 70 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0
+    },
+    {
+      "id": "two-column-sweep",
+      "title": "Two-column slide over a time sweep",
+      "caption": "A snapshot_sweep loops the box through cosmic time behind the slide content.",
+      "snap_num": "first",
+      "camera": { "frame": "box", "zoom": 1.4 },
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": false,
+        "halo_color_mode": "mvir",
+        "halo_colormap": "viridis"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "overlays": [
+        { "kind": "heading", "text": "A Two-Column Comparison Slide", "anchor": "top", "y": 6, "align": "center", "size": 3.5 },
+        { "kind": "equation", "latex": "\\underline{\\textbf{Left Column Heading}}", "inline": true, "anchor": "top-left", "x": "24px", "y": "65%", "align": "left", "size": 2.5 },
+        { "kind": "text", "text": "First point about the left thing\nSecond point, e.g. 10¹⁰ M⊙ resolution\nThird point\nFourth point", "anchor": "top-left", "x": "24px", "y": "70%", "align": "left", "size": 2.0, "max_width": 38 },
+        { "kind": "equation", "latex": "\\underline{\\textbf{Right Column Heading}}", "inline": true, "anchor": "top-right", "x": "24px", "y": "65%", "align": "right", "size": 2.5 },
+        { "kind": "text", "text": "First point about the right thing\nSecond point\nThird point\nFourth point", "anchor": "top-right", "x": "24px", "y": "70%", "align": "right", "size": 2.0, "max_width": 38 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0,
+      "motion": { "kind": "snapshot_sweep", "from": "first", "to": "last", "fps": 2.5, "loop": true, "prerender": true }
+    },
+    {
+      "id": "equation-slide",
+      "title": "Display equation",
+      "caption": "KaTeX display equations render centred; use inline=true for label-sized ones.",
+      "snap_num": "last",
+      "camera": "box",
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": true,
+        "halo_opacity": 0.12,
+        "galaxy_color_mode": "structure"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "hold": true,
+      "overlays": [
+        { "kind": "heading", "text": "An Equation Slide", "anchor": "top", "y": 6, "align": "center", "size": 3.5 },
+        { "kind": "equation", "latex": "\\dot{M}_* = \\alpha_{\\rm SF}\\,\\frac{M_{\\rm cold} - M_{\\rm crit}}{t_{\\rm dyn,disk}}", "anchor": "center", "size": 2.2 },
+        { "kind": "citation", "text": "Author et al. (2026)", "anchor": "bottom-right", "x": 3, "y": 3 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0
+    },
+    {
+      "id": "media-slide",
+      "title": "Image and video overlays",
+      "caption": "Drop your media into visage/static/ and reference it as /sage_static/<file>.",
+      "snap_num": "last",
+      "camera": "box",
+      "state": {
+        "halos_visible": false,
+        "galaxies_visible": false
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "hold": true,
+      "overlays": [
+        { "kind": "heading", "text": "A Media Slide", "anchor": "top", "y": 6, "align": "center", "size": 3.5 },
+        { "kind": "text", "text": "Replace the src below with your own file in visage/static/.\nImages take width + opacity; videos add loop / autoplay / muted / controls.\nPixel offsets like x=\"60px\" pin media regardless of window size;\nnumbers are percentages of the stage.", "anchor": "top", "y": 16, "align": "center", "size": 1.8, "max_width": 70 },
+        { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "left", "x": "60px", "width": 400 },
+        { "kind": "video", "src": "/sage_static/your_video.mp4", "anchor": "right", "x": "60px", "width": "35vw", "loop": true, "autoplay": true, "muted": true, "controls": true },
+        { "kind": "citation", "text": "Media credit goes here", "anchor": "bottom-right", "x": 3, "y": 3 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0
+    },
+    {
+      "id": "rewind-flythrough",
+      "title": "Fly-through with time rewind",
+      "caption": "flythrough tours the massive structures; rewind_to plays cached snapshots back to the chosen redshift on arrival.",
+      "snap_num": "last",
+      "camera": "box",
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": true,
+        "galaxy_color_mode": "structure"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "overlays": [],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0,
+      "motion": { "kind": "flythrough", "rewind_to": "z=2", "rewind_fps": 24.0 }
+    },
+    {
+      "id": "bullet-slide",
+      "title": "Text-heavy summary slide",
+      "caption": "",
+      "snap_num": "last",
+      "camera": "box",
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": true,
+        "galaxy_color_mode": "structure"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "hold": true,
+      "overlays": [
+        { "kind": "heading", "text": "Summary", "anchor": "top", "y": 5, "align": "center", "size": 3.0 },
+        { "kind": "heading", "text": "Key Points", "anchor": "top", "y": 11, "align": "center", "size": 2.5 },
+        { "kind": "text", "text": "•  First key point of your talk, written out as a full sentence.\n\n•  Second key point — blank lines between bullets keep them readable.\n\n•  Third key point; max_width controls where long lines wrap.", "anchor": "top", "y": 16, "align": "center", "size": 1.8, "max_width": 84 },
+        { "kind": "heading", "text": "Next Steps", "anchor": "top", "y": 52, "align": "center", "size": 2.5 },
+        { "kind": "text", "text": "•  The first thing you plan to do next\n\n•  The second thing\n\n•  The third thing", "anchor": "top", "y": 58, "align": "center", "size": 1.8, "max_width": 84 },
+        { "kind": "citation", "text": "Code: github.com/your-name/your-repo\nDocs: your-site.example.org", "anchor": "bottom-right", "x": 3, "y": 3, "align": "right", "size": 1.5, "max_width": 40 },
+        { "kind": "image", "src": "/sage_static/SAGElogo.jpg", "anchor": "bottom-left", "x": 0, "y": 0, "width": 200 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0,
+      "motion": { "kind": "flythrough", "style": "normal" }
+    },
+    {
+      "id": "scene-menu",
+      "title": "",
+      "caption": "A clickable grid of every scene — handy for question time.",
+      "snap_num": "last",
+      "camera": "box",
+      "state": {
+        "halos_visible": true,
+        "galaxies_visible": true,
+        "galaxy_color_mode": "structure"
+      },
+      "focus": { "kind": "none" },
+      "chrome": { "hide_panel": true },
+      "overlays": [
+        { "kind": "scene_menu", "title": "Jump to a scene", "anchor": "center", "cols": 4, "max_width": 88 }
+      ],
+      "transition": { "duration_secs": 0.0, "easing": "smoothstep" },
+      "dwell_secs": 6.0,
+      "motion": { "kind": "flythrough", "style": "normal" }
+    }
+  ]
+}

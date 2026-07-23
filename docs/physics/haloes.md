@@ -4,7 +4,7 @@
 
 Halo data is read from lhalo_binary merger tree files (`trees_063.N`). These are the same files consumed by SAGE26 at runtime.
 
-## Fields loaded by SAGE-Viewer
+## Fields loaded by ViSAGE
 
 | Field | Type | Units (raw) | Units (viewer) |
 |---|---|---|---|
@@ -29,8 +29,8 @@ int32[nforests]  nhalos_per_forest
 HaloStruct[nhalos_total]
 ```
 
-`HaloStruct` is 19 fields; the full dtype is defined in `sage_viewer/io/halo_reader.py:HALO_DTYPE`.
+`HaloStruct` is 19 fields; the full dtype is defined in `visage/io/halo_reader.py:HALO_DTYPE`.
 
 ## Parallel loading
 
-SAGE-Viewer reads the N tree files in parallel (joblib). For miniMillennium with 8 files and 8 CPUs, all files load simultaneously.
+ViSAGE reads the N tree files in parallel (joblib). For miniMillennium with 8 files and 8 CPUs, all files load simultaneously.

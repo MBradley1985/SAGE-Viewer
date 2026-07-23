@@ -62,7 +62,7 @@ Enter an axis-aligned bounding box (Xmin, Xmax, Ymin, Ymax, Zmin, Zmax) in Mpc/h
 ## Programmatic navigation (Python API)
 
 ```python
-from sage_viewer.scene.camera import CameraController
+from visage.scene.camera import CameraController
 
 # After scene is created:
 scene.camera.go_to_coords(30.0, 30.0, 30.0, distance=10.0)

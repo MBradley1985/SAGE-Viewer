@@ -11,7 +11,7 @@
 Launch:
 
 ```bash
-sage-viewer --par input/millennium.par
+visage --par input/millennium.par
 ```
 
 ## microUchuu
@@ -24,13 +24,13 @@ sage-viewer --par input/millennium.par
 Launch:
 
 ```bash
-sage-viewer --par input/microuchuu.par
+visage --par input/microuchuu.par
 ```
 
 ## How the par file is used
 
-SAGE-Viewer's `parse_par()` reads the `.par` file you pass to the CLI. Relative paths in the par file are resolved relative to the par file's parent directory (your SAGE26 root), so you can run `sage-viewer` from anywhere as long as you give it the absolute or correctly relative path to the par file.
+ViSAGE's `parse_par()` reads the `.par` file you pass to the CLI. Relative paths in the par file are resolved relative to the par file's parent directory (your SAGE26 root), so you can run `visage` from anywhere as long as you give it the absolute or correctly relative path to the par file.
 
 ## Data that is never committed
 
-Tree files, HDF5 outputs, and scale-factor lists are all listed in `.gitignore`. SAGE-Viewer only reads them at runtime.
+Tree files, HDF5 outputs, and scale-factor lists are all listed in `.gitignore`. ViSAGE only reads them at runtime.

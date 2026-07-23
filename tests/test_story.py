@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-from sage_viewer.scene.box_profile import FILTER_KEYS, LAYER_KEYS
-from sage_viewer.story.io import discover_stories, load_story, save_story
-from sage_viewer.story.keys import ENV_KEYS, STORY_STATE_KEYS
-from sage_viewer.story.model import Scene, Story
+from visage.scene.box_profile import FILTER_KEYS, LAYER_KEYS
+from visage.story.io import discover_stories, load_story, save_story
+from visage.story.keys import ENV_KEYS, STORY_STATE_KEYS
+from visage.story.model import Scene, Story
 
 
 def _sample_story():
@@ -108,7 +108,7 @@ def test_empty_optional_fields_omitted():
 
 
 def test_normalize_overlay_equation_and_citation():
-    from sage_viewer.story.engine import _normalize_overlay
+    from visage.story.engine import _normalize_overlay
 
     eq = _normalize_overlay(
         {"kind": "equation", "latex": "x^2", "anchor": "top"}
@@ -133,7 +133,7 @@ def test_normalize_overlay_equation_and_citation():
 
 
 def test_normalize_overlay_image():
-    from sage_viewer.story.engine import _normalize_overlay
+    from visage.story.engine import _normalize_overlay
 
     img = _normalize_overlay(
         {
@@ -167,7 +167,7 @@ def test_normalize_overlay_image():
 
 
 def test_normalize_overlay_audio():
-    from sage_viewer.story.engine import _normalize_overlay
+    from visage.story.engine import _normalize_overlay
 
     au = _normalize_overlay(
         {
@@ -187,7 +187,7 @@ def test_normalize_overlay_audio():
 
 
 def test_resolve_snap_symbolic():
-    from sage_viewer.story.engine import resolve_snap
+    from visage.story.engine import resolve_snap
 
     # count=64 -> last index 63
     assert resolve_snap("last", 64) == 63
@@ -202,7 +202,7 @@ def test_resolve_snap_symbolic():
 
 
 def test_resolve_model_ref_adaptive():
-    from sage_viewer.story.engine import StoryPlayer
+    from visage.story.engine import StoryPlayer
 
     class FakeScene:
         primary_name = "millennium"
@@ -246,7 +246,7 @@ def test_story_model_names_collects_all_referenced_models():
     """Preload must cover every model the story uses: the launched primary,
     requirements.models, and each scene's primary/adjacent refs (deduped,
     symbolic refs resolved)."""
-    from sage_viewer.story.engine import StoryPlayer
+    from visage.story.engine import StoryPlayer
 
     class FakeScene:
         primary_name = "millennium_vanilla"
@@ -297,7 +297,7 @@ def test_story_model_names_collects_all_referenced_models():
 def test_propagate_layer_visibility_mirrors_all_boxes():
     """Visibility toggled on the active box is mirrored to every loaded box
     (so a paused multi-box scene resumes with both boxes matching)."""
-    from sage_viewer.story.engine import StoryPlayer
+    from visage.story.engine import StoryPlayer
 
     class FakeLayer:
         def __init__(self):
@@ -369,7 +369,7 @@ def test_propagate_layer_visibility_mirrors_all_boxes():
 
 def test_portable_example_loads(tmp_path, monkeypatch):
     """The shipped example must parse with symbolic snap/camera values."""
-    from sage_viewer.story.model import Scene
+    from visage.story.model import Scene
 
     sc = Scene.from_dict(
         {
@@ -402,7 +402,7 @@ def test_scene_menu_expands_to_clickable_grid():
     scenes — excluding the menu scene itself and (by default) card-* dividers —
     each cell carrying its scene index for goto and an empty thumb until one is
     captured."""
-    from sage_viewer.story.engine import StoryPlayer
+    from visage.story.engine import StoryPlayer
 
     class FakeState:
         story_overlays_json = "[]"
@@ -449,7 +449,7 @@ def test_scene_menu_expands_to_clickable_grid():
 
 def test_scene_menu_include_cards():
     """include_cards:true keeps the card-* divider scenes in the grid."""
-    from sage_viewer.story.engine import StoryPlayer
+    from visage.story.engine import StoryPlayer
 
     class FakeState:
         story_overlays_json = "[]"
@@ -483,7 +483,7 @@ def test_scene_menu_include_cards():
 def test_goto_menu_jumps_to_the_scene_selector_scene():
     """goto_menu() finds the scene carrying a scene_menu overlay and jumps to
     it (here scene index 2)."""
-    from sage_viewer.story.engine import StoryPlayer
+    from visage.story.engine import StoryPlayer
 
     class FakeState:
         pass
@@ -516,7 +516,7 @@ def test_resolve_snap_redshift_spec():
     """A 'z=...' snap spec resolves to the closest snapshot via the model's
     redshift table, so it carries over to whatever box is loaded; without a
     table it falls back to the last snapshot."""
-    from sage_viewer.story.engine import resolve_snap
+    from visage.story.engine import resolve_snap
 
     class FakeTable:
         # redshifts for 5 snapshots, z=0 last (typical ordering)

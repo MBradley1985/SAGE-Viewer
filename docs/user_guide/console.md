@@ -1,6 +1,6 @@
 # Console
 
-The **Console** tab is a multi-mode terminal embedded in the viewer's right panel. It runs on the server side of the Trame app, so its working directory, environment, and process namespace are wherever you launched `sage-viewer` from — including remote compute nodes.
+The **Console** tab is a multi-mode terminal embedded in the viewer's right panel. It runs on the server side of the Trame app, so its working directory, environment, and process namespace are wherever you launched `visage` from — including remote compute nodes.
 
 ## Modes
 

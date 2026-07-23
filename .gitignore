@@ -70,11 +70,11 @@ sage_library/
 !docs/images/*.jpg
 !docs/images/*.jpeg
 !docs/images/*.gif
-!sage_viewer/static/*.jpg
-!sage_viewer/static/*.jpeg
-!sage_viewer/static/*.png
+!visage/static/*.jpg
+!visage/static/*.jpeg
+!visage/static/*.png
 # Bundled Story Mode example stories (package data — must be committed)
-!sage_viewer/examples/*.json
+!visage/examples/*.json
 # Personal stories in sage_stories/ stay local (covered by *.json above);
-# ship a story by adding it to sage_viewer/examples/ instead.
+# ship a story by adding it to visage/examples/ instead.
 .pypirc
