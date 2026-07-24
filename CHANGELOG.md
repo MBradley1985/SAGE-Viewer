@@ -25,11 +25,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - **Rebrand: SAGE-Viewer is now ViSAGE.** The import package `sage_viewer`
-  is renamed to `visage`, the CLI command `sage-viewer` becomes `visage`, and
-  the PyPI distribution is now `vi-sage` (`pip install vi-sage`; plain `visage`
-  was already taken on PyPI). GitHub URLs point to `MBradley1985/ViSAGE`. This
-  is a breaking change for anyone importing `sage_viewer` or invoking the old
-  command/dist name.
+  is renamed to `visage` and the CLI command `sage-viewer` becomes `visage`.
+  GitHub URLs point to `MBradley1985/ViSAGE`. The PyPI distribution stays
+  **`sage-viewer`** (`pip install sage-viewer`) — `visage`/`vi-sage` are blocked
+  on PyPI by the existing `visage` project. This is a breaking change for anyone
+  importing `sage_viewer` or invoking the old `sage-viewer` command.
 
 - **Galaxy splats scale with the subhalo virial radius.** All galaxy layers
   (CGM/Hot outer envelope, cold-gas envelope, focus-only disk/bulge, and the

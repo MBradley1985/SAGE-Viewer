@@ -114,7 +114,7 @@ Both supported automatically — point at the `.par` file and ViSAGE figures out
 ## Quick start
 
 ```bash
-pip install vi-sage
+pip install sage-viewer
 ```
 
 **Explore Mode** — view existing SAGE26 results by pointing at a `.par` file:
@@ -180,7 +180,7 @@ then `visage --par input/millennium.par` discovers all three models automaticall
 ### PyPI (recommended)
 
 ```bash
-pip install vi-sage
+pip install sage-viewer
 ```
 
 Requires Python ≥ 3.10. After install, `visage` is available as a command. If your shell can't find it, add the user bin directory to your PATH:

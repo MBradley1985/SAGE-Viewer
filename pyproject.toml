@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vi-sage"
+name = "sage-viewer"
 dynamic = ["version"]
 description = "Interactive 3D viewer for SAGE semi-analytic galaxy formation outputs"
 readme = "README.md"
@@ -49,7 +49,7 @@ dev = [
     "ruff>=0.3",
     "black>=24.0",
     "pre-commit>=3.6",
-    "vi-sage[docs]",
+    "sage-viewer[docs]",
 ]
 
 [project.scripts]

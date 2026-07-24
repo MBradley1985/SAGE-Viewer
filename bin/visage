@@ -7,5 +7,5 @@ for _py in python3.12 python3.13 python3.11 python3.10 python3 python; do
         exec "$_py" -m visage.cli "$@"
     fi
 done
-echo "Error: trame not found. Install with: pip install vi-sage" >&2
+echo "Error: trame not found. Install with: pip install sage-viewer" >&2
 exit 1
