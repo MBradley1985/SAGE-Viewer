@@ -1,4 +1,4 @@
-from sage_viewer.io.par_reader import parse_par
+from visage.io.par_reader import parse_par
 
 
 def test_parse_par_basic(mini_par_path):

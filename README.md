@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/MBradley1985/SAGE-Viewer/main/docs/images/SAGElogo.jpg" alt="SAGE-Viewer logo" width="220"/>
+  <img src="https://raw.githubusercontent.com/MBradley1985/ViSAGE/main/docs/images/SAGElogo.jpg" alt="ViSAGE logo" width="220"/>
 </p>
 
-# SAGE-Viewer
+# ViSAGE
 
 An interactive 3D visualization package for [SAGE26](https://github.com/MBradley1985/SAGE26) semi-analytic galaxy formation outputs.
 
 Renders dark matter haloes and SAGE galaxies together in a browser-based interactive viewer powered by [PyVista](https://pyvista.org) and [Trame](https://kitware.github.io/trame/).
 
-![SAGE-Viewer](https://raw.githubusercontent.com/MBradley1985/SAGE-Viewer/main/docs/images/hero.png)
+![ViSAGE](https://raw.githubusercontent.com/MBradley1985/ViSAGE/main/docs/images/hero.png)
 
 ## Features
 
@@ -20,7 +20,7 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - Colour-by dropdowns are model-aware — only modes whose underlying field is present in the loaded model appear in the list; they update automatically on model switch
 - Full still-quality rendering at all times — no resolution drop during camera drag or playback
 
-![Structure mode](https://raw.githubusercontent.com/MBradley1985/SAGE-Viewer/main/docs/images/structure_mode.png)
+![Structure mode](https://raw.githubusercontent.com/MBradley1985/ViSAGE/main/docs/images/structure_mode.png)
 
 ### Playback & camera
 - Play / Pause / Stop / Reverse / Repeat transport at 0.1× – 5× speeds
@@ -40,7 +40,7 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - **Double-click any point** in the viewport (any tab) to populate the Target tab's halo + galaxy IDs and draw a red marker on the selection. Only currently visible galaxies (passing all filters and focus) are selectable. If Focus is active, the camera carries to the new selection at the last-used radius.
 - **Enter to run** in every input field — Halo idx, Galaxy idx, Coords X/Y/Z, Box bounds, Console command, script path, screenshot/movie label all submit on Enter, equivalent to clicking the paired Go / Zoom / Run / Take Screenshot button
 
-![Filters in action](https://raw.githubusercontent.com/MBradley1985/SAGE-Viewer/main/docs/images/filters.gif)
+![Filters in action](https://raw.githubusercontent.com/MBradley1985/ViSAGE/main/docs/images/filters.gif)
 
 ### Filtering
 - Halo filters: Mvir (log10), Rvir (Mpc/h), Vvir (km/s)
@@ -80,10 +80,10 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 - Scenes carry titles, headings, body text, citations, LaTeX equations (vendored KaTeX, offline), images, videos, audio, and a clickable scene-menu grid
 - Camera motions per scene: orbit, snapshot sweeps through cosmic time (with pre-rendering for instant playback), and fly-throughs with optional snapshot rewind to a target redshift
 - Portable stories: symbolic snapshot references (`"first"`, `"last"`, `"40%"`, `"z=1.5"`) resolve against whatever model is loaded
-- Stories load from `sage_stories/` in your launch directory; a bundled **Presentation Template** provides a full talk skeleton to copy and fill in — see the [Story Mode guide](https://mbradley1985.github.io/SAGE-Viewer/user_guide/story_mode/)
+- Stories load from `sage_stories/` in your launch directory; a bundled **Presentation Template** provides a full talk skeleton to copy and fill in — see the [Story Mode guide](https://mbradley1985.github.io/ViSAGE/user_guide/story_mode/)
 
 ### Launch Mode wizard
-- Guided setup flow for configuring and launching SAGE26, accessible standalone (`sage-viewer` with no `--par`) or from the Explore Mode hamburger menu
+- Guided setup flow for configuring and launching SAGE26, accessible standalone (`visage` with no `--par`) or from the Explore Mode hamburger menu
 - Step chips in the header track progress (cyan = current step, green = done, white = pending)
 - **Rescan** button re-runs the environment scan from scratch at any point
 - **Clone SAGE26** option clones the SAGE26 repository from GitHub — prompts for the parent directory (defaults to home folder) before cloning
@@ -109,32 +109,32 @@ Renders dark matter haloes and SAGE galaxies together in a browser-based interac
 | miniMillennium | 62.5 Mpc/h | 64 | lhalo_binary |
 | microUchuu | 96 Mpc/h | 50 | lhalo_binary |
 
-Both supported automatically — point at the `.par` file and SAGE-Viewer figures out the rest from the HDF5.
+Both supported automatically — point at the `.par` file and ViSAGE figures out the rest from the HDF5.
 
 ## Quick start
 
 ```bash
-pip install sage-viewer
+pip install vi-sage
 ```
 
 **Explore Mode** — view existing SAGE26 results by pointing at a `.par` file:
 
 ```bash
-sage-viewer --par /path/to/SAGE26/input/millennium.par
+visage --par /path/to/SAGE26/input/millennium.par
 ```
 
 **Launch Mode** — configure and run SAGE26 via the guided wizard. Run from your SAGE26 root so the wizard can find your `.par` files and executable automatically:
 
 ```bash
 cd /path/to/SAGE26
-sage-viewer
+visage
 ```
 
 Open the printed URL in any browser. To launch on a remote cluster and view locally, use SSH port-forwarding:
 
 ```bash
 # On the cluster
-sage-viewer --par millennium.par --port 8080
+visage --par millennium.par --port 8080
 
 # In a local terminal
 ssh -L 8080:localhost:8080 user@cluster
@@ -173,17 +173,17 @@ SAGE26/
     └── microuchuu/model_0.hdf5
 ```
 
-then `sage-viewer --par input/millennium.par` discovers all three models automatically. Click the hamburger icon (top-left) → Models section to switch, or click "+ overlay" next to a compatible model to render both at once.
+then `visage --par input/millennium.par` discovers all three models automatically. Click the hamburger icon (top-left) → Models section to switch, or click "+ overlay" next to a compatible model to render both at once.
 
 ## Installation
 
 ### PyPI (recommended)
 
 ```bash
-pip install sage-viewer
+pip install vi-sage
 ```
 
-Requires Python ≥ 3.10. After install, `sage-viewer` is available as a command. If your shell can't find it, add the user bin directory to your PATH:
+Requires Python ≥ 3.10. After install, `visage` is available as a command. If your shell can't find it, add the user bin directory to your PATH:
 
 ```bash
 # macOS (Python 3.12 user install)
@@ -195,8 +195,8 @@ Movie recording in MOV format requires `ffmpeg` in your `PATH`.
 ### From source
 
 ```bash
-git clone https://github.com/MBradley1985/SAGE-Viewer
-cd SAGE-Viewer
+git clone https://github.com/MBradley1985/ViSAGE
+cd ViSAGE
 pip install .
 ```
 
@@ -208,11 +208,11 @@ A helper script is included for module-system clusters (Slurm, PBS, etc.):
 # Load a Python module first (name varies by cluster)
 module load python/3.12.0
 
-# Create a venv and install SAGE-Viewer in one step
+# Create a venv and install ViSAGE in one step
 ./install_hpc.sh
 
 # Optional: place the venv on scratch for faster I/O
-./install_hpc.sh /scratch/$USER/sage-viewer-env
+./install_hpc.sh /scratch/$USER/visage-env
 ```
 
 The install is editable (`pip install -e .`) so a `git pull` updates the code immediately with no reinstall. Load `ffmpeg` via your module system if you need MOV recording.
@@ -221,13 +221,13 @@ In every session:
 
 ```bash
 source .venv/bin/activate
-sage-viewer --par /path/to/millennium.par --port 8080
+visage --par /path/to/millennium.par --port 8080
 # SSH-tunnel the port to your local browser
 ```
 
 ## Documentation
 
-Full documentation at [mbradley1985.github.io/SAGE-Viewer](https://mbradley1985.github.io/SAGE-Viewer/).
+Full documentation at [mbradley1985.github.io/ViSAGE](https://mbradley1985.github.io/ViSAGE/).
 
 ## Tabs at a glance
 
@@ -245,7 +245,7 @@ When multiple boxes are loaded a **box strip** appears at the bottom of the view
 | Console    | Live xterm.js shell terminal (PTY-backed) + SAGE natural-language command mode. Multiple sessions, pop-out window |
 | Library    | Browse stored screenshots / movies; double-click a row to open as a movable, resizable floating card over the viewport (multiple items open simultaneously); per-row delete button removes the file from disk immediately |
 
-![Draw Sphere](https://raw.githubusercontent.com/MBradley1985/SAGE-Viewer/main/docs/images/draw_sphere.gif)
+![Draw Sphere](https://raw.githubusercontent.com/MBradley1985/ViSAGE/main/docs/images/draw_sphere.gif)
 
 The **Focus button** (top of the right panel) is tab-aware: it focuses on whatever's active in the current tab (target galaxy, environment halo, coords point, or box region).
 

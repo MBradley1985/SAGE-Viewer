@@ -1,65 +1,65 @@
 # API Reference
 
-SAGE-Viewer exposes a Python API for scripting, integration with notebooks, and extending the viewer.
+ViSAGE exposes a Python API for scripting, integration with notebooks, and extending the viewer.
 
 ## IO layer
 
-### `sage_viewer.io.par_reader`
+### `visage.io.par_reader`
 
-::: sage_viewer.io.par_reader.parse_par
+::: visage.io.par_reader.parse_par
 
-### `sage_viewer.io.snapshot_table`
+### `visage.io.snapshot_table`
 
-::: sage_viewer.io.snapshot_table.SnapshotTable
+::: visage.io.snapshot_table.SnapshotTable
 
-### `sage_viewer.io.halo_reader`
+### `visage.io.halo_reader`
 
-::: sage_viewer.io.halo_reader.load_halo_snapshot
-::: sage_viewer.io.halo_reader.HaloSnapshot
+::: visage.io.halo_reader.load_halo_snapshot
+::: visage.io.halo_reader.HaloSnapshot
 
-### `sage_viewer.io.galaxy_reader`
+### `visage.io.galaxy_reader`
 
-::: sage_viewer.io.galaxy_reader.load_galaxy_snapshot
-::: sage_viewer.io.galaxy_reader.GalaxySnapshot
+::: visage.io.galaxy_reader.load_galaxy_snapshot
+::: visage.io.galaxy_reader.GalaxySnapshot
 
 ## Scene layer
 
-### `sage_viewer.scene.scene`
+### `visage.scene.scene`
 
-::: sage_viewer.scene.scene.Scene
+::: visage.scene.scene.Scene
 
-### `sage_viewer.scene.camera`
+### `visage.scene.camera`
 
-::: sage_viewer.scene.camera.CameraController
+::: visage.scene.camera.CameraController
 
-### `sage_viewer.scene.halo_layer`
+### `visage.scene.halo_layer`
 
-::: sage_viewer.scene.halo_layer.HaloLayer
+::: visage.scene.halo_layer.HaloLayer
 
-### `sage_viewer.scene.galaxy_layer`
+### `visage.scene.galaxy_layer`
 
-::: sage_viewer.scene.galaxy_layer.GalaxyLayer
+::: visage.scene.galaxy_layer.GalaxyLayer
 
 ## Parallel loader
 
-::: sage_viewer.parallel.loader.SnapshotLoader
+::: visage.parallel.loader.SnapshotLoader
 
 ## Utilities
 
-::: sage_viewer.utils.colormap
-::: sage_viewer.utils.sizing
-::: sage_viewer.utils.kdtree.NearestHaloIndex
+::: visage.utils.colormap
+::: visage.utils.sizing
+::: visage.utils.kdtree.NearestHaloIndex
 
 ## App
 
-::: sage_viewer.app.create_app
+::: visage.app.create_app
 
 ## Example: headless snapshot render
 
 ```python
-from sage_viewer.io import parse_par, SnapshotTable
-from sage_viewer.io.halo_reader import load_halo_snapshot
-from sage_viewer.io.galaxy_reader import load_galaxy_snapshot
+from visage.io import parse_par, SnapshotTable
+from visage.io.halo_reader import load_halo_snapshot
+from visage.io.galaxy_reader import load_galaxy_snapshot
 import pyvista as pv
 
 cfg = parse_par("input/millennium.par")

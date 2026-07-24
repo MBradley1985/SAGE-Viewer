@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from sage_viewer.utils.colormap import (
+from visage.utils.colormap import (
     normalize_log_mass,
     normalize_log_ssfr,
 )

@@ -1,8 +1,8 @@
-# SAGE-Viewer
+# ViSAGE
 
 **Interactive 3D visualization for SAGE semi-analytic galaxy formation outputs.**
 
-SAGE-Viewer renders dark matter haloes and SAGE galaxies together in a browser-based interactive viewer, powered by [PyVista](https://pyvista.org) and [Trame](https://kitware.github.io/trame/). It is designed to work directly with the output of [SAGE26](https://github.com/MBradley1985/SAGE26) and [SAGE-PSO](https://github.com/MBradley1985/SAGE-PSO).
+ViSAGE renders dark matter haloes and SAGE galaxies together in a browser-based interactive viewer, powered by [PyVista](https://pyvista.org) and [Trame](https://kitware.github.io/trame/). It is designed to work directly with the output of [SAGE26](https://github.com/MBradley1985/SAGE26) and [SAGEswarm](https://github.com/MBradley1985/SAGEswarm).
 
 ---
 
@@ -32,8 +32,8 @@ SAGE-Viewer renders dark matter haloes and SAGE galaxies together in a browser-b
 ## Quick example
 
 ```bash
-pip install sage-viewer
-sage-viewer --par input/millennium.par
+pip install vi-sage
+visage --par input/millennium.par
 # → Open http://localhost:8080
 ```
 

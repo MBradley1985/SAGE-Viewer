@@ -1,6 +1,6 @@
 # Story Mode
 
-Story Mode turns SAGE-Viewer into a presentation tool: a *story* is an ordered
+Story Mode turns ViSAGE into a presentation tool: a *story* is an ordered
 list of scenes — each one a complete captured viewer state (snapshot, camera,
 layer visibility, colouring) plus text/media overlays and an optional camera
 motion — played back like slides over the live 3D render.
@@ -14,9 +14,9 @@ screenshots every scene for the scene-menu grid.
 
 Stories are JSON files discovered from two places:
 
-1. `sage_stories/` in the directory you launched `sage-viewer` from — your own
+1. `sage_stories/` in the directory you launched `visage` from — your own
    stories live here.
-2. The examples bundled with the package (`sage_viewer/examples/`).
+2. The examples bundled with the package (`visage/examples/`).
 
 A story in `sage_stories/` overrides a bundled one with the same title.
 Malformed files are skipped silently, so if a story doesn't appear in the
@@ -31,7 +31,7 @@ slide, image/video overlays, fly-through and rewind motion scenes, a
 text-heavy summary and a clickable scene menu. To build your own talk:
 
 ```bash
-cp <package>/sage_viewer/examples/presentation_template.json sage_stories/my_talk.json
+cp <package>/visage/examples/presentation_template.json sage_stories/my_talk.json
 ```
 
 then change the `title` and replace the placeholder text. The template is
@@ -146,7 +146,7 @@ the window, so a slide keeps its exact layout on any screen. Common fields:
 | `scene_menu` | `title`, `cols`, `max_width` | Clickable grid of every scene — put it on the last scene for question time. |
 
 Media `src` paths are served from `/sage_static/`, which maps to the
-package's `sage_viewer/static/` folder — drop your file in there and
+package's `visage/static/` folder — drop your file in there and
 reference it as `/sage_static/<file>`. (Media does **not** load from the data
 Library.)
 

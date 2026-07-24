@@ -5,14 +5,14 @@
 **Explore Mode** — view existing SAGE26 results using a full path to your `.par` file:
 
 ```bash
-sage-viewer --par /path/to/SAGE26/input/millennium.par
+visage --par /path/to/SAGE26/input/millennium.par
 ```
 
 **Launch Mode** (wizard) — configure and run SAGE26. Run from your SAGE26 root so the wizard can find your `.par` files and executable automatically:
 
 ```bash
 cd /path/to/SAGE26
-sage-viewer
+visage
 ```
 
 ## Explore Mode examples
@@ -24,23 +24,23 @@ Open the printed URL (default `http://localhost:8080`) in any browser.
 ## Launch on microUchuu
 
 ```bash
-sage-viewer --par input/microuchuu.par --snap 49
+visage --par input/microuchuu.par --snap 49
 ```
 
 ## Common options
 
 ```bash
 # Start at a specific snapshot
-sage-viewer --par input/millennium.par --snap 32
+visage --par input/millennium.par --snap 32
 
 # Use a specific port
-sage-viewer --par input/millennium.par --port 8888
+visage --par input/millennium.par --port 8888
 
 # Limit haloes per snapshot (faster on slower machines)
-sage-viewer --par input/millennium.par --max-halos 20000
+visage --par input/millennium.par --max-halos 20000
 
 # Use all CPUs for loading
-sage-viewer --par input/millennium.par --n-jobs -1
+visage --par input/millennium.par --n-jobs -1
 ```
 
 ## First steps in the viewer

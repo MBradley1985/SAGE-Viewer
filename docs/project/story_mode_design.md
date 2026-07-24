@@ -8,12 +8,12 @@
 
 ## Overview
 
-**Story Mode** turns SAGE-Viewer into a guided, data-driven presentation tool.
+**Story Mode** turns ViSAGE into a guided, data-driven presentation tool.
 A *story* is an ordered set of *scenes* — each a fully captured viewpoint
 (camera + render state + narration) — that the viewer steps through with
 Next / Previous, or plays back automatically. Stories live as JSON files in a
 `sage_stories/` folder so users can author their own; bundled example stories
-ship with the package in `sage_viewer/examples/`.
+ship with the package in `visage/examples/`.
 
 Conceptually, Story Mode is a generalisation of the existing **fly-through**
 (`toolbar.py`): the fly-through is a single hard-coded, non-interactive tour;
@@ -130,7 +130,7 @@ camera interaction). Overlay item fields:
 | `kind` | `title` · `heading` · `text` · `citation` · `equation` (text kinds — set size/weight/italic defaults) · `image` · `video` · `audio` (sound only, no visual) · `scene_menu` (clickable scene grid — see below) |
 | `text` | content for non-equation kinds |
 | `latex` | LaTeX source for `equation` kind; set `"inline": true` for inline math |
-| `src` | for `image` / `video` / `audio`: file served from `sage_viewer/static/` at `/sage_static/<file>` (NOT the data Library) |
+| `src` | for `image` / `video` / `audio`: file served from `visage/static/` at `/sage_static/<file>` (NOT the data Library) |
 | `width` | for `image` / `video`: px (number) or any CSS length (e.g. `"55vw"`) |
 | `opacity` | for `image` / `video`: 0–1 (default 1.0) |
 | `loop`, `autoplay`, `muted` | `video`: all default `true`. `audio`: `autoplay` default `true`, `loop`/`muted` default `false` |
@@ -149,7 +149,7 @@ the engine, so the client pauses/resumes them with the show's play/pause state
 (`#sage-story-playing-relay`), and they stop when the scene changes (the overlay layer
 is rebuilt). Pair with scene `"hold": true` so a short clip isn't cut off by
 auto-advance. All are normalised in `engine._normalize_overlay` and emitted by
-`sage_viewer.js`.
+`visage.js`.
 
 ### Scene-selector grid (`scene_menu`)
 
@@ -171,7 +171,7 @@ thumbnail (or a numbered placeholder) and, on click, flies to that scene.
 
 Mechanics: the menu scene is itself a scene (usually the last, with
 `"hold": true`). `engine._build_scene_menu` lists every other scene as a cell
-`{index, n, label, thumb}`; `sage_viewer.js` renders the grid and a cell click
+`{index, n, label, thumb}`; `visage.js` renders the grid and a cell click
 writes the target index to a hidden relay input (`#sage-story-goto-relay`,
 `v_model="story_goto_relay"`) whose server `@state.change` handler calls
 `player.goto(index)` — the same external-JS→server relay path the PTY uses.
@@ -188,7 +188,7 @@ are **story content, not framework** — they belong to the story that generated
 them and are not committed or shipped.
 
 The overlay layer is rendered **entirely outside Vue**: the server ships the
-items as JSON (`story_overlays_json`) and `sage_viewer.js` builds the children of
+items as JSON (`story_overlays_json`) and `visage.js` builds the children of
 `#sage-overlay-root` itself. Vue owns the (empty) container element but never its
 children, so KaTeX's DOM writes cannot corrupt Vue's virtual DOM. Equations are
 typeset with **vendored KaTeX** (`static/katex/`, woff2-only, no network) via a

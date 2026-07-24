@@ -1,10 +1,10 @@
-# Contributing to SAGE-Viewer
+# Contributing to ViSAGE
 
 ## Development setup
 
 ```bash
-git clone https://github.com/MBradley1985/SAGE-Viewer
-cd SAGE-Viewer
+git clone https://github.com/MBradley1985/ViSAGE
+cd ViSAGE
 pip install -e ".[dev]"
 pre-commit install
 ```
@@ -27,21 +27,21 @@ Tests use synthetic fixtures in `tests/data/` — no real simulation data requir
 Run checks:
 
 ```bash
-ruff check sage_viewer tests
-black --check sage_viewer tests
+ruff check visage tests
+black --check visage tests
 ```
 
 ## Adding a new simulation
 
-1. Add a reader in `sage_viewer/io/` if the tree format differs from lhalo_binary
-2. Add the snapshot list file (scale factors, one per line) to `sage_viewer/io/snapshot_table.py`
+1. Add a reader in `visage/io/` if the tree format differs from lhalo_binary
+2. Add the snapshot list file (scale factors, one per line) to `visage/io/snapshot_table.py`
 3. Test with a `.par` file from the new simulation
 
 ## Adding a new colormap mode
 
-1. Add scalar computation in `sage_viewer/utils/colormap.py`
-2. Register the mode in `sage_viewer/scene/halo_layer.py` and `galaxy_layer.py`
-3. Add the colormap dropdown option in `sage_viewer/ui/layer_panel.py`
+1. Add scalar computation in `visage/utils/colormap.py`
+2. Register the mode in `visage/scene/halo_layer.py` and `galaxy_layer.py`
+3. Add the colormap dropdown option in `visage/ui/layer_panel.py`
 
 ## Submitting changes
 

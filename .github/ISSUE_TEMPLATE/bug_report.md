@@ -16,7 +16,7 @@ What you expected to happen.
 **Environment**
 - OS:
 - Python version:
-- sage-viewer version (`sage-viewer --version`):
+- visage version (`visage --version`):
 - PyVista version:
 - Browser (if Trame-related):
 

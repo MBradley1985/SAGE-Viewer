@@ -4,7 +4,7 @@
 
 Galaxy data is read from the SAGE HDF5 output file (`model_0.hdf5`). The file is structured as one HDF5 group per snapshot: `Snap_0`, `Snap_1`, …, `Snap_63`.
 
-## Fields loaded by SAGE-Viewer
+## Fields loaded by ViSAGE
 
 | HDF5 field | Type | Raw units | Viewer units |
 |---|---|---|---|
@@ -32,4 +32,4 @@ The default stellar mass floor is `1e8 Msun`. Galaxies with `Mvir = 0` are also 
 
 ## SAGE26 output format reference
 
-The full 84-field SAGE HDF5 schema is documented in the [SAGE26 output reference](https://github.com/MBradley1985/SAGE26). SAGE-Viewer uses only the 8 fields above; all others are available in the file for custom scripting via the Python API.
+The full 84-field SAGE HDF5 schema is documented in the [SAGE26 output reference](https://github.com/MBradley1985/SAGE26). ViSAGE uses only the 8 fields above; all others are available in the file for custom scripting via the Python API.

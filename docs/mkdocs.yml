@@ -1,10 +1,10 @@
-site_name: SAGE-Viewer
-site_url: https://mbradley1985.github.io/SAGE-Viewer/
+site_name: ViSAGE
+site_url: https://mbradley1985.github.io/ViSAGE/
 site_description: Interactive 3D visualization for SAGE semi-analytic galaxy formation outputs
 site_author: Michael Bradley
 
-repo_name: MBradley1985/SAGE-Viewer
-repo_url: https://github.com/MBradley1985/SAGE-Viewer
+repo_name: MBradley1985/ViSAGE
+repo_url: https://github.com/MBradley1985/ViSAGE
 edit_uri: edit/main/docs/
 
 docs_dir: .

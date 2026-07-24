@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install_hpc.sh — create a Python venv and install SAGE-Viewer into it.
+# install_hpc.sh — create a Python venv and install ViSAGE into it.
 #
 # Usage:
 #   ./install_hpc.sh [VENV_DIR]
@@ -8,14 +8,14 @@
 # On clusters with a module system, load Python before running:
 #
 #   module load python/3.12.0        # adjust to your cluster's module name
-#   ./install_hpc.sh /scratch/$USER/sage-viewer-env
+#   ./install_hpc.sh /scratch/$USER/visage-env
 #
 # Subsequent sessions only need:
 #   source <VENV_DIR>/bin/activate
-#   sage-viewer --par /path/to/millennium.par
+#   visage --par /path/to/millennium.par
 #
 # Or without activating:
-#   <VENV_DIR>/bin/sage-viewer --par /path/to/millennium.par
+#   <VENV_DIR>/bin/visage --par /path/to/millennium.par
 
 set -euo pipefail
 
@@ -58,8 +58,8 @@ source "$VENV_DIR/bin/activate"
 echo "Upgrading pip ..."
 pip install --quiet --upgrade pip
 
-# ── 4. Install SAGE-Viewer (editable so git pull = instant update) ─────────
-echo "Installing SAGE-Viewer from $SCRIPT_DIR ..."
+# ── 4. Install ViSAGE (editable so git pull = instant update) ─────────
+echo "Installing ViSAGE from $SCRIPT_DIR ..."
 pip install -e "$SCRIPT_DIR"
 
 # ── 5. Check for ffmpeg (MOV recording only) ───────────────────────────────
@@ -73,14 +73,14 @@ fi
 
 # ── 6. Summary ─────────────────────────────────────────────────────────────
 echo ""
-echo "Done.  To use SAGE-Viewer:"
+echo "Done.  To use ViSAGE:"
 echo ""
 echo "  # Activate the environment:"
 echo "  source $VENV_DIR/bin/activate"
-echo "  sage-viewer --par /path/to/millennium.par"
+echo "  visage --par /path/to/millennium.par"
 echo ""
 echo "  # Or run directly without activating:"
-echo "  $VENV_DIR/bin/sage-viewer --par /path/to/millennium.par"
+echo "  $VENV_DIR/bin/visage --par /path/to/millennium.par"
 echo ""
 echo "  # To update after a git pull:"
 echo "  git pull && pip install -e $SCRIPT_DIR   # re-run only if pyproject.toml changed"

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from sage_viewer.utils.sizing import (
+from visage.utils.sizing import (
     HALO_SIZE_BINS,
     halo_point_sizes,
     galaxy_point_sizes,

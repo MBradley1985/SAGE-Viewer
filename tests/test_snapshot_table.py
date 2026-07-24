@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from sage_viewer.io.snapshot_table import SnapshotTable
+from visage.io.snapshot_table import SnapshotTable
 
 
 def test_count(mini_a_list_path):

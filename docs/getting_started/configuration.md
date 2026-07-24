@@ -1,6 +1,6 @@
 # Configuration
 
-SAGE-Viewer reads all simulation parameters directly from the SAGE `.par` file. No separate config file is needed.
+ViSAGE reads all simulation parameters directly from the SAGE `.par` file. No separate config file is needed.
 
 ## CLI options
 
@@ -17,7 +17,7 @@ SAGE-Viewer reads all simulation parameters directly from the SAGE `.par` file. 
 
 ## Par file fields used
 
-SAGE-Viewer reads the following fields from the `.par` file:
+ViSAGE reads the following fields from the `.par` file:
 
 | Field | Used for |
 |---|---|
@@ -36,7 +36,7 @@ SAGE-Viewer reads the following fields from the `.par` file:
 For interactive use on a laptop with miniMillennium:
 
 ```bash
-sage-viewer --par input/millennium.par \
+visage --par input/millennium.par \
   --max-halos 30000 \
   --max-galaxies 30000 \
   --min-halo-mass 1e11 \
@@ -46,7 +46,7 @@ sage-viewer --par input/millennium.par \
 For cluster use with full data:
 
 ```bash
-sage-viewer --par input/millennium.par \
+visage --par input/millennium.par \
   --max-halos 100000 \
   --n-jobs 16 \
   --port 8080

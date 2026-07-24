@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sage-viewer"
+name = "vi-sage"
 dynamic = ["version"]
 description = "Interactive 3D viewer for SAGE semi-analytic galaxy formation outputs"
 readme = "README.md"
@@ -31,6 +31,10 @@ dependencies = [
     "numpy>=1.24",
     "joblib>=1.3",
     "scipy>=1.11",
+    # SAGE plotting/analysis stack — so the Console's interpreter can run the
+    # SAGE26 plotting scripts and SAGEswarm without extra installs.
+    "matplotlib>=3.7",
+    "pandas>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -45,30 +49,30 @@ dev = [
     "ruff>=0.3",
     "black>=24.0",
     "pre-commit>=3.6",
-    "sage-viewer[docs]",
+    "vi-sage[docs]",
 ]
 
 [project.scripts]
-sage-viewer = "sage_viewer.cli:main"
+visage = "visage.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/MBradley1985/SAGE-Viewer"
-Documentation = "https://mbradley1985.github.io/SAGE-Viewer/"
-Repository = "https://github.com/MBradley1985/SAGE-Viewer"
-Issues = "https://github.com/MBradley1985/SAGE-Viewer/issues"
+Homepage = "https://github.com/MBradley1985/ViSAGE"
+Documentation = "https://mbradley1985.github.io/ViSAGE/"
+Repository = "https://github.com/MBradley1985/ViSAGE"
+Issues = "https://github.com/MBradley1985/ViSAGE/issues"
 
 [tool.setuptools.dynamic]
-version = { attr = "sage_viewer._version.__version__" }
+version = { attr = "visage._version.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["sage_viewer*"]
+include = ["visage*"]
 
 [tool.setuptools.package-data]
 # Include nested static assets too (e.g. vendored KaTeX under static/katex/
 # and its fonts) — "static/*" alone does not recurse into subdirectories.
 # Also bundle the example Story Mode stories so they ship with the package.
-sage_viewer = ["static/*", "static/**/*", "examples/*.json"]
+visage = ["static/*", "static/**/*", "examples/*.json"]
 
 [tool.ruff]
 line-length = 79

@@ -4,7 +4,7 @@ Guards against env-class commands leaking into the wrong flags (e.g. "show only
 clusters" leaving pairs on) and against documented forms not matching.
 """
 
-from sage_viewer.utils.command_parser import CommandContext, execute_command
+from visage.utils.command_parser import CommandContext, execute_command
 
 ENV = (
     "env_show_field",

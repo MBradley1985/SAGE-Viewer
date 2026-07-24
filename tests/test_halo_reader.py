@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from sage_viewer.io.halo_reader import load_halo_snapshot
+from visage.io.halo_reader import load_halo_snapshot
 
 
 def test_loads_correct_snap(mini_tree_path):

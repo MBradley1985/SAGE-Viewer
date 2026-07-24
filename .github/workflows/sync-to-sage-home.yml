@@ -1,4 +1,4 @@
-name: Sync to sage-home/SAGE-Viewer
+name: Sync to sage-home/ViSAGE
 
 on:
   push:
@@ -9,18 +9,18 @@ on:
 jobs:
   mirror:
     runs-on: ubuntu-latest
-    if: github.repository == 'MBradley1985/SAGE-Viewer'
+    if: github.repository == 'MBradley1985/ViSAGE'
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0          # full history needed for mirror push
           persist-credentials: false  # prevent GITHUB_TOKEN overriding the PAT below
 
-      - name: Push to sage-home/SAGE-Viewer
+      - name: Push to sage-home/ViSAGE
         env:
           SAGE_HOME_TOKEN: ${{ secrets.SAGE_HOME_TOKEN }}
         run: |
-          git remote add sage-home https://x-access-token:${SAGE_HOME_TOKEN}@github.com/sage-home/SAGE-Viewer.git
+          git remote add sage-home https://x-access-token:${SAGE_HOME_TOKEN}@github.com/sage-home/ViSAGE.git
           # Force: this repo is the source of truth, so the mirror must follow
           # even when a branch here was rebased or force-updated (e.g. dev
           # being reset to main after a squash-merge).
