@@ -2987,11 +2987,43 @@ def build_navigation_panel(server, scene: Scene) -> None:
     )
     import subprocess as _subprocess
     import os as _os
+    import sys as _sys
     import socket as _socket
     import getpass as _getpass
     import base64 as _base64
+    import pathlib as _pathlib_pty
 
     _cmd_ctx = CommandContext(scene=scene, state=state, ctrl=ctrl)
+
+    def _python_shim_dir() -> str | None:
+        """Create a bin dir of python/python3/pip/pip3 shims pointing at the
+        interpreter running ViSAGE, so the Console's `python3` (etc.) sees all
+        of ViSAGE's installed packages (h5py, numpy, scipy, matplotlib, …)
+        rather than whatever the login shell's default python happens to be."""
+        exe = _sys.executable
+        if not exe:
+            return None
+        shim = _pathlib_pty.Path.home() / ".visage" / "shims"
+        try:
+            shim.mkdir(parents=True, exist_ok=True)
+            for _name in ("python", "python3"):
+                link = shim / _name
+                try:
+                    if link.is_symlink() or link.exists():
+                        link.unlink()
+                    link.symlink_to(exe)
+                except OSError:
+                    pass
+            for _name in ("pip", "pip3"):
+                f = shim / _name
+                try:
+                    f.write_text(f'#!/bin/sh\nexec "{exe}" -m pip "$@"\n')
+                    f.chmod(0o755)
+                except OSError:
+                    pass
+        except OSError:
+            return None
+        return str(shim)
 
     class _PTYSession:
         """PTY-backed shell session powering the xterm.js terminal."""
@@ -3498,8 +3530,35 @@ def build_navigation_panel(server, scene: Scene) -> None:
         if d is None:
             return
         if d.get("pty") is None or not d["pty"].is_alive():
-            d["pty"] = _PTYSession(cwd=_os.getcwd(), env=dict(_os.environ))
+            # Put ViSAGE's own interpreter (and pip) first on PATH so the
+            # Console's python/python3/pip carry all of ViSAGE's packages.
+            env = dict(_os.environ)
+            _prepend = _os.pathsep.join(
+                p
+                for p in (
+                    _python_shim_dir(),
+                    _os.path.dirname(_sys.executable),
+                )
+                if p
+            )
+            if _prepend:
+                env["PATH"] = _prepend + _os.pathsep + env.get("PATH", "")
+            d["pty"] = _PTYSession(cwd=_os.getcwd(), env=env)
             _start_pty_reader(cid, d["pty"])
+            # A login shell re-sources the user's profile, which can push our
+            # dirs back down PATH; re-assert them as the shell's first input
+            # (queued before any typing, runs after profile init).
+            if _prepend:
+                try:
+                    d["pty"].write(
+                        (
+                            'export PATH="'
+                            + _prepend
+                            + ':$PATH"; hash -r 2>/dev/null; clear\n'
+                        ).encode()
+                    )
+                except Exception:
+                    pass
 
     @state.change("pty_ensure_seq")
     def on_pty_ensure(pty_ensure_seq, **_):
