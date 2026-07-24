@@ -80,3 +80,29 @@ def test_scan_plots_no_dir_is_noop(tmp_path):
     c = _ctrl()
     c._scan_plots(None)
     assert c._st.pso_plots == []
+
+
+def test_scan_plots_recurses_into_output_subdir(tmp_path):
+    out = tmp_path / "millennium_pso"
+    out.mkdir()
+    (out / "smf.png").write_bytes(b"X")
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "obs.png").write_bytes(b"Y")  # skipped dir
+
+    c = _ctrl()
+    c._scan_plots(tmp_path)
+    names = {p["name"] for p in c._st.pso_plots}
+    assert names == {"millennium_pso/smf.png"}  # obs data dir excluded
+
+
+def test_sw_output_dir_parsed_from_script(tmp_path):
+    c = _ctrl()
+    c._sw_dir = tmp_path
+    c._st.wiz_sw_script_text = 'OUTPUT_PATH="./millennium_pso"\n'
+    assert c._sw_output_dir() == tmp_path / "millennium_pso"
+
+    c._st.wiz_sw_script_text = "python3 main.py -o /abs/out -x SMF_z0\n"
+    assert c._sw_output_dir() == __import__("pathlib").Path("/abs/out")
+
+    c._st.wiz_sw_script_text = "no output here\n"
+    assert c._sw_output_dir() == tmp_path  # falls back to the SAGEswarm dir

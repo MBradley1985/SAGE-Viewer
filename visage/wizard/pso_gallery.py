@@ -41,7 +41,7 @@ def build_pso_gallery(server) -> None:
                 style="color:#06b6d4;font-weight:700;letter-spacing:0.06em;",
             )
             html.Span(
-                ("`(${(pso_plots || []).length})`",),
+                "({{ (pso_plots || []).length }})",
                 style="color:#9ca3af;font-size:0.8rem;",
             )
             v3.VSpacer()
@@ -83,7 +83,7 @@ def build_pso_gallery(server) -> None:
                     style="width:100%;height:auto;display:block;",
                 )
                 html.Span(
-                    ("p.name",),
+                    "{{ p.name }}",
                     style=(
                         "color:#9ca3af;font-size:0.7rem;"
                         "padding:4px 6px;text-align:center;"

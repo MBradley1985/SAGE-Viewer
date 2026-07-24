@@ -76,7 +76,7 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
             with html.Div(style="display:flex;gap:6px;align-items:center;"):
                 for i in range(len(_STEPS)):
                     v3.VChip(
-                        (f"wiz_steps[{i}]",),
+                        "{{ wiz_steps[" + str(i) + "] }}",
                         size="small",
                         color=(
                             f"wiz_step === {i} ? '#06b6d4' : "
@@ -100,20 +100,27 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
             )
 
         # ── Main area ────────────────────────────────────────────────────────
+        # paddingRight reserves space for the live PSO gallery (fixed, docked
+        # right) so the terminal is never hidden under it; overflowX lets the
+        # user scroll horizontally if the content is still wider than the gap.
         with html.Div(
             style=(
-                "flex:1;display:flex;align-items:center;"
-                "justify-content:center;overflow:hidden;padding:24px;"
+                "{flex:'1',display:'flex',alignItems:'center',"
+                "justifyContent:'center',overflowX:'auto',overflowY:'hidden',"
+                "padding:'24px',"
+                "paddingRight: pso_gallery_show "
+                "? 'calc(min(46vw, 720px) + 24px)' : '24px'}",
             ),
         ):
-            # Row wrapper — expands to two columns when par editor is visible
+            # Row wrapper — expands to two columns when an editor is visible
             with html.Div(
                 style=(
                     "{"
                     "display:'flex',gap:'16px',alignItems:'stretch',"
                     "height:'640px',maxHeight:'80vh',"
                     "width:'100%',maxWidth:'calc(100vw - 48px)',"
-                    "justifyContent: wiz_par_show ? 'flex-start' : 'center'"
+                    "justifyContent: (wiz_par_show || wiz_sw_config_show || "
+                    "pso_gallery_show) ? 'flex-start' : 'center'"
                     "}",
                 ),
             ):
@@ -121,7 +128,8 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                 with v3.VCard(
                     style=(
                         "`flex:1;min-width:0;"
-                        "max-width:${wiz_par_show ? '860px' : '1100px'};"
+                        "max-width:${(wiz_par_show || wiz_sw_config_show) "
+                        "? '860px' : '1100px'};"
                         "background:#000000;border:2px solid #06b6d4;"
                         "display:grid;grid-template-rows:1fr auto;"
                         "overflow:hidden;position:relative;`",
@@ -191,33 +199,22 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                                 hide_details=True,
                                 style="font-family:monospace;max-width:520px;",
                             )
-                        # SAGEswarm config — constraints (-x) + output dir (-o)
+                        # Cancel button — shown whenever a command is running;
+                        # sends SIGINT (Ctrl+C) to the process group.
                         with html.Div(
-                            v_show=("wiz_sw_config_show",),
-                            style=(
-                                "display:flex;align-items:center;gap:8px;"
-                                "flex-wrap:wrap;"
-                            ),
+                            v_show=("wiz_run_active",),
+                            style="display:flex;align-items:center;gap:8px;",
                         ):
-                            v3.VTextField(
-                                v_model=("wiz_sw_constraints",),
-                                label="Constraints (-x, comma-separated)",
+                            v3.VBtn(
+                                "Cancel (Ctrl+C)",
+                                prepend_icon="mdi-close-octagon",
+                                color="#ef4444",
                                 variant="outlined",
-                                density="compact",
-                                color="cyan",
-                                bg_color="#000000",
-                                hide_details=True,
-                                style="font-family:monospace;max-width:300px;",
-                            )
-                            v3.VTextField(
-                                v_model=("wiz_sw_outdir",),
-                                label="Output dir (-o)",
-                                variant="outlined",
-                                density="compact",
-                                color="cyan",
-                                bg_color="#000000",
-                                hide_details=True,
-                                style="font-family:monospace;max-width:280px;",
+                                size="small",
+                                click=server.controller.wiz_cancel_run,
+                                style=(
+                                    "font-family:monospace;text-transform:none;"
+                                ),
                             )
                         with html.Div(
                             v_show=("!wiz_busy && wiz_choices.length > 0",),
@@ -246,9 +243,9 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                                     style="font-family:monospace;text-transform:none;",
                                 )
 
-                # ── Right: par file card (shown when wiz_par_show) ───────────
+                # ── Right: editor card — SAGE26 .par OR SAGEswarm run_pso.sh ──
                 with v3.VCard(
-                    v_show=("wiz_par_show",),
+                    v_show=("wiz_par_show || wiz_sw_config_show",),
                     style=(
                         "flex:1;min-width:0;"
                         "background:#000000;border:2px solid #06b6d4;"
@@ -269,14 +266,17 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                             size="small",
                         )
                         html.Span(
-                            "Parameter File",
+                            "{{ wiz_sw_config_show ? 'run_pso.sh' "
+                            ": 'Parameter File' }}",
                             style="color:#06b6d4;font-size:0.82rem;",
                         )
                     with v3.VSheet(
                         color="#000000",
                         style="flex:1;min-height:0;overflow-y:auto;padding:8px 12px;",
                     ):
+                        # SAGE26 parameter file
                         v3.VTextarea(
+                            v_if=("wiz_par_show",),
                             v_model=("wiz_par_text",),
                             rows=9,
                             auto_grow=True,
@@ -289,6 +289,22 @@ def build_wizard_ui(server, ctrl: WizardController) -> None:
                                 "height:100%;"
                             ),
                             label="Edit freely — format is preserved",
+                        )
+                        # SAGEswarm run script (all run options live here)
+                        v3.VTextarea(
+                            v_if=("wiz_sw_config_show",),
+                            v_model=("wiz_sw_script_text",),
+                            rows=9,
+                            auto_grow=True,
+                            variant="outlined",
+                            bg_color="#000000",
+                            hide_details=True,
+                            classes="wiz-par-area",
+                            style=(
+                                "font-family:monospace;color:#e2e8f0;"
+                                "height:100%;"
+                            ),
+                            label="Edit constraints, PSO params, paths — then Save & Run",
                         )
 
         # SAGE logo — pinned to bottom-right corner of the wizard screen

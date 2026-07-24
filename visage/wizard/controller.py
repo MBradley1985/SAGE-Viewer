@@ -4,6 +4,7 @@ import asyncio
 import base64 as _b64
 import os
 import shutil
+import signal
 import sys
 from pathlib import Path
 
@@ -109,6 +110,47 @@ _STEPS_SAGESWARM = [
     "Run PSO",
     "View plots",
 ]
+
+# The SAGEswarm run is driven by editing its run_pso.sh script (all options —
+# constraints, PSO params, bounds file, sim settings — are shell vars in there),
+# mirroring how the SAGE26 flow edits the .par file.
+_SW_RUN_SCRIPT = "run_pso.sh"
+
+# Seed used only when a checkout ships no run_pso.sh (the user edits the paths).
+_SW_RUN_SCRIPT_TEMPLATE = """\
+#!/bin/bash
+
+CONFIG_PATH="../SAGE26/input/millennium.par"
+BASE_PATH="../SAGE26/sage"
+OUTPUT_PATH="./millennium_pso"
+PARTICLES=25
+ITERATIONS=100
+TEST="chi2"
+CONSTRAINTS="SMF_z0"
+BOXSIZE=62.5
+SIM=1
+VOL_FRAC=1.0
+OMEGA0=0.25
+H0=0.73
+CSVOUTPUT="./millennium_pso/pso.csv"
+SPACEFILE="./space.txt"
+
+python3 ./main.py \\
+  -c "$CONFIG_PATH" \\
+  -b "$BASE_PATH" \\
+  -o "$OUTPUT_PATH" \\
+  -s "$PARTICLES" \\
+  -m "$ITERATIONS" \\
+  -t "$TEST" \\
+  -x "$CONSTRAINTS" \\
+  -csv "$CSVOUTPUT" \\
+  --sim "$SIM" \\
+  --boxsize "$BOXSIZE" \\
+  --vol-frac "$VOL_FRAC" \\
+  --Omega0 "$OMEGA0" \\
+  --h0 "$H0" \\
+  -S "$SPACEFILE"
+"""
 
 _MILLENNIUM_PAR_TEMPLATE = """\
 %------------------------------------------
@@ -267,10 +309,10 @@ class WizardController:
         self._flow: str = "sage26"  # "sage26" | "sageswarm"
         self._sw_dir: Path | None = None
         self._sw_sage_bin: Path | None = None
-        self._sw_par: Path | None = None
         self._plot_task = None  # asyncio task watching for PSO plots
         self._plot_watch_stop = True
         self._plot_seen: dict[str, int] = {}  # plot name → last-seen mtime
+        self._run_proc = None  # currently-running _run_cmd subprocess
 
         self._st.wiz_step = 0
         self._st.wiz_steps = list(_STEPS)  # header chip labels (per-flow)
@@ -287,16 +329,17 @@ class WizardController:
         self._st.wiz_pty_buf = ""  # base64 full replay buffer
         self._st.wiz_clone_dir_show = False
         self._st.wiz_clone_dir = str(Path.home())
-        # SAGEswarm config inputs + live plot gallery
+        # SAGEswarm config (run_pso.sh editor) + live plot gallery
         self._st.wiz_sw_config_show = False
-        self._st.wiz_sw_outdir = "output_pso"
-        self._st.wiz_sw_constraints = "SMF"
+        self._st.wiz_sw_script_text = ""  # editable run_pso.sh contents
+        self._st.wiz_run_active = False  # a _run_cmd subprocess is live
         self._st.pso_plots = []  # [{name, data_url, mtime}]
         self._st.pso_gallery_show = False
 
         server.controller.set("wiz_choose")(self._on_choice)
         server.controller.set("wiz_close")(self._on_close)
         server.controller.set("wiz_rescan")(self._on_rescan)
+        server.controller.set("wiz_cancel_run")(self._on_cancel_run)
 
         if auto_start:
             asyncio.ensure_future(self._step_scan())
@@ -314,7 +357,6 @@ class WizardController:
         self._models = []
         self._sw_dir = None
         self._sw_sage_bin = None
-        self._sw_par = None
         self._stop_plot_watch()
         self._wiz_buf = bytearray()
         self._back = "back_fresh"
@@ -333,6 +375,7 @@ class WizardController:
         self._st.wiz_clone_dir_show = False
         self._st.wiz_clone_dir = str(Path.home())
         self._st.wiz_sw_config_show = False
+        self._st.wiz_sw_script_text = ""
         self._st.pso_plots = []
         self._st.pso_gallery_show = False
         # Push a clear sequence as the first "chunk" so a late-mounting xterm
@@ -355,6 +398,21 @@ class WizardController:
 
     def _on_rescan(self, **_) -> None:
         self.reset_and_start(flow=self._flow)
+
+    def _on_cancel_run(self, **_) -> None:
+        """Interrupt the running command — equivalent to pressing Ctrl+C.
+
+        Sends SIGINT to the whole process group (created via os.setsid) so the
+        PSO driver and any SAGE instances it spawned all receive the interrupt.
+        """
+        proc = self._run_proc
+        if proc is None or proc.poll() is not None:
+            return
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGINT)
+            self._emit("^C  — interrupt sent to the running process", "warn")
+        except (ProcessLookupError, OSError) as exc:
+            self._emit(f"Could not interrupt process: {exc}", "err")
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -430,6 +488,11 @@ class WizardController:
             os.close(slave_fd)
             slave_fd = -1
 
+            # Expose the process so the Cancel button (Ctrl+C) can signal it.
+            self._run_proc = proc
+            self._st.wiz_run_active = True
+            self._st.flush()
+
             loop = asyncio.get_running_loop()
 
             def _read_chunk() -> bytes | None:
@@ -475,6 +538,9 @@ class WizardController:
             self._push_bytes(f"\x1b[1;31mError: {exc}\x1b[0m\r\n".encode())
             return 1
         finally:
+            self._run_proc = None
+            self._st.wiz_run_active = False
+            self._st.flush()
             for fd in (master_fd, slave_fd):
                 if fd >= 0:
                     try:
@@ -696,15 +762,7 @@ class WizardController:
         elif value == "sw_install":
             await self._step_sw_install()
 
-        elif value == "sw_pick_bin":
-            await self._step_sw_pick_bin()
-
-        elif value.startswith("sw_bin:"):
-            self._sw_sage_bin = Path(value[len("sw_bin:") :])
-            await self._step_sw_pick_par()
-
-        elif value.startswith("sw_par:"):
-            self._sw_par = Path(value[len("sw_par:") :])
+        elif value == "sw_configure":
             await self._step_sw_config()
 
         elif value == "sw_run":
@@ -1232,17 +1290,31 @@ class WizardController:
                 return c
         return None
 
-    def _sw_par_files(self) -> list[Path]:
-        pars: list[Path] = []
-        for base in (self._sw_dir, self._sage26_dir, Path.cwd()):
-            if not base:
-                continue
-            inp = base / "input"
-            if inp.is_dir():
-                for p in sorted(inp.glob("*.par")):
-                    if p not in pars:
-                        pars.append(p)
-        return pars
+    def _sw_script_path(self) -> Path | None:
+        """Path to the SAGEswarm run script (run_pso.sh) in the checkout."""
+        return (self._sw_dir / _SW_RUN_SCRIPT) if self._sw_dir else None
+
+    def _sw_output_dir(self) -> Path | None:
+        """Where the PSO writes its plots — parsed from the edited run_pso.sh
+        (OUTPUT_PATH=… or a literal -o …), resolved relative to the SAGEswarm
+        dir. Falls back to the SAGEswarm dir itself."""
+        if not self._sw_dir:
+            return None
+        text = str(self._st.wiz_sw_script_text or "")
+        val = None
+        m = _re.search(
+            r'^\s*OUTPUT_PATH\s*=\s*["\']?([^"\'\n#]+)', text, _re.MULTILINE
+        )
+        if m:
+            val = m.group(1).strip()
+        else:
+            m = _re.search(r'-o\s+["\']?([^"\'\s]+)', text)
+            if m:
+                val = m.group(1).strip()
+        if not val or val.startswith("$"):
+            return self._sw_dir
+        p = Path(val).expanduser()
+        return p if p.is_absolute() else (self._sw_dir / p)
 
     def _back_choice(self, value: str = "sw_back_scan") -> dict:
         return {
@@ -1251,6 +1323,19 @@ class WizardController:
             "icon": "mdi-arrow-left",
             "disabled": False,
         }
+
+    def _sw_available_constraints(self) -> list[str]:
+        """Valid -x names, read from the checkout's src/constraints.py registry."""
+        if not self._sw_dir:
+            return []
+        try:
+            text = (self._sw_dir / "src" / "constraints.py").read_text()
+        except OSError:
+            return []
+        m = _re.search(r"_constraints\s*=\s*\{(.*?)\}", text, _re.DOTALL)
+        if not m:
+            return []
+        return _re.findall(r"['\"]([A-Za-z0-9_]+)['\"]\s*:", m.group(1))
 
     async def _step_sw_scan(self) -> None:
         self._flow = "sageswarm"
@@ -1290,6 +1375,14 @@ class WizardController:
                     "label": "Install requirements",
                     "value": "sw_install",
                     "icon": "mdi-package-down",
+                    "disabled": False,
+                }
+            )
+            choices.append(
+                {
+                    "label": "Configure & Run SAGEswarm",
+                    "value": "sw_configure",
+                    "icon": "mdi-play",
                     "disabled": False,
                 }
             )
@@ -1387,15 +1480,10 @@ class WizardController:
         req = self._sw_dir / "requirements.txt"
         if req.is_file():
             self._emit("Installing SAGEswarm requirements ...", "info")
+            # Use python3 to match run_pso.sh's `python3 ./main.py`, so deps
+            # land in the interpreter the run will actually use.
             rc = await self._run_cmd(
-                [
-                    sys.executable,
-                    "-m",
-                    "pip",
-                    "install",
-                    "-r",
-                    "requirements.txt",
-                ],
+                ["python3", "-m", "pip", "install", "-r", "requirements.txt"],
                 cwd=self._sw_dir,
             )
             if rc != 0:
@@ -1404,7 +1492,7 @@ class WizardController:
                     [
                         {
                             "label": "Continue anyway",
-                            "value": "sw_pick_bin",
+                            "value": "sw_configure",
                             "icon": "mdi-arrow-right",
                             "disabled": False,
                         },
@@ -1415,105 +1503,51 @@ class WizardController:
             self._emit("Requirements installed.", "ok")
         else:
             self._emit("No requirements.txt found — skipping install.", "warn")
-        await self._step_sw_pick_bin()
-
-    async def _step_sw_pick_bin(self) -> None:
-        self._st.wiz_step = 3
-        self._sage26_dir = self._sage26_dir or self._find_sage26()
-        cands: list[Path] = []
-        if self._sage26_dir:
-            cands += [
-                self._sage26_dir / "bin" / "sage",
-                self._sage26_dir / "sage",
-            ]
-        if self._sw_dir:
-            cands += [self._sw_dir / "sage", self._sw_dir / "bin" / "sage"]
-        bins = [c for c in cands if c.is_file()]
-        if not bins:
-            self._emit("No compiled SAGE binary found.", "warn")
-            self._emit(
-                "Build SAGE26 first via Launch Mode (Setup Wizard), then "
-                "return here.",
-                "info",
-            )
-            self._set_choices(
-                [
-                    {
-                        "label": "Switch to SAGE26 setup",
-                        "value": "back_sage26",
-                        "icon": "mdi-swap-horizontal",
-                        "disabled": False,
-                    },
-                    self._back_choice(),
-                ]
-            )
-            return
-        if len(bins) == 1:
-            self._sw_sage_bin = bins[0]
-            self._emit(f"Using SAGE binary: {self._sw_sage_bin}", "ok")
-            await self._step_sw_pick_par()
-            return
-        self._emit("Select the SAGE binary to calibrate:", "info")
-        choices = [
-            {
-                "label": str(b),
-                "value": f"sw_bin:{b}",
-                "icon": "mdi-cog",
-                "disabled": False,
-            }
-            for b in bins
-        ]
-        choices.append(self._back_choice())
-        self._set_choices(choices)
-
-    async def _step_sw_pick_par(self) -> None:
-        self._st.wiz_step = 3
-        pars = self._sw_par_files()
-        if not pars:
-            self._emit("No .par files found for calibration.", "warn")
-            self._emit(
-                "Add a .par to SAGEswarm/input/ (or SAGE26/input/) and "
-                "rescan.",
-                "info",
-            )
-            self._set_choices([self._back_choice()])
-            return
-        if len(pars) == 1:
-            self._sw_par = pars[0]
-            self._emit(f"Using par file: {self._sw_par}", "ok")
-            await self._step_sw_config()
-            return
-        self._emit("Select a parameter (.par) file:", "info")
-        choices = [
-            {
-                "label": p.name,
-                "value": f"sw_par:{p}",
-                "icon": "mdi-file-cog",
-                "disabled": False,
-            }
-            for p in pars
-        ]
-        choices.append(self._back_choice())
-        self._set_choices(choices)
+        await self._step_sw_config()
 
     async def _step_sw_config(self) -> None:
+        """Edit run_pso.sh (all run options live in it), then run it — mirrors
+        the SAGE26 .par editor."""
         self._st.wiz_step = 3
-        self._emit("Set the PSO constraints and output directory:", "info")
+        script = self._sw_script_path()
+        if script is None:
+            self._emit("SAGEswarm not found — clone it first.", "err")
+            self._set_choices([self._back_choice()])
+            return
+
+        if script.is_file():
+            try:
+                self._st.wiz_sw_script_text = script.read_text()
+                self._emit(
+                    f"Loaded {script.name} — edit it on the right.", "ok"
+                )
+            except OSError as exc:
+                self._emit(f"Could not read {script.name}: {exc}", "err")
+                self._set_choices([self._back_choice()])
+                return
+        else:
+            # No script shipped — seed a template the user can fill in.
+            self._st.wiz_sw_script_text = _SW_RUN_SCRIPT_TEMPLATE
+            self._emit(
+                f"No {script.name} found — starting from a template.", "warn"
+            )
+
+        avail = self._sw_available_constraints()
+        if avail:
+            self._emit("Valid constraints (-x): " + ", ".join(avail), "info")
         self._emit(
-            "  Constraints (-x): comma-separated, e.g. SMF,BHMF,HIMF", "info"
-        )
-        self._emit(
-            "  Output dir (-o): final diagnostics; live plots appear in the "
-            "gallery",
+            "Set BASE_PATH (the compiled ./sage) and CONFIG_PATH (.par); "
+            "bounds live in the -S space file.",
             "info",
         )
         self._emit("", "info")
+
         self._st.wiz_sw_config_show = True
         self._st.flush()
         self._set_choices(
             [
                 {
-                    "label": "Run PSO",
+                    "label": "Save & Run PSO",
                     "value": "sw_run",
                     "icon": "mdi-play",
                     "disabled": False,
@@ -1526,42 +1560,34 @@ class WizardController:
         self._st.wiz_step = 4
         self._st.wiz_sw_config_show = False
         self._st.flush()
-        if not (self._sw_dir and self._sw_sage_bin and self._sw_par):
-            self._emit(
-                "Missing SAGEswarm dir, SAGE binary, or par file.", "err"
-            )
+        script = self._sw_script_path()
+        if script is None or not self._sw_dir:
+            self._emit("SAGEswarm directory not set.", "err")
             self._set_choices([self._back_choice()])
             return
 
-        outdir = (
-            str(self._st.wiz_sw_outdir or "output_pso").strip() or "output_pso"
-        )
-        constraints = str(self._st.wiz_sw_constraints or "").strip()
-        cmd = [
-            sys.executable,
-            "main.py",
-            "-b",
-            str(self._sw_sage_bin),
-            "-c",
-            str(self._sw_par),
-            "-o",
-            outdir,
-        ]
-        if constraints:
-            cmd += ["-x", constraints]
+        # Save the edited run_pso.sh back to the checkout (like the .par editor).
+        try:
+            script.write_text(str(self._st.wiz_sw_script_text or ""))
+            self._emit(f"Saved {script.name}", "ok")
+        except OSError as exc:
+            self._emit(f"Could not save {script.name}: {exc}", "err")
+            self._set_choices([self._back_choice()])
+            return
 
         self._emit("", "info")
         self._emit(
             "Running SAGEswarm PSO — plots appear live in the gallery.", "info"
         )
-        self._emit("This can take a long time.", "info")
+        self._emit("This can take a long time.  Use Cancel to stop.", "info")
         self._emit("", "info")
 
-        # Watch the SAGEswarm main/root folder (the run's cwd) for plot PNGs.
-        self._start_plot_watch(self._sw_dir)
-        rc = await self._run_cmd(cmd, cwd=self._sw_dir)
+        # Watch the PSO output directory (from run_pso.sh) for plot PNGs.
+        watch_dir = self._sw_output_dir()
+        self._start_plot_watch(watch_dir)
+        rc = await self._run_cmd(["bash", _SW_RUN_SCRIPT], cwd=self._sw_dir)
         # Final sweep to catch plots written just before exit, then stop.
-        self._scan_plots(self._sw_dir)
+        self._scan_plots(watch_dir)
         self._stop_plot_watch()
 
         if rc != 0:
@@ -1600,7 +1626,18 @@ class WizardController:
 
     # ── live PSO plot gallery ────────────────────────────────────────────────
 
-    _PSO_PLOT_CAP = 40  # max plots shown in the gallery
+    _PSO_PLOT_CAP = 60  # max plots shown in the gallery
+    # Subdirectories that hold bundled observational data / VCS junk, never the
+    # PSO's own diagnostic plots — skipped so we don't surface stale PNGs.
+    _PLOT_SKIP_DIRS = {
+        ".git",
+        "__pycache__",
+        ".ipynb_checkpoints",
+        "data",
+        "obs",
+        "observations",
+        "node_modules",
+    }
 
     def _start_plot_watch(self, main_dir: Path | None) -> None:
         self._stop_plot_watch()
@@ -1610,6 +1647,7 @@ class WizardController:
         self._st.flush()
         if main_dir is None:
             return
+        self._emit(f"  [gallery] watching {Path(main_dir)} for *.png", "out")
         self._plot_watch_stop = False
         self._plot_task = asyncio.ensure_future(
             self._watch_pso_plots(Path(main_dir))
@@ -1629,37 +1667,52 @@ class WizardController:
                 await asyncio.sleep(2.0)
         except asyncio.CancelledError:
             pass
+        except Exception as exc:  # keep the run alive; just report
+            self._emit(f"  [gallery] watcher error: {exc}", "err")
 
     def _scan_plots(self, main_dir: Path | None) -> None:
-        """Scan the PSO main folder for PNGs; re-encode only changed ones."""
+        """Scan the PSO main folder (recursively) for PNGs; re-encode changed
+        ones. Recursive so plots land wherever SAGEswarm writes them under the
+        run cwd; skip dirs that only hold bundled obs data."""
         if main_dir is None:
             return
+        root = Path(main_dir)
+        pngs: list[Path] = []
         try:
-            pngs = sorted(Path(main_dir).glob("*.png"))
+            for p in root.rglob("*.png"):
+                parts = p.relative_to(root).parts[:-1]
+                if any(seg in self._PLOT_SKIP_DIRS for seg in parts):
+                    continue
+                pngs.append(p)
         except OSError:
             return
+        pngs = sorted(pngs)[: self._PSO_PLOT_CAP]
         current = list(self._st.pso_plots or [])
         by_name = {it["name"]: it for it in current}
         changed = False
-        for p in pngs[: self._PSO_PLOT_CAP]:
+        for p in pngs:
+            rel = str(p.relative_to(root))
             try:
                 mtime = int(p.stat().st_mtime)
             except OSError:
                 continue
-            if self._plot_seen.get(p.name) == mtime and p.name in by_name:
+            if self._plot_seen.get(rel) == mtime and rel in by_name:
                 continue
             try:
                 raw = p.read_bytes()
             except OSError:
                 continue
-            self._plot_seen[p.name] = mtime
-            by_name[p.name] = {
-                "name": p.name,
+            fresh = rel not in by_name
+            self._plot_seen[rel] = mtime
+            by_name[rel] = {
+                "name": rel,
                 "data_url": "data:image/png;base64,"
                 + _b64.b64encode(raw).decode(),
                 "mtime": mtime,
             }
             changed = True
+            if fresh:
+                self._emit(f"  [gallery] + {rel}", "ok")
         if changed:
             self._st.pso_plots = [by_name[k] for k in sorted(by_name)]
             self._st.flush()
