@@ -12,6 +12,9 @@ permissions:
 
 jobs:
   build:
+    # Only the canonical repo publishes docs; the sage-home mirror has no
+    # GitHub Pages configured, so skip it there.
+    if: github.repository == 'MBradley1985/ViSAGE'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +31,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.repository == 'MBradley1985/ViSAGE'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
