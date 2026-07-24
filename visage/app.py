@@ -668,7 +668,7 @@ def create_app(
                 ctx = ssl.create_default_context()
             try:
                 with urllib.request.urlopen(
-                    "https://pypi.org/pypi/vi-sage/json",
+                    "https://pypi.org/pypi/sage-viewer/json",
                     timeout=8,
                     context=ctx,
                 ) as r:
@@ -677,7 +677,7 @@ def create_app(
                 # macOS Python may lack system CA certs; retry unverified
                 ctx = ssl._create_unverified_context()
                 with urllib.request.urlopen(
-                    "https://pypi.org/pypi/vi-sage/json",
+                    "https://pypi.org/pypi/sage-viewer/json",
                     timeout=8,
                     context=ctx,
                 ) as r:
@@ -716,7 +716,7 @@ def create_app(
                 "pip",
                 "install",
                 "--upgrade",
-                "vi-sage",
+                "sage-viewer",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )

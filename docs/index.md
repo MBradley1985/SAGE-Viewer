@@ -32,7 +32,7 @@ ViSAGE renders dark matter haloes and SAGE galaxies together in a browser-based 
 ## Quick example
 
 ```bash
-pip install vi-sage
+pip install sage-viewer
 visage --par input/millennium.par
 # → Open http://localhost:8080
 ```
